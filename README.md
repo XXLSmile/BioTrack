@@ -6,7 +6,7 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
-| _Nothing to show_ |
+| 2025.09.18 | List of Features | Initial feature specification for BioTrack wildlife tracking application |
 
 ---
 
@@ -19,6 +19,16 @@
 ## 3. Requirements Specification
 
 ### **3.1. List of Features**
+
+**High-level features:**
+
+1. **Login & Authentication** - User account management and secure access
+2. **Scan and Recognize Wildlife** - Camera-based wildlife identification using external API
+3. **Maintain Personal Collection/Catalog** - Database-connected storage of animals encountered
+4. **Manage Friends** - Add friends, create groups, and friend recommendations
+5. **Friend Recommendation** - Computations implemented by your group based on catalog similarity
+6. **Sharing Finds with Friends** - View recent findings of rare species and share discoveries
+7. **Real-time Updates** - Changes happening in the app's content or state as a response to external events
 
 
 ### **3.2. Use Case Diagram**
