@@ -1,5 +1,3 @@
-# BioTrack
-
 # Requirements and Design
 
 ## 1. Change History
@@ -12,7 +10,11 @@
 
 ## 2. Project Description
 
-[WRITE_PROJECT_DESCRIPTION_HERE]
+BioTrack – Wildlife Scanner & Collection App
+
+BioTrack is designed for hikers, tourists, birdwatchers, animal lovers, and scientists such as botanists, entomologists, and zoologists. These users often encounter plants, animals, or insects in the wild but struggle to identify and document them in a structured, accessible way. Existing solutions are either fragmented (separate apps for plants, birds, or insects) or too technical for casual users.
+
+The project aims to bridge this gap by providing a simple yet powerful mobile app that allows users to scan and identify wildlife instantly, store observations in personal or shared catalogs, and view them on a map. This helps both casual explorers and professional researchers keep track of biodiversity, share findings with friends or collaborators, and learn more about the natural world around them.
 
 ---
 
@@ -25,8 +27,10 @@
 
 
 ### **3.3. Actors Description**
-1. **[WRITE_NAME_HERE]**: ...
-2. **[WRITE_NAME_HERE]**: ...
+1. **User**: The primary actor who interacts with the BioTrack app. Users can scan wildlife, view identifications, save observations to catalogs, manage their collections, and optionally share findings with friends or collaborators.
+2. **External Authentication Service**: A third-party provider that verifies a user’s identity and manages secure login and account syncing across devices.
+3. **External Image Recognition Service**: An API that processes photos uploaded by the user and returns likely species identifications along with confidence scores.
+4. **Push Notification Service**: A cloud-based service that delivers real-time alerts to users such as friend activity updates.
 
 ### **3.4. Use Case Description**
 - Use cases for feature 1: [WRITE_FEATURE_1_NAME_HERE]
