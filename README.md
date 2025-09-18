@@ -6,7 +6,7 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
-| 2025.09.18 | List of Features | Initial feature specification for BioTrack wildlife tracking application |
+| | ||
 
 ---
 
@@ -20,15 +20,15 @@
 
 ### **3.1. List of Features**
 
-**High-level features:**
+1. **Authentication**: To access app features, a user must Sign In using their using Google Authentication Service first. New users should Sign Up before Signing In. An authenticated user can Sign Out. Users can also remove their account and manage their profile information.
 
-1. **Login & Authentication** - User account management and secure access
-2. **Scan and Recognize Wildlife** - Camera-based wildlife identification using external API
-3. **Maintain Personal Collection/Catalog** - Database-connected storage of animals encountered
-4. **Manage Friends** - Add friends, create groups, and friend recommendations
-5. **Friend Recommendation** - Computations implemented by your group based on catalog similarity
-6. **Sharing Finds with Friends** - View recent findings of rare species and share discoveries
-7. **Real-time Updates** - Changes happening in the app's content or state as a response to external events
+2. **Scan and Image recognition**: A user can use their device camera to capture photos of living creatures. The app processes these images using an external living creatures identification API to recognize and identify the species. The app displays the identification results including species name, scientific name, and relevant information about the animal. Users can save these identifications to their personal collection.
+
+3. **Manage Friends**: A user can add friends by searching for other users or u. Users can create friend groups to organize their connections. A user can view their list of friends and groups. Users can also remove friends or leave groups they no longer wish to be part of.
+
+4. **Friend Recommendation**: The app analyzes user living creatures catalogs and preferences to suggest potential friends with similar interests. Recommendations are based on catalog similarity, shared species encounters, and geographic proximity. Users can view recommended friends and choose to send friend requests or ignore recommendations.
+
+5. **Sharing with Friends**: Users get instant notifications when friends discover rare creatures. They can search through their friends' community to see who found what and where it happened. The app shows a complete map of friends' creature encounters with locations, dates, and photos. Users can explore their friends' discovery history and stay updated on exciting rare finds in their network.
 
 
 ### **3.2. Use Case Diagram**
