@@ -89,36 +89,65 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 ## 4. Designs Specification
 ### **4.1. Main Components**
-1. **[WRITE_NAME_HERE]**
-    - **Purpose**: ...
+1. **Species Identification**
+    - **Purpose**: Receives an uploaded photo and returns the most likely species with confidence scores and metadata. It abstracts over multiple image recognition APIs and caches frequent results to reduce latency and cost.
     - **Interfaces**: 
-        1. ...
-            - **Purpose**: ...
-        2. ...
-2. ...
+        1. `POST /identify`
+            - **Purpose**: Run identification, normalize API responses, persist a summarized species candidate set, and return top results along with relavant info.
+2. **Catalog**
+    - **Purpose**: Creates and manages a user’s catalog of sightings, and maintains a list of unique species seen. Keeps domain logic server-side for consistency and offline-friendly syncing; cleaner than pushing all logic to the client.
+    - **Interfaces**: 
+        1. `POST /sightings`
+            - **Purpose**: Create a sighting from an identification result, stores data like image, location, time, etc.
+        2. `GET /sightings?user_id=…`
+            - **Purpose**: List/filter a user’s sightings with pagination and bounding-box map filters.
+        3. `GET /collection/summary`
+            - **Purpose**: Return aggregates (unique species count, streaks, badges progress).
+3. **User**
+    - **Purpose**: Handles user profiles, OAuth login, friends.
+    - **Interfaces**:
+        1. `GET /me`
+            - **Purpose**: Return the authenticated user profile and settings.
+        2. `POST /friends/{add|accept|remove}`
+            - **Purpose**: Manage friend relationships.
+
 
 
 ### **4.2. Databases**
-1. **[WRITE_NAME_HERE]**
-    - **Purpose**: ...
-2. ...
+**MySQL (self-hosted on cloud VM)**
+    - **Purpose**: Primary relational store: `users`, `sessions`, `friends`, `species`, `sightings`, `photos`. Chosen over MongoDB to benefit from strong relational integrity for joins (e.g., user<-->sightings, species<-->sightings).
 
 
 ### **4.3. External Modules**
-1. **[WRITE_NAME_HERE]** 
-    - **Purpose**: ...
-2. ...
+1. **iNaturalist / Pl@ntNet / Kindwise (image Recognition APIs)**
+    - **Purpose**: Perform image-based species identification and return candidate species with scores; we normalize these to a unified schema. We believe domain-trained models outperform generic vision APIs; avoids training our own model within course scope.
+2. **Google Map**
+    - **Purpose**: Display and record locations. Mature SDKs, reliable tiles, and strong mobile support.
+3. **Firebase Cloud Messaging**
+    - **Purpose**: Push notifications for friend requests and catalog sharing.
+4. **Google Authentication**
+    - **Purpose**: Create accounts and manage login.
+
 
 
 ### **4.4. Frameworks**
-1. **[WRITE_NAME_HERE]**
-    - **Purpose**: ...
-    - **Reason**: ...
-2. ...
+1. **Android (Kotlin) + Jetpack Compose + CameraX**
+    - **Purpose**: Native UI and camera capture that meet course constraints; Compose for UI, CameraX for image acquisition.
+    - **Reason**: Compliant to syllabus.
+2. **Node.js (TypeScript) + Express**
+    - **Purpose**: Implement the RESTful APIs with typing and middleware ecosystem.
+    - **Reason**: Compliant to syllabus, easy to test and deploy.
+3. **Azure Virtual Machine (Ubuntu) + Docker**
+    - **Purpose**: Cloud deployment of the Node/TS services and MySQL database on a self-managed VM; Nginx for TLS termination and static photo serving.
+    - **Reason**: Cloud is required and free Azure service can be requested from course staff. Docker simplifies reproducible grading.
+4. **GitHub Actions**
+    - **Purpose**: Build/test pipelines for Android app and Node back end; push Docker images and perform zero-downtime deploys.
+    - **Reason**: Streamlines delivery without relying on disallowed managed back-ends; improves reliability for grading.
 
 
 ### **4.5. Dependencies Diagram**
 
+![dependicies_diagram](documentation/images/CPEN321M2-DependencyDiagram.drawio.pdf)
 
 ### **4.6. Use Case Sequence Diagram (5 Most Major Use Cases)**
 1. [**[WRITE_NAME_HERE]**](#uc1)\
