@@ -147,7 +147,7 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 ### **4.5. Dependencies Diagram**
 
-![dependicies_diagram](images/CPEN321M2-DependencyDiagram.drawio.pdf)
+![dependicies_diagram](images/CPEN321M2-DependencyDiagram.drawio.png)
 
 ### **4.6. Use Case Sequence Diagram (5 Most Major Use Cases)**
 1. [**[WRITE_NAME_HERE]**](#uc1)\
