@@ -28,7 +28,7 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 ### **3.2. Use Case Diagram**
 
-![use_case_diagram](images/Use%20Case%20Diagram%20(CPEN).drawio.png)
+![use_case_diagram](images/Use%20Case%20Diagram%20(CPEN)2.drawio.png)
 
 ### **3.3. Actors Description**
 1. **User**: The primary actor who interacts with the BioTrack app. Users can scan wildlife, view identifications, save observations to catalogs, manage their collections, and optionally share findings with friends or collaborators.
