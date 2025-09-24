@@ -22,8 +22,8 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 ### **3.1. List of Features**
 1. **Authentication**: To access the app, a user must sign in using the Google authentication service. New users should sign up before signing in. An authenticated user can sign out. Users can also remove their account.
-2. **Wildlife Recognition**: A user can scan and recognize wildlife using their devices camera. The app uses an external API to process the image and identify the animal species. When identified, the user can see basic information about the animal, like its name, habitat, rarity etc. The user can then catalog the species, or share the species directly with a friend(s).
-3. **Catalog**: A user can create a catalog and save scanned animals to the catalog. Each entry contains information about the species and when and where the species was scanned. Users can make multiple catalogs as well as share catalogs with friends, where they can catalog entries in real time.
+2. **Wildlife Recognition**: A user can scan and recognize wildlife using their devices camera. The app uses an external API to process the image and identify the wildlife species. When identified, the user can see basic information about the wildlife, like its name, habitat, rarity etc. The user can then catalog the species, or share the species directly with a friend(s).
+3. **Catalog**: A user can create a catalog and save scanned wildlife to the catalog. Each entry contains information about the species and when and where the species was scanned. Users can make multiple catalogs as well as share catalogs with friends, where they can catalog entries in real time.
 4. **Manage Friends**: A user can add friends by searching for their username. A user can view their friends list, accept friend requests and remove friends. Based on species catalogged by a user, friend reccommendations will be suggested to the user based on catalog similarity to other users.
 
 ### **3.2. Use Case Diagram**
@@ -43,34 +43,34 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 3. **Sign-Out**: The user logs out of the app by logging out of their google account
 4. **Remove Account**: the user deletes their google account from the app.
 - Use cases for feature 2: Wildlife Recognition
-5. **Take Picture**: The user takes a photo of an animal using thr apps camera function.
-6. **Scan Picture**: The app scans the picture and identifies the species using an external recognition API.
+5. **Get Picture**: The user takes a photo of wildlife using the apps camera feature or uploads a photo already in device storage.
+6. **Scan Picture**: The app scans the picture and identifies the wildlife and description of the wildlife (eg. species type, mammel, rarity, endarngered) using an external recognition API.
 - Use cases for feature 3: Catalog
-7. **Create Catalog**: The user creates a personal collection to store and organize encountered wildlife.
-8. **Delete Catalog**: The user deletes their catalog, permanently removing all stored encounters.
-9. **Catalog Scanned Image**: After scanning, the user saves the identified species to their catalog.
+7. **Create Catalog**: The user creates a personal collection to store the picture taken of the wildlife as well as the time and location of the sighting and the description of the wildlife and organize by species encountered wildlife. The user can title catalogs and make mulitple catalogs
+8. **Delete Catalog**: The user deletes their catalog, permanently removing all stored encounters in said catalog.
+9. **Catalog Scanned Picture**: After scanning, the user saves the identified species along with the time and location of the sighting as well as a description of the species to their catalog.
 - Use cases for feature 4: Manage Friends
-10. **Share Catalog**: The user shares their entire catalog with friends for viewing/collaboration.
-11. **Share Scanned Picture**: The user shares a single scanned wildlife image and its details with friends.
-12. **Add Friends**: The user sends or accepts friend requests to connect with other app users.
+10. **Share Catalog**: The user can share one or multiple of their catalogs with friends. Friends can view the catalog or, if the catalog owner gives permission for collaboration, friends can contribute their own pictures to the catalog. The owner of the catalog can revoke collaboration permissions and remove friends from a catalog at any time.
+11. **Share Scanned Picture**: The user can share a single scanned wildlife picture as well a brief description of the scanned wildlife directly with friends. The users friends will get a push notification when a scanned picture is shared with them.
+12. **Add Friends**: The user can send or accept friend requests to connect with other app users. Users can search for usernames to add friends as well as remove friends from their friendslist. When users search for friends, there will be a reccommended list of friends the user can add based on catalog similarity.
 
 ### **3.5. Formal Use Case Specifications (5 Most Major Use Cases)**
 <a name="uc1"></a>
 
-#### Use Case 1: Take Picture
+#### Use Case 1: Get Picture
 
-**Description**: The user captures a photo of an animal using the app’s built-in camera function.
+**Description**: The user takes a photo of wildlife using the apps camera feature or uploads a photo already in device storage.
 
 **Primary actor(s)**: User 
 
 **Preconditions**: The user is logged into the app and camera permissions are granted.
 
-**Postconditions**: A photo is successfully stored in temporary memory, ready for scanning.
+**Postconditions**: A photo is successfully taken and stored in device storage, ready for scanning.
     
 **Main success scenario**:
-1. The user selects the “Take Picture” option.
-2. The app opens the device’s camera interface.
-3. The user points the camera at an animal and captures a photo.
+1. The user selects the “Get Picture” option.
+2. The app opens the built in camera function.
+3. The user points the camera at wildlife and captures a photo.
 4. The system confirms the photo was taken and stores it for further processing.
 
 **Failure scenario(s)**:
@@ -87,26 +87,26 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 #### Use Case 2: Scan Picture
 
-**Description**: The system analyzes the captured photo and identifies the animal species using an external recognition API.
+**Description**: The system analyzes the uploaded photo and identifies the wildlife using an external recognition API.
 
 **Primary actor(s)**: User 
 
-**Preconditions**: he user has a photo stored in temporary memory.
+**Preconditions**: he user has a photo stored in device storage.
 
-**Postconditions**: The identified species and metadata are displayed to the user.
+**Postconditions**: The identified wildlife and metadata are displayed to the user.
     
 **Main success scenario**:
 1. The user selects “Scan Picture.”
-2. The system sends the image to the external recognition API.
-3. The API processes the image and returns the species identification with metadata.
-4. The system displays the species name, picture, and details (e.g., habitat, rarity).
+2. The system sends the picture to the external recognition API.
+3. The API processes the picture and returns the wildlife identification with metadata.
+4. The system displays the species name, picture, and description (eg. species type, mammel, rarity, endarngered).
 
 **Failure scenario(s)**:
 - 1a. No internet connection.
     - 1a1. The system displays an error and asks the user to reconnect.
 
-- 2a. The API cannot recognize the species.
-    - 2a1. The system displays a message: “Species not found,” with an option to retry or save as “Unknown.”
+- 2a. The API cannot recognize the wildlife.
+    - 2a1. The system displays a message: “Species not found,” with an option to retry.
                 
 - 2b. API request times out.
     - 2b1. The system prompts the user to retry scanning later.
@@ -115,19 +115,17 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 #### Use Case 3: Catalog Scanned Image
 
-**Description**: The user saves the scanned wildlife entry into their personal catalog.
+**Description**: After scanning, the user saves the identified species along with the time and location of the sighting as well as a description of the species to their catalog.
 
-**Primary actor(s)**: User 
+**Primary actor(s)**: User
 
 **Preconditions**: The user has successfully scanned a picture and received identification results.
 
-**Postconditions**: The species and encounter details are stored in the catalog.
+**Postconditions**: The wildlife and encounter details are stored in the catalog.
     
 **Main success scenario**:
 1. The user chooses “Save to Catalog.”
-2. The system prompts for optional encounter details (e.g., location, notes).
-3. The user confirms the save.
-4. The system adds the entry (species + metadata) to the user’s catalog.
+2. The system adds the entry (species + description) to the user’s catalog.
 
 **Failure scenario(s)**:
 - 1a. User does not have a catalog.
@@ -143,13 +141,13 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 #### Use Case 4: Add Friends
 
-**Description**: The user connects with another app user by sending or accepting a friend request.
+**Description**: The user can send or accept friend requests to connect with other app users. Users can search for usernames to add friends as well as remove friends from their friendslist. When users search for friends, there will be a reccommended list of friends the user can add based on catalog similarity.
 
 **Primary actor(s)**: User 
 
 **Preconditions**: The user is logged into the app.
 
-**Postconditions**: The friend request is sent or accepted, and the new friend is added to the user’s list.
+**Postconditions**: The friend request is sent or accepted, and the new friend is added to the user’s friend list.
     
 **Main success scenario**:
 1. The user selects “Add Friend.”
@@ -173,21 +171,21 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 #### Use Case 5: Share Scanned Picture
 
-**Description**: The user shares a scanned wildlife image with friends or groups.
+**Description**: The user can share a single scanned wildlife picture as well a brief description of the scanned wildlife directly with friends. The users friends will get a push notification when a scanned picture is shared with them.
 
 **Primary actor(s)**: User 
 
-**Preconditions**: The user has at least one scanned image in their collection.
+**Preconditions**: The user has at least one scanned picture in their collection.
 
-**Postconditions**: The shared image is sent, and friends can view it in their feed.
+**Postconditions**: The shared picture is sent, and friends can view it from a push notification.
     
 **Main success scenario**:
 1. The user selects a scanned picture from their catalog.
 2. The user chooses the option “Share with Friends”
-3. The system displays a list of friends.
-4. The user selects recipients and confirms sharing.
-5. The system sends notifications to the selected friends.
-6. Recipients view the shared picture and its details in their feed.
+3. The system displays the users list of friends.
+4. The user selects recipient(s) and confirms sharing.
+5. The system sends notifications to the selected friend(s).
+6. Recipients view the shared picture and its details.
 
 **Failure scenario(s)**:
 - 1a. User cancels before confirming share.
@@ -213,7 +211,7 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
     - **Justification**: Wildlife encounters often happen in remote areas with limited connectivity. Ensuring offline support prevents missed captures and maintains trust in the app’s reliability.
 3. **Privacy & Data Protection**
     - **Description**: All personal data (friend lists, catalog entries, location metadata) must be stored securely in the cloud database with encryption. Users must be able to delete all their data upon account removal.
-    - **Justification**: Users are sharing sensitive data such as GPS-tagged animal encounters. Protecting this data ensures compliance with privacy standards (e.g., GDPR) and builds user trust.
+    - **Justification**: Users are sharing sensitive data such as GPS-tagged wildlife encounters. Protecting this data ensures compliance with privacy standards (e.g., GDPR) and builds user trust.
 
 ---
 
