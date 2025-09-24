@@ -171,7 +171,7 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 <a name="uc5"></a>
 
-#### Use Case 4: Share Scanned Picture
+#### Use Case 5: Share Scanned Picture
 
 **Description**: The user shares a scanned wildlife image with friends or groups.
 
