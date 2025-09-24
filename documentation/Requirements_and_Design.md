@@ -23,7 +23,7 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 ### **3.1. List of Features**
 1. **Authentication**: To access the app, a user must sign in using the Google authentication service. New users should sign up before signing in. An authenticated user can sign out. Users can also remove their account.
 2. **Wildlife Recognition**: A user can scan and recognize wildlife using their devices camera. The app uses an external API to process the image and identify the animal species. When identified, the user can see basic information about the animal, like its name, habitat, rarity etc. The user can then catalog the species, or share the species directly with a friend(s).
-3. **Catalog**: A user can create a catalog and save scanned animals to the catalog. Each entry contains information about the species and when and where the species was scanned. Users can make multiple catalogs as well as share catalogs with friends, where they can catalog entries in real time.
+3. **Catalog**: A user can create a catalog and save scanned animals to the catalog. Each entry contains information(pictures, description, location and time found) about the species. Users can make multiple catalogs as well as share catalogs with friends, where they can catalog entries in real time.
 4. **Manage Friends**: A user can add friends by searching for their username. A user can view their friends list, accept friend requests and remove friends. Based on species catalogged by a user, friend reccommendations will be suggested to the user based on catalog similarity to other users.
 
 ### **3.2. Use Case Diagram**
@@ -224,7 +224,7 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
     - **Interfaces**: 
         1. `POST /identify`
             - **Purpose**: Run identification, normalize API responses, persist a summarized species candidate set, and return top results along with relavant info.
-2. **Catalog**
+2. **Catalog Management**
     - **Purpose**: Creates and manages a user’s catalog of sightings, and maintains a list of unique species seen. Keeps domain logic server-side for consistency and offline-friendly syncing; cleaner than pushing all logic to the client.
     - **Interfaces**: 
         1. `POST /sightings`
@@ -233,14 +233,22 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
             - **Purpose**: List/filter a user’s sightings with pagination and bounding-box map filters.
         3. `GET /collection/summary`
             - **Purpose**: Return aggregates (e.g. unique species count).
-3. **User**
+        4. `POST /catalogs/share`
+            - **Purpose**: Share catalog with friends.
+3. **User Management**
     - **Purpose**: Handles user profiles, OAuth login, friends.
     - **Interfaces**:
         1. `GET /me`
             - **Purpose**: Return the authenticated user profile and settings.
-        2. `POST /friends/{add|accept|remove}`
+        2. `GET /users/search`
+            - **Purpose**: Search for users.
+        3. `POST /friends/{add|accept|remove}`
             - **Purpose**: Manage friend relationships.
-
+4. **Notifications Management**
+    - **Purpose**: manages push notifications, in-app messaging, and real-time updates for friend activities, shared catalogs, and system announcements to keep users engaged.
+     - **Interfaces**:
+        1. `GET /notifications`
+            - **Purpose**: Get user's notifications.
 
 
 ### **4.2. Databases**
