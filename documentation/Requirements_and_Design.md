@@ -28,7 +28,7 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 ### **3.2. Use Case Diagram**
 
-![use_case_diagram](images\Use Case Diagram (CPEN).drawio.png)
+![use_case_diagram](images/Use%20Case%20Diagram%20(CPEN).drawio.png)
 
 ### **3.3. Actors Description**
 1. **User**: The primary actor who interacts with the BioTrack app. Users can scan wildlife, view identifications, save observations to catalogs, manage their collections, and optionally share findings with friends or collaborators.
@@ -37,33 +37,34 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 4. **Push Notification Service**: A cloud-based service that delivers real-time alerts to users such as friend activity updates.
 
 ### **3.4. Use Case Description**
-- Use cases for feature 1: [Authentication]
-1. **[Sign-Up]**: Create an account by registering with google authentication before accessing the app.
-2. **[Sign-In]**: An existing user logs into the app using their google account to access features
-3. **[Sign-Out]**: The user logs out of the app by logging out of their google account
-4. **[Remove Account]**: the user deletes their google account from the app.
-- Use cases for feature 2: [Wildlife Recognition]
-5. **[Take Picture]**: The user takes a photo of an animal using thr apps camera function.
-6. **[Scan Picture]**: The app scans the picture and identifies the species using an external recognition API.
-- Use cases for feature 3: [Catalog]
-7. **[Create Catalog]**: The user creates a personal collection to store and organize encountered wildlife.
-8. **[Delete Catalog]**: The user deletes their catalog, permanently removing all stored encounters.
-9. **[Catalog Scanned Image]**: After scanning, the user saves the identified species to their catalog.
-- Use cases for feature 4: [Manage Friends]
-10. **[Share Catalog]**: The user shares their entire catalog with friends for viewing/collaboration.
-11. **[Share Scanned Picture]**: The user shares a single scanned wildlife image and its details with friends.
-12. **[Add Friends]**: The user sends or accepts friend requests to connect with other app users.
+- Use cases for feature 1: Authentication
+1. **Sign-Up**: Create an account by registering with google authentication before accessing the app.
+2. **Sign-In**: An existing user logs into the app using their google account to access features
+3. **Sign-Out**: The user logs out of the app by logging out of their google account
+4. **Remove Account**: the user deletes their google account from the app.
+- Use cases for feature 2: Wildlife Recognition
+5. **Take Picture**: The user takes a photo of an animal using thr apps camera function.
+6. **Scan Picture**: The app scans the picture and identifies the species using an external recognition API.
+- Use cases for feature 3: Catalog
+7. **Create Catalog**: The user creates a personal collection to store and organize encountered wildlife.
+8. **Delete Catalog**: The user deletes their catalog, permanently removing all stored encounters.
+9. **Catalog Scanned Image**: After scanning, the user saves the identified species to their catalog.
+- Use cases for feature 4: Manage Friends
+10. **Share Catalog**: The user shares their entire catalog with friends for viewing/collaboration.
+11. **Share Scanned Picture**: The user shares a single scanned wildlife image and its details with friends.
+12. **Add Friends**: The user sends or accepts friend requests to connect with other app users.
 
 ### **3.5. Formal Use Case Specifications (5 Most Major Use Cases)**
 <a name="uc1"></a>
 
-#### Use Case 1: [Take Picture]
+#### Use Case 1: Take Picture
 
 **Description**: The user captures a photo of an animal using the app’s built-in camera function.
 
 **Primary actor(s)**: User 
 
 **Preconditions**: The user is logged into the app and camera permissions are granted.
+
 **Postconditions**: A photo is successfully stored in temporary memory, ready for scanning.
     
 **Main success scenario**:
@@ -84,13 +85,14 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 <a name="uc2"></a>
 
-#### Use Case 2: [Scan Picture]
+#### Use Case 2: Scan Picture
 
 **Description**: The system analyzes the captured photo and identifies the animal species using an external recognition API.
 
 **Primary actor(s)**: User 
 
 **Preconditions**: he user has a photo stored in temporary memory.
+
 **Postconditions**: The identified species and metadata are displayed to the user.
     
 **Main success scenario**:
@@ -111,13 +113,14 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 <a name="uc3"></a>
 
-#### Use Case 3: [Catalog Scanned Image]
+#### Use Case 3: Catalog Scanned Image
 
 **Description**: The user saves the scanned wildlife entry into their personal catalog.
 
 **Primary actor(s)**: User 
 
 **Preconditions**: The user has successfully scanned a picture and received identification results.
+
 **Postconditions**: The species and encounter details are stored in the catalog.
     
 **Main success scenario**:
@@ -138,13 +141,14 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 <a name="uc4"></a>
 
-#### Use Case 4: [Add Friends]
+#### Use Case 4: Add Friends
 
 **Description**: The user connects with another app user by sending or accepting a friend request.
 
 **Primary actor(s)**: User 
 
 **Preconditions**: The user is logged into the app.
+
 **Postconditions**: The friend request is sent or accepted, and the new friend is added to the user’s list.
     
 **Main success scenario**:
@@ -167,13 +171,14 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 <a name="uc5"></a>
 
-#### Use Case 4: [Share Scanned Picture]
+#### Use Case 4: Share Scanned Picture
 
 **Description**: The user shares a scanned wildlife image with friends or groups.
 
 **Primary actor(s)**: User 
 
 **Preconditions**: The user has at least one scanned image in their collection.
+
 **Postconditions**: The shared image is sent, and friends can view it in their feed.
     
 **Main success scenario**:
@@ -200,13 +205,13 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 ### **3.7. Non-Functional Requirements**
 <a name="nfr1"></a>
 
-1. **[Recognition Latency]**
+1. **Recognition Latency**
     - **Description**: The system must return wildlife recognition results within ≤ 5 seconds for 95% of scans.
     - **Justification**: Real-time wildlife identification is a core value proposition; if results take too long, the app feels unusable in outdoor/field settings. The 5-second threshold balances API response times, network variability, and user patience.
-2. **[Offline Functionality]**
+2. **Offline Functionality**
     - **Description**: The app must allow users to capture photos and store them locally offline, then automatically queue recognition requests once an internet connection is restored.
     - **Justification**: Wildlife encounters often happen in remote areas with limited connectivity. Ensuring offline support prevents missed captures and maintains trust in the app’s reliability.
-3. **[Privacy & Data Protection]**
+3. **Privacy & Data Protection**
     - **Description**: All personal data (friend lists, catalog entries, location metadata) must be stored securely in the cloud database with encryption. Users must be able to delete all their data upon account removal.
     - **Justification**: Users are sharing sensitive data such as GPS-tagged animal encounters. Protecting this data ensures compliance with privacy standards (e.g., GDPR) and builds user trust.
 
