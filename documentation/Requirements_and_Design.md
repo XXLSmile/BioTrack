@@ -47,8 +47,9 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 6. **Scan Picture**: The app scans the picture and identifies the wildlife and description of the wildlife (eg. species type, mammel, rarity, endarngered) using an external recognition API.
 - Use cases for feature 3: Catalog
 7. **Create Catalog**: The user creates a personal collection to store the picture taken of the wildlife as well as the time and location of the sighting and the description of the wildlife and organize by species encountered wildlife. The user can title catalogs and make mulitple catalogs
-8. **Delete Catalog**: The user deletes their catalog, permanently removing all stored encounters in said catalog.
-9. **Catalog Scanned Picture**: After scanning, the user saves the identified species along with the time and location of the sighting as well as a description of the species to their catalog.
+8. **View Catalog**: The user can view their catalog(s) to browse through saved wildlife entries, filter by species, date, or location, and see details about each sighting including photos, descriptions, and metadata.
+9. **Delete Catalog**: The user deletes their catalog, permanently removing all stored encounters in said catalog.
+10. **Catalog Scanned Picture**: After scanning, the user saves the identified species along with the time and location of the sighting as well as a description of the species to their catalog.
 - Use cases for feature 4: Manage Friends
 10. **Share Catalog**: The user can share one or multiple of their catalogs with friends. Friends can view the catalog or, if the catalog owner gives permission for collaboration, friends can contribute their own pictures to the catalog. The owner of the catalog can revoke collaboration permissions and remove friends from a catalog at any time.
 11. **Share Scanned Picture**: The user can share a single scanned wildlife picture as well a brief description of the scanned wildlife directly with friends. The users friends will get a push notification when a scanned picture is shared with them.
