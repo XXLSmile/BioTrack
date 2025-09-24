@@ -21,10 +21,14 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 ## 3. Requirements Specification
 
 ### **3.1. List of Features**
-
+1. **Authentication**: To access the app, a user must sign in using the Google authentication service. New users should sign up before signing in. An authenticated user can sign out. Users can also remove their account.
+2. **Wildlife Recognition**: A user can scan and recognize wildlife using their devices camera. The app uses an external API to process the image and identify the animal species. When identified, the user can see basic information about the animal, like its name, habitat, rarity etc. The user can then catalog the species, or share the species directly with a friend(s).
+3. **Catalog**: A user can create a catalog and save scanned animals to the catalog. Each entry contains information about the species and when and where the species was scanned. Users can make multiple catalogs as well as share catalogs with friends, where they can catalog entries in real time.
+4. **Manage Friends**: A user can add friends by searching for their username. A user can view their friends list, accept friend requests and remove friends. Based on species catalogged by a user, friend reccommendations will be suggested to the user based on catalog similarity to other users.
 
 ### **3.2. Use Case Diagram**
 
+![use_case_diagram](images\Use Case Diagram (CPEN).drawio.png)
 
 ### **3.3. Actors Description**
 1. **User**: The primary actor who interacts with the BioTrack app. Users can scan wildlife, view identifications, save observations to catalogs, manage their collections, and optionally share findings with friends or collaborators.
@@ -33,57 +37,178 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 4. **Push Notification Service**: A cloud-based service that delivers real-time alerts to users such as friend activity updates.
 
 ### **3.4. Use Case Description**
-- Use cases for feature 1: [WRITE_FEATURE_1_NAME_HERE]
-1. **[WRITE_NAME_HERE]**: ...
-2. **[WRITE_NAME_HERE]**: ...
-- Use cases for feature 2: [WRITE_FEATURE_2_NAME_HERE]
-3. **[WRITE_NAME_HERE]**: ...
-4. **[WRITE_NAME_HERE]**: ...
-...
+- Use cases for feature 1: [Authentication]
+1. **[Sign-Up]**: Create an account by registering with google authentication before accessing the app.
+2. **[Sign-In]**: An existing user logs into the app using their google account to access features
+3. **[Sign-Out]**: The user logs out of the app by logging out of their google account
+4. **[Remove Account]**: the user deletes their google account from the app.
+- Use cases for feature 2: [Wildlife Recognition]
+5. **[Take Picture]**: The user takes a photo of an animal using thr apps camera function.
+6. **[Scan Picture]**: The app scans the picture and identifies the species using an external recognition API.
+- Use cases for feature 3: [Catalog]
+7. **[Create Catalog]**: The user creates a personal collection to store and organize encountered wildlife.
+8. **[Delete Catalog]**: The user deletes their catalog, permanently removing all stored encounters.
+9. **[Catalog Scanned Image]**: After scanning, the user saves the identified species to their catalog.
+- Use cases for feature 4: [Manage Friends]
+10. **[Share Catalog]**: The user shares their entire catalog with friends for viewing/collaboration.
+11. **[Share Scanned Picture]**: The user shares a single scanned wildlife image and its details with friends.
+12. **[Add Friends]**: The user sends or accepts friend requests to connect with other app users.
 
 ### **3.5. Formal Use Case Specifications (5 Most Major Use Cases)**
 <a name="uc1"></a>
 
-#### Use Case 1: [WRITE_USE_CASE_1_NAME_HERE]
+#### Use Case 1: [Take Picture]
 
-**Description**: ...
+**Description**: The user captures a photo of an animal using the app’s built-in camera function.
 
-**Primary actor(s)**: ... 
+**Primary actor(s)**: User 
+
+**Preconditions**: The user is logged into the app and camera permissions are granted.
+**Postconditions**: A photo is successfully stored in temporary memory, ready for scanning.
     
 **Main success scenario**:
-1. ...
-2. ...
+1. The user selects the “Take Picture” option.
+2. The app opens the device’s camera interface.
+3. The user points the camera at an animal and captures a photo.
+4. The system confirms the photo was taken and stores it for further processing.
 
 **Failure scenario(s)**:
-- 1a. ...
-    - 1a1. ...
-    - 1a2. ...
+- 1a. Camera permissions are denied.
+    - 1a1. The system prompts the user to enable permissions in settings.
 
-- 1b. ...
-    - 1b1. ...
-    - 1b2. ...
+- 2a. The user cancels without taking a photo.
+    - 2a1. The system returns to the previous screen without saving anything.
                 
-- 2a. ...
-    - 2a1. ...
-    - 2a2. ...
-
-...
+- 3a. Device storage is full.
+    - 3a1. The system displays an error message and discards the photo.
 
 <a name="uc2"></a>
 
-#### Use Case 2: [WRITE_USE_CASE_2_NAME_HERE]
-...
+#### Use Case 2: [Scan Picture]
 
+**Description**: The system analyzes the captured photo and identifies the animal species using an external recognition API.
+
+**Primary actor(s)**: User 
+
+**Preconditions**: he user has a photo stored in temporary memory.
+**Postconditions**: The identified species and metadata are displayed to the user.
+    
+**Main success scenario**:
+1. The user selects “Scan Picture.”
+2. The system sends the image to the external recognition API.
+3. The API processes the image and returns the species identification with metadata.
+4. The system displays the species name, picture, and details (e.g., habitat, rarity).
+
+**Failure scenario(s)**:
+- 1a. No internet connection.
+    - 1a1. The system displays an error and asks the user to reconnect.
+
+- 2a. The API cannot recognize the species.
+    - 2a1. The system displays a message: “Species not found,” with an option to retry or save as “Unknown.”
+                
+- 2b. API request times out.
+    - 2b1. The system prompts the user to retry scanning later.
+
+<a name="uc3"></a>
+
+#### Use Case 3: [Catalog Scanned Image]
+
+**Description**: The user saves the scanned wildlife entry into their personal catalog.
+
+**Primary actor(s)**: User 
+
+**Preconditions**: The user has successfully scanned a picture and received identification results.
+**Postconditions**: The species and encounter details are stored in the catalog.
+    
+**Main success scenario**:
+1. The user chooses “Save to Catalog.”
+2. The system prompts for optional encounter details (e.g., location, notes).
+3. The user confirms the save.
+4. The system adds the entry (species + metadata) to the user’s catalog.
+
+**Failure scenario(s)**:
+- 1a. User does not have a catalog.
+    - 1a1. The system prompts the user to create a catalog.
+
+- 2a. User cancels before saving
+    - 2a1. The system discards the scanned entry.
+                
+- 3a. Device storage or database write fails.
+    - 3a1. The system displays an error message and does not save the entry.
+
+<a name="uc4"></a>
+
+#### Use Case 4: [Add Friends]
+
+**Description**: The user connects with another app user by sending or accepting a friend request.
+
+**Primary actor(s)**: User 
+
+**Preconditions**: The user is logged into the app.
+**Postconditions**: The friend request is sent or accepted, and the new friend is added to the user’s list.
+    
+**Main success scenario**:
+1. The user selects “Add Friend.”
+2. The system prompts the user to enter a friend’s username.
+3. The system searches and locates the account.
+4. The user sends a friend request.
+5. The recipient accepts the request.
+6. Both users see each other in their friend lists.
+
+**Failure scenario(s)**:
+- 1a. No input provided.
+    - 1a1. The system displays an error: “Please enter a username.”
+
+- 2a. No account matches the input.
+    - 2a1. The system displays: “No user found.”
+                
+- 3a. Recipient rejects or ignores request.
+    - 3a1. The system informs the sender that the request was not accepted.
+
+<a name="uc5"></a>
+
+#### Use Case 4: [Share Scanned Picture]
+
+**Description**: The user shares a scanned wildlife image with friends or groups.
+
+**Primary actor(s)**: User 
+
+**Preconditions**: The user has at least one scanned image in their collection.
+**Postconditions**: The shared image is sent, and friends can view it in their feed.
+    
+**Main success scenario**:
+1. The user selects a scanned picture from their catalog.
+2. The user chooses the option “Share with Friends”
+3. The system displays a list of friends.
+4. The user selects recipients and confirms sharing.
+5. The system sends notifications to the selected friends.
+6. Recipients view the shared picture and its details in their feed.
+
+**Failure scenario(s)**:
+- 1a. User cancels before confirming share.
+    - 1a1. The system aborts the operation.
+
+- 2a. No friends or groups are selected.
+    - 2a1. The system displays an error message: “Please select at least one recipient.”
+                
+- 3a. Notification delivery fails.
+    - 3a1. The system retries sending, or displays an error if unsuccessful.
+    
 ### **3.6. Screen Mock-ups**
 
 
 ### **3.7. Non-Functional Requirements**
 <a name="nfr1"></a>
 
-1. **[WRITE_NAME_HERE]**
-    - **Description**: ...
-    - **Justification**: ...
-2. ...
+1. **[Recognition Latency]**
+    - **Description**: The system must return wildlife recognition results within ≤ 5 seconds for 95% of scans.
+    - **Justification**: Real-time wildlife identification is a core value proposition; if results take too long, the app feels unusable in outdoor/field settings. The 5-second threshold balances API response times, network variability, and user patience.
+2. **[Offline Functionality]**
+    - **Description**: The app must allow users to capture photos and store them locally offline, then automatically queue recognition requests once an internet connection is restored.
+    - **Justification**: Wildlife encounters often happen in remote areas with limited connectivity. Ensuring offline support prevents missed captures and maintains trust in the app’s reliability.
+3. **[Privacy & Data Protection]**
+    - **Description**: All personal data (friend lists, catalog entries, location metadata) must be stored securely in the cloud database with encryption. Users must be able to delete all their data upon account removal.
+    - **Justification**: Users are sharing sensitive data such as GPS-tagged animal encounters. Protecting this data ensures compliance with privacy standards (e.g., GDPR) and builds user trust.
 
 ---
 
