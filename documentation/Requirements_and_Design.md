@@ -232,7 +232,7 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
         2. `GET /sightings?user_id=…`
             - **Purpose**: List/filter a user’s sightings with pagination and bounding-box map filters.
         3. `GET /collection/summary`
-            - **Purpose**: Return aggregates (unique species count, streaks, badges progress).
+            - **Purpose**: Return aggregates (e.g. unique species count).
 3. **User**
     - **Purpose**: Handles user profiles, OAuth login, friends.
     - **Interfaces**:
@@ -272,7 +272,7 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
     - **Reason**: Cloud is required and free Azure service can be requested from course staff. Docker simplifies reproducible grading.
 4. **GitHub Actions**
     - **Purpose**: Build/test pipelines for Android app and Node back end; push Docker images and perform zero-downtime deploys.
-    - **Reason**: Streamlines delivery without relying on disallowed managed back-ends; improves reliability for grading.
+    - **Reason**: Streamlines deployment, improves efficiency.
 
 
 ### **4.5. Dependencies Diagram**
