@@ -220,24 +220,18 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 1. **Species Identification**
     - **Purpose**: Receives an uploaded photo and returns the most likely species with confidence scores and metadata. It abstracts over multiple image recognition APIs and caches frequent results to reduce latency and cost.
     - **Interfaces**: 
-        1. `POST /identify`
-            - **Purpose**: Run identification, normalize API responses, persist a summarized species candidate set, and return top results along with relavant info.
+        1. **[name]**
+            - **Purpose**:
 2. **Catalog**
     - **Purpose**: Creates and manages a user’s catalog of sightings, and maintains a list of unique species seen. Keeps domain logic server-side for consistency and offline-friendly syncing; cleaner than pushing all logic to the client.
     - **Interfaces**: 
-        1. `POST /sightings`
-            - **Purpose**: Create a sighting from an identification result, stores data like image, location, time, etc.
-        2. `GET /sightings?user_id=…`
-            - **Purpose**: List/filter a user’s sightings with pagination and bounding-box map filters.
-        3. `GET /collection/summary`
-            - **Purpose**: Return aggregates (e.g. unique species count).
+        1. **[name]**
+            - **Purpose**:
 3. **User**
     - **Purpose**: Handles user profiles, OAuth login, friends.
     - **Interfaces**:
-        1. `GET /me`
-            - **Purpose**: Return the authenticated user profile and settings.
-        2. `POST /friends/{add|accept|remove}`
-            - **Purpose**: Manage friend relationships.
+        1. **[name]**
+            - **Purpose**:
 
 
 
