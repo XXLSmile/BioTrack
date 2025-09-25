@@ -14,7 +14,7 @@ BioTrack – Wildlife Scanner & Collection App
 
 BioTrack is designed for hikers, tourists, birdwatchers, animal lovers, and scientists such as botanists, entomologists, and zoologists. These users often encounter plants, animals, or insects in the wild but struggle to identify and document them in a structured, accessible way. Existing solutions are either fragmented (separate apps for plants, birds, or insects) or too technical for casual users.
 
-The project aims to bridge this gap by providing a simple yet powerful mobile app that allows users to scan and identify wildlife instantly, store observations in personal or shared catalogs, and view them on a map. This helps both casual explorers and professional researchers keep track of biodiversity, share findings with friends or collaborators, and learn more about the natural world around them.
+The project aims to bridge this gap by providing a simple yet powerful mobile app that allows users to scan and identify wildlife instantly and store observations in personal or shared catalogs. This helps both casual explorers and professional researchers keep track of biodiversity, share findings with friends or collaborators, and learn more about the natural world around them.
 
 ---
 
@@ -23,12 +23,12 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 ### **3.1. List of Features**
 1. **Authentication**: To access the app, a user must sign in using the Google authentication service. New users should sign up before signing in. An authenticated user can sign out. Users can also remove their account.
 2. **Wildlife Recognition**: A user can scan and recognize wildlife using their devices camera. The app uses an external API to process the image and identify the wildlife species. When identified, the user can see basic information about the wildlife, like its name, habitat, rarity etc. The user can then catalog the species, or share the species directly with a friend(s).
-3. **Catalog**: A user can create a catalog and save scanned wildlife to the catalog. Each entry contains information (pictures, description, location and time found) about the species. Users can make multiple catalogs as well as share catalogs with friends, where they can catalog entries in real time.
+3. **Catalog**: A user can create a catalog and save scanned wildlife to the catalog. Each entry contains information about the species and when and where the species was scanned. Users can make multiple catalogs as well as share catalogs with friends, where they can catalog entries in real time.
 4. **Manage Friends**: A user can add friends by searching for their username. A user can view their friends list, accept friend requests and remove friends. Based on species catalogged by a user, friend reccommendations will be suggested to the user based on catalog similarity to other users.
 
 ### **3.2. Use Case Diagram**
 
-![use_case_diagram](images/Use%20Case%20Diagram%20(CPEN)2.drawio.png)
+![use_case_diagram](images/Use-Case-Diagram-(CPEN)3.drawio.png)
 
 ### **3.3. Actors Description**
 1. **User**: The primary actor who interacts with the BioTrack app. Users can scan wildlife, view identifications, save observations to catalogs, manage their collections, and optionally share findings with friends or collaborators.
@@ -38,22 +38,23 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 ### **3.4. Use Case Description**
 - Use cases for feature 1: Authentication
-1. **Sign-Up**: Create an account by registering with google authentication before accessing the app.
+1. **Sign-Up**: Create an account by registering with google authentication API before accessing the app.
 2. **Sign-In**: An existing user logs into the app using their google account to access features
-3. **Sign-Out**: The user logs out of the app by logging out of their google account
-4. **Remove Account**: the user deletes their google account from the app.
+3. **Create Profile**: an existing user can create a profile connected to their google account to store catalogs and friends.
+4. **Sign-Out**: The user logs out of the app by logging out of their google account
+5. **Remove Account**: the user deletes their google account from the app.
 - Use cases for feature 2: Wildlife Recognition
-5. **Get Picture**: The user takes a photo of wildlife using the apps camera feature or uploads a photo already in device storage.
-6. **Scan Picture**: The app scans the picture and identifies the wildlife and description of the wildlife (eg. species type, mammel, rarity, endarngered) using an external recognition API.
+6. **Get Picture**: The user takes a photo of wildlife using the apps camera feature or uploads a photo already in device storage.
+7. **Scan Picture**: The app scans the picture and identifies the wildlife and description of the wildlife (eg. species type, mammel, rarity, endarngered) using an external recognition API.
 - Use cases for feature 3: Catalog
-7. **Create Catalog**: The user creates a personal collection to store the picture taken of the wildlife as well as the time and location of the sighting and the description of the wildlife and organize by species encountered wildlife. The user can title catalogs and make mulitple catalogs
-8. **View Catalog**: The user can view their catalog(s) to browse through saved wildlife entries, filter by species, date, or location, and see details about each sighting including photos, descriptions, and metadata.
+8. **Create Catalog**: The user creates a personal collection to store the picture taken of the wildlife as well as the time and location of the sighting and the description of the wildlife and organize by species encountered wildlife. The user can title catalogs and make mulitple catalogs
 9. **Delete Catalog**: The user deletes their catalog, permanently removing all stored encounters in said catalog.
-10. **Catalog Scanned Picture**: After scanning, the user saves the identified species along with the time and location of the sighting as well as a description of the species to their catalog.
+10. **Edit Catalog**: The user can edit their catalog name, and remove entries from the catalog.
+11. **Catalog Scanned Picture**: After scanning, the user saves the identified species along with the time and location of the sighting as well as a description of the species to their catalog.
 - Use cases for feature 4: Manage Friends
-10. **Share Catalog**: The user can share one or multiple of their catalogs with friends. Friends can view the catalog or, if the catalog owner gives permission for collaboration, friends can contribute their own pictures to the catalog. The owner of the catalog can revoke collaboration permissions and remove friends from a catalog at any time.
-11. **Share Scanned Picture**: The user can share a single scanned wildlife picture as well a brief description of the scanned wildlife directly with friends. The users friends will get a push notification when a scanned picture is shared with them.
 12. **Add Friends**: The user can send or accept friend requests to connect with other app users. Users can search for usernames to add friends as well as remove friends from their friendslist. When users search for friends, there will be a reccommended list of friends the user can add based on catalog similarity.
+13. **Share Catalog**: The user can share one or multiple of their catalogs with friends. Friends can view the catalog or, if the catalog owner gives permission for collaboration, friends can contribute their own pictures to the catalog. The owner of the catalog can revoke collaboration permissions and remove friends from a catalog at any time.
+14. **Share Scanned Picture**: The user can share a single scanned wildlife picture as well a brief description of the scanned wildlife directly with friends. The users friends will get a push notification when a scanned picture is shared with them.
 
 ### **3.5. Formal Use Case Specifications (5 Most Major Use Cases)**
 <a name="uc1"></a>
@@ -114,7 +115,7 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 <a name="uc3"></a>
 
-#### Use Case 3: Catalog Scanned Image
+#### Use Case 3: Catalog Scanned Picture
 
 **Description**: After scanning, the user saves the identified species along with the time and location of the sighting as well as a description of the species to their catalog.
 
@@ -197,22 +198,19 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
                 
 - 3a. Notification delivery fails.
     - 3a1. The system retries sending, or displays an error if unsuccessful.
-    
-### **3.6. Screen Mock-ups**
-
 
 ### **3.7. Non-Functional Requirements**
 <a name="nfr1"></a>
 
 1. **Recognition Latency**
-    - **Description**: The system must return wildlife recognition results within ≤ 5 seconds for 95% of scans.
-    - **Justification**: Real-time wildlife identification is a core value proposition; if results take too long, the app feels unusable in outdoor/field settings. The 5-second threshold balances API response times, network variability, and user patience.
-2. **Offline Functionality**
-    - **Description**: The app must allow users to capture photos and store them locally offline, then automatically queue recognition requests once an internet connection is restored.
-    - **Justification**: Wildlife encounters often happen in remote areas with limited connectivity. Ensuring offline support prevents missed captures and maintains trust in the app’s reliability.
+    - **Description**: The app must return wildlife recognition results within ≤ 10 seconds for [alomst] all scans.
+    - **Justification**: Real-time wildlife identification is a core value proposition; if results take too long, the app feels unusable in outdoor/field settings. The 10-second threshold balances API response times, network variability, and user patience. (https://www.nngroup.com/articles/response-times-3-important-limits/)
+2. **UI/UX Accessibility**
+    - **Description**: The apps UI/UX should be easily accessible for [almost] all our users.
+    - **Justification**: The goal of this app is to provide a simplified, easy way for users to scan, keep track of and learn about different wildlife they come across. So our UI/UX should be accessible to a wide range of users. (https://www.freecodecamp.org/news/why-accessibility-matters-in-ui-ux-design/).
 3. **Privacy & Data Protection**
     - **Description**: All personal data (friend lists, catalog entries, location metadata) must be stored securely in the cloud database with encryption. Users must be able to delete all their data upon account removal.
-    - **Justification**: Users are sharing sensitive data such as GPS-tagged wildlife encounters. Protecting this data ensures compliance with privacy standards (e.g., GDPR) and builds user trust.
+    - **Justification**: We have to made sure the application is complient with canadian data protection laws (https://www.priv.gc.ca/en/privacy-topics/privacy-laws-in-canada/the-personal-information-protection-and-electronic-documents-act-pipeda/pipeda_brief/). This means only data from a user that is absolutly neccessary is collected and a user can delete all their data from the app at any time.
 
 ---
 
