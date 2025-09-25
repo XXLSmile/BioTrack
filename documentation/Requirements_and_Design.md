@@ -23,7 +23,7 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 ### **3.1. List of Features**
 1. **Authentication**: To access the app, a user must sign in using the Google authentication service. New users should sign up before signing in. An authenticated user can sign out. Users can also remove their account.
 2. **Wildlife Recognition**: A user can scan and recognize wildlife using their devices camera. The app uses an external API to process the image and identify the wildlife species. When identified, the user can see basic information about the wildlife, like its name, habitat, rarity etc. The user can then catalog the species, or share the species directly with a friend(s).
-3. **Catalog**: A user can create a catalog and save scanned wildlife to the catalog. Each entry contains information about the species and when and where the species was scanned. Users can make multiple catalogs as well as share catalogs with friends, where they can catalog entries in real time.
+3. **Catalog**: A user can create a catalog and save scanned wildlife to the catalog. Each entry contains information (pictures, description, location and time found) about the species. Users can make multiple catalogs as well as share catalogs with friends, where they can catalog entries in real time.
 4. **Manage Friends**: A user can add friends by searching for their username. A user can view their friends list, accept friend requests and remove friends. Based on species catalogged by a user, friend reccommendations will be suggested to the user based on catalog similarity to other users.
 
 ### **3.2. Use Case Diagram**
@@ -47,8 +47,9 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 6. **Scan Picture**: The app scans the picture and identifies the wildlife and description of the wildlife (eg. species type, mammel, rarity, endarngered) using an external recognition API.
 - Use cases for feature 3: Catalog
 7. **Create Catalog**: The user creates a personal collection to store the picture taken of the wildlife as well as the time and location of the sighting and the description of the wildlife and organize by species encountered wildlife. The user can title catalogs and make mulitple catalogs
-8. **Delete Catalog**: The user deletes their catalog, permanently removing all stored encounters in said catalog.
-9. **Catalog Scanned Picture**: After scanning, the user saves the identified species along with the time and location of the sighting as well as a description of the species to their catalog.
+8. **View Catalog**: The user can view their catalog(s) to browse through saved wildlife entries, filter by species, date, or location, and see details about each sighting including photos, descriptions, and metadata.
+9. **Delete Catalog**: The user deletes their catalog, permanently removing all stored encounters in said catalog.
+10. **Catalog Scanned Picture**: After scanning, the user saves the identified species along with the time and location of the sighting as well as a description of the species to their catalog.
 - Use cases for feature 4: Manage Friends
 10. **Share Catalog**: The user can share one or multiple of their catalogs with friends. Friends can view the catalog or, if the catalog owner gives permission for collaboration, friends can contribute their own pictures to the catalog. The owner of the catalog can revoke collaboration permissions and remove friends from a catalog at any time.
 11. **Share Scanned Picture**: The user can share a single scanned wildlife picture as well a brief description of the scanned wildlife directly with friends. The users friends will get a push notification when a scanned picture is shared with them.
