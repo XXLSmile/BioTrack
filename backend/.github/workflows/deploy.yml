@@ -1,0 +1,45 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Copy files to EC2
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_KEY }}
+        source: "."
+        target: "/home/ubuntu/cpen321-m1-backend"
+
+    - name: Rebuild and Deploy
+      uses: appleboy/ssh-action@master
+      with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            cd /home/ubuntu/cpen321-m1-backend
+            
+            cat > .env <<EOF
+            PORT=${{ secrets.PROD_PORT }}
+            MONGODB_URI=${{ secrets.PROD_DB_URI }}
+            JWT_SECRET=${{ secrets.PROD_JWT_SECRET }}
+            GOOGLE_CLIENT_ID=${{ secrets.PROD_GOOGLE_CLIENT_ID }}
+            EOF
+            
+            chmod 600 .env
+            
+            sudo docker-compose down
+            sudo docker-compose --env-file .env build
+            sudo docker-compose --env-file .env up -d
