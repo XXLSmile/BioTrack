@@ -37,7 +37,7 @@ jobs:
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_KEY }}
         source: "."
-        target: "/home/ubuntu/biotrack-backend"
+        target: "/home/leo/biotrack-backend"
 
     - name: Rebuild and Deploy
       uses: appleboy/ssh-action@master
@@ -46,7 +46,7 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_KEY }}
           script: |
-            cd /home/ubuntu/biotrack-backend
+            cd /home/leo/biotrack-backend
             
             cat > .env <<EOF
             PORT=${{ secrets.PROD_PORT }}
