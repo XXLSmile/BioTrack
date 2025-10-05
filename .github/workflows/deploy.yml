@@ -21,7 +21,7 @@ jobs:
       with:
         host: ${{ secrets.VM_HOST }}
         username: ${{ secrets.VM_USER }}   # often ubuntu (Ubuntu AMI) or ec2-user (Amazon Linux)
-        key: ${{ secrets.VM_SSH_KEY }}
+        key: ${{ secrets.VM_KEY }}
         script: |
           set -euxo pipefail
           whoami
