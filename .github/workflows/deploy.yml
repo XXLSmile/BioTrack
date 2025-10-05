@@ -16,6 +16,20 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v3
 
+    - name: Sanity check SSH & perms
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USER }}   # often ubuntu (Ubuntu AMI) or ec2-user (Amazon Linux)
+        key: ${{ secrets.VM_SSH_KEY }}
+        script: |
+          set -euxo pipefail
+          whoami
+          pwd
+          mkdir -p /home/${USER}/biotrack-backend
+          touch /home/${USER}/biotrack-backend/.write_test
+          ls -la /home/${USER}/biotrack-backend
+
     - name: Copy files to VM
       uses: appleboy/scp-action@master
       with:
