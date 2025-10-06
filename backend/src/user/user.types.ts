@@ -1,6 +1,6 @@
 import mongoose, { Document } from 'mongoose';
 import z from 'zod';
-import { HOBBIES } from './hobbies/hobbies';
+import { HOBBIES } from '../hobbies/hobbies';
 
 // User model
 // ------------------------------------------------------------
