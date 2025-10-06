@@ -92,7 +92,10 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
 
     // Material Design Components
-    implementation(libs.material)
+    implementation(libs.material) {
+        exclude(group = "androidx.compose.material", module = "material")
+    }
+    //implementation(libs.material)
 
     implementation(libs.kotlinx.coroutines.play.services)
 
