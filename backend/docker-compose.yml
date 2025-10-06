@@ -18,7 +18,7 @@ services:
     restart: always
     container_name: cpen321-app
     environment:
-        - MONGODB_URI=${MONGODB_URI}
+        - MONGODB_URI=mongodb://mongo:27017/biotrack
         - PORT=${PORT}
         - JWT_SECRET=${JWT_SECRET}
         - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
