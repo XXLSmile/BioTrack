@@ -90,3 +90,5 @@ lint/tmp/
 
 # .idea folder
 .idea/
+
+.DS_Store
