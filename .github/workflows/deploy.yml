@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - "backend/**"
-      # - ".github/workflows/deploy.yml"
+      - ".github/workflows/deploy.yml"
 
 jobs:
   deploy:
@@ -26,9 +26,9 @@ jobs:
           set -euxo pipefail
           whoami
           pwd
-          mkdir -p /home/${USER}/biotrack-backend
-          touch /home/${USER}/biotrack-backend/.write_test
-          ls -la /home/${USER}/biotrack-backend
+          mkdir -p /home/${USER}/biotrack
+          touch /home/${USER}/biotrack/.write_test
+          ls -la /home/${USER}/biotrack
 
     - name: Copy files to VM
       uses: appleboy/scp-action@master
@@ -37,7 +37,7 @@ jobs:
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_KEY }}
         source: "."
-        target: "/home/leo/biotrack-backend"
+        target: "/home/leo/biotrack"
 
     - name: Rebuild and Deploy
       uses: appleboy/ssh-action@master
@@ -46,8 +46,8 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_KEY }}
           script: |
-            cd /home/leo/biotrack-backend
-            
+            cd /home/leo/biotrack/backend
+
             cat > .env <<EOF
             PORT=${{ secrets.PROD_PORT }}
             MONGODB_URI=${{ secrets.PROD_DB_URI }}
