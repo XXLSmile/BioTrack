@@ -60,6 +60,7 @@ class AuthRepositoryImpl @Inject constructor(
         result: GetCredentialResponse
     ): Result<GoogleIdTokenCredential> {
         val credential = result.credential
+
         return when (credential) {
             is CustomCredential -> {
                 if (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {

@@ -8,10 +8,10 @@ import retrofit2.http.*
 interface WildlifeApi {
 
     @Multipart
-    @POST("animal")
+    @POST("detect-label")
     suspend fun identifyAnimal(
         @Part image: MultipartBody.Part,
-        @Header("x-rapidapi-key") apiKey: String = "YOUR_RAPIDAPI_KEY",
-        @Header("x-rapidapi-host") host: String = "animal-recognition2.p.rapidapi.com"
+        @Header("x-rapidapi-key") apiKey: String = "b8b295a1e9msh04198519f49ce85p198b00jsn5742e43e1cfe",
+        @Header("x-rapidapi-host") host: String = "label-image.p.rapidapi.com"
     ): Response<WildlifeResponse>
 }

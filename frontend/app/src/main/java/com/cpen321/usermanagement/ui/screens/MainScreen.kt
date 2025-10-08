@@ -33,12 +33,20 @@ import com.cpen321.usermanagement.ui.theme.LocalSpacing
 import com.cpen321.usermanagement.ui.viewmodels.ThemeViewModel
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Button
+import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.navigation.NavHostController
+import com.cpen321.usermanagement.ui.navigation.NavRoutes
+
+
 
 @Composable
 fun MainScreen(
     mainViewModel: MainViewModel,
     themeViewModel: ThemeViewModel,
-    onProfileClick: () -> Unit
+    onProfileClick: () -> Unit,
+    navController: androidx.navigation.NavHostController
 ) {
     val uiState by mainViewModel.uiState.collectAsState()
     val snackBarHostState = remember { SnackbarHostState() }
@@ -48,7 +56,8 @@ fun MainScreen(
         snackBarHostState = snackBarHostState,
         onProfileClick = onProfileClick,
         onSuccessMessageShown = mainViewModel::clearSuccessMessage,
-        themeViewModel = themeViewModel
+        themeViewModel = themeViewModel,
+        navController = navController
     )
 }
 
@@ -59,6 +68,7 @@ private fun MainContent(
     onProfileClick: () -> Unit,
     onSuccessMessageShown: () -> Unit,
     themeViewModel: ThemeViewModel,
+    navController: androidx.navigation.NavHostController,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -76,7 +86,8 @@ private fun MainContent(
     ) { paddingValues ->
         MainBody(
             paddingValues = paddingValues,
-            themeViewModel = themeViewModel
+            themeViewModel = themeViewModel,
+            navController = navController
         )
     }
 }
@@ -155,26 +166,40 @@ private fun MainSnackbarHost(
     )
 }
 
-
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun MainBody(
     paddingValues: PaddingValues,
     themeViewModel: ThemeViewModel,
+    navController: androidx.navigation.NavHostController,
     modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(paddingValues),
-        contentAlignment = Alignment.Center
+            .padding(paddingValues)
     ) {
+        // Centered welcome message
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.align(Alignment.Center)
         ) {
             WelcomeMessage()
-            Button(onClick = { themeViewModel.getRandomThemeColors() }) {
-                Text(text = "Change Theme")
-            }
+        }
+
+        // Floating Camera Button
+        androidx.compose.material3.FloatingActionButton(
+            onClick = { navController.navigate(NavRoutes.CAMERA) },
+            containerColor = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(24.dp)
+        ) {
+            androidx.compose.material3.Icon(
+                imageVector = Icons.Outlined.CameraAlt,
+                contentDescription = "Open Camera",
+                tint = MaterialTheme.colorScheme.onPrimary
+            )
         }
     }
 }
