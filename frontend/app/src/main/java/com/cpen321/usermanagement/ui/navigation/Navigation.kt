@@ -27,6 +27,9 @@ import com.cpen321.usermanagement.ui.viewmodels.ProfileViewModel
 
 import com.cpen321.usermanagement.ui.viewmodels.ThemeViewModel
 
+import com.cpen321.usermanagement.ui.screens.CameraScreen
+
+
 object NavRoutes {
     const val LOADING = "loading"
     const val AUTH = "auth"
@@ -35,6 +38,8 @@ object NavRoutes {
     const val MANAGE_PROFILE = "manage_profile"
     const val MANAGE_HOBBIES = "manage_hobbies"
     const val PROFILE_COMPLETION = "profile_completion"
+
+    const val CAMERA = "camera"
 }
 
 @Composable
@@ -184,7 +189,8 @@ private fun AppNavHost(
             MainScreen(
                 mainViewModel = mainViewModel,
                 themeViewModel = themeViewModel,
-                onProfileClick = { navigationStateManager.navigateToProfile() }
+                onProfileClick = { navigationStateManager.navigateToProfile() },
+                navController = navController
             )
         }
 
@@ -215,5 +221,12 @@ private fun AppNavHost(
                 onBackClick = { navigationStateManager.navigateBack() }
             )
         }
+
+        composable(NavRoutes.CAMERA) {
+            CameraScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
     }
 }
