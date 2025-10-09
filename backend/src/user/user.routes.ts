@@ -17,4 +17,11 @@ router.post(
 
 router.delete('/profile', userController.deleteProfile);
 
+// BioTrack specific routes
+router.get('/stats', userController.getUserStats);
+
+router.post('/favorite-species', userController.addFavoriteSpecies);
+
+router.delete('/favorite-species', userController.removeFavoriteSpecies);
+
 export default router;
