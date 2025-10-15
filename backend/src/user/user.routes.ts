@@ -20,6 +20,18 @@ router.delete('/profile', userController.deleteProfile);
 // BioTrack specific routes
 router.get('/stats', userController.getUserStats);
 
+router.get('/check-username', userController.checkUsernameAvailability);
+
+router.get('/search', userController.searchUsers);
+
+router.get('/username/:username', userController.getUserByUsername);
+
+router.get('/profile/:username', userController.getUserByName);
+
+router.get('/name/:username', userController.getUserByName);
+
+router.get('/:userId', userController.getUserById);
+
 router.post('/favorite-species', userController.addFavoriteSpecies);
 
 router.delete('/favorite-species', userController.removeFavoriteSpecies);
