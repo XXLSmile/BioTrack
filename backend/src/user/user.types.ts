@@ -1,6 +1,5 @@
 import mongoose, { Document } from 'mongoose';
 import z from 'zod';
-import { HOBBIES } from '../hobbies/hobbies';
 
 // User model
 // ------------------------------------------------------------
@@ -9,6 +8,7 @@ export interface IUser extends Document {
   googleId: string;
   email: string;
   name: string;
+  username: string;              // Unique username (required, no spaces)
   profilePicture?: string;
   // BioTrack specific fields
   observationCount: number;
@@ -28,13 +28,21 @@ export interface IUser extends Document {
 export const createUserSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1),
+  username: z.string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(30, 'Username must be at most 30 characters')
+    .regex(/^[a-z0-9_]+$/, 'Username must be lowercase letters, numbers, and underscores only'),
   googleId: z.string().min(1),
   profilePicture: z.string().optional(),
-
 });
 
 export const updateProfileSchema = z.object({
   name: z.string().min(1).optional(),
+  username: z.string()
+    .min(3)
+    .max(30)
+    .regex(/^[a-z0-9_]+$/, 'Username must be lowercase letters, numbers, and underscores only')
+    .optional(),
   // BioTrack specific fields
   location: z.string().max(100).optional(),
   region: z.string().max(100).optional(),
