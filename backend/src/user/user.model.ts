@@ -1,7 +1,7 @@
 import mongoose, { Schema } from 'mongoose';
 import { z } from 'zod';
 
-import { HOBBIES } from '../hobbies/hobbies';
+
 import {
   createUserSchema,
   GoogleUserInfo,
@@ -29,6 +29,17 @@ const userSchema = new Schema<IUser>(
       type: String,
       required: true,
       trim: true,
+    },
+    username: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+      match: /^[a-z0-9_]+$/,
+      minlength: 3,
+      maxlength: 30,
+      index: true,
     },
     profilePicture: {
       type: String,
@@ -88,7 +99,26 @@ export class UserModel {
 
   async create(userInfo: GoogleUserInfo): Promise<IUser> {
     try {
-      const validatedData = createUserSchema.parse(userInfo);
+      // Auto-generate username from email if not provided
+      const username = userInfo.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      
+      // Ensure username is unique by adding suffix if needed
+      let finalUsername = username;
+      let isAvailable = await this.isUsernameAvailable(finalUsername);
+      let suffix = 1;
+      
+      while (!isAvailable) {
+        finalUsername = `${username}_${suffix}`;
+        isAvailable = await this.isUsernameAvailable(finalUsername);
+        suffix++;
+      }
+
+      const dataWithUsername = {
+        ...userInfo,
+        username: finalUsername,
+      };
+
+      const validatedData = createUserSchema.parse(dataWithUsername);
 
       return await this.user.create(validatedData);
     } catch (error) {
@@ -158,6 +188,64 @@ export class UserModel {
     } catch (error) {
       console.error('Error finding user by Google ID:', error);
       throw new Error('Failed to find user');
+    }
+  }
+
+  async findByUsername(username: string): Promise<IUser | null> {
+    try {
+      // Username is stored lowercase, so direct match
+      const user = await this.user.findOne({ username: username.toLowerCase() });
+
+      if (!user) {
+        return null;
+      }
+
+      return user;
+    } catch (error) {
+      logger.error('Error finding user by username:', error);
+      throw new Error('Failed to find user');
+    }
+  }
+
+  async isUsernameAvailable(username: string): Promise<boolean> {
+    try {
+      const user = await this.user.findOne({ username: username.toLowerCase() });
+      return user === null; // true if available, false if taken
+    } catch (error) {
+      logger.error('Error checking username availability:', error);
+      throw new Error('Failed to check username');
+    }
+  }
+
+  async findByName(name: string): Promise<IUser | null> {
+    try {
+      // Case-insensitive search
+      const user = await this.user.findOne({ 
+        name: new RegExp(`^${name}$`, 'i')
+      });
+
+      if (!user) {
+        return null;
+      }
+
+      return user;
+    } catch (error) {
+      logger.error('Error finding user by name:', error);
+      throw new Error('Failed to find user');
+    }
+  }
+
+  async searchByName(query: string, limit: number = 10): Promise<IUser[]> {
+    try {
+      // Case-insensitive partial match
+      const users = await this.user.find({
+        name: new RegExp(query, 'i')
+      }).limit(limit);
+
+      return users;
+    } catch (error) {
+      logger.error('Error searching users by name:', error);
+      throw new Error('Failed to search users');
     }
   }
 
