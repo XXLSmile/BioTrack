@@ -10,8 +10,15 @@ export interface IUser extends Document {
   email: string;
   name: string;
   profilePicture?: string;
-  bio?: string;
-  hobbies: string[];
+  // BioTrack specific fields
+  observationCount: number;
+  speciesDiscovered: number;
+  favoriteSpecies?: string[];
+  location?: string;
+  region?: string;
+  isPublicProfile: boolean;
+  badges: string[];
+  friendCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -23,20 +30,16 @@ export const createUserSchema = z.object({
   name: z.string().min(1),
   googleId: z.string().min(1),
   profilePicture: z.string().optional(),
-  bio: z.string().max(500).optional(),
-  hobbies: z.array(z.string()).default([]),
+
 });
 
 export const updateProfileSchema = z.object({
   name: z.string().min(1).optional(),
-  bio: z.string().max(500).optional(),
-  hobbies: z
-    .array(z.string())
-    .refine(val => val.length === 0 || val.every(v => HOBBIES.includes(v)), {
-      message: 'Hobby must be in the available hobbies list',
-    })
-    .optional(),
-  profilePicture: z.string().min(1).optional(),
+  // BioTrack specific fields
+  location: z.string().max(100).optional(),
+  region: z.string().max(100).optional(),
+  isPublicProfile: z.boolean().optional(),
+  favoriteSpecies: z.array(z.string()).optional(),
 });
 
 // Request types

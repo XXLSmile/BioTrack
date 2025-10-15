@@ -35,25 +35,43 @@ const userSchema = new Schema<IUser>(
       required: false,
       trim: true,
     },
-    bio: {
-      type: String,
-      required: false,
-      trim: true,
-      maxlength: 500,
+    // BioTrack specific fields
+    observationCount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
-    hobbies: {
+    speciesDiscovered: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    favoriteSpecies: {
       type: [String],
       default: [],
-      validate: {
-        validator: function (hobbies: string[]) {
-          return (
-            hobbies.length === 0 ||
-            hobbies.every(hobby => HOBBIES.includes(hobby))
-          );
-        },
-        message:
-          'Hobbies must be non-empty strings and must be in the available hobbies list',
-      },
+    },
+    location: {
+      type: String,
+      trim: true,
+      maxlength: 100,
+    },
+    region: {
+      type: String,
+      trim: true,
+      maxlength: 100,
+    },
+    isPublicProfile: {
+      type: Boolean,
+      default: true,
+    },
+    badges: {
+      type: [String],
+      default: [],
+    },
+    friendCount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
   },
   {
@@ -140,6 +158,107 @@ export class UserModel {
     } catch (error) {
       console.error('Error finding user by Google ID:', error);
       throw new Error('Failed to find user');
+    }
+  }
+
+  // BioTrack specific methods
+  async incrementObservationCount(userId: mongoose.Types.ObjectId): Promise<void> {
+    try {
+      await this.user.findByIdAndUpdate(userId, {
+        $inc: { observationCount: 1 },
+      });
+    } catch (error) {
+      logger.error('Error incrementing observation count:', error);
+      throw new Error('Failed to update observation count');
+    }
+  }
+
+  async incrementSpeciesDiscovered(userId: mongoose.Types.ObjectId): Promise<void> {
+    try {
+      await this.user.findByIdAndUpdate(userId, {
+        $inc: { speciesDiscovered: 1 },
+      });
+    } catch (error) {
+      logger.error('Error incrementing species discovered:', error);
+      throw new Error('Failed to update species discovered');
+    }
+  }
+
+  async addFavoriteSpecies(userId: mongoose.Types.ObjectId, speciesName: string): Promise<void> {
+    try {
+      await this.user.findByIdAndUpdate(userId, {
+        $addToSet: { favoriteSpecies: speciesName },
+      });
+    } catch (error) {
+      logger.error('Error adding favorite species:', error);
+      throw new Error('Failed to add favorite species');
+    }
+  }
+
+  async removeFavoriteSpecies(userId: mongoose.Types.ObjectId, speciesName: string): Promise<void> {
+    try {
+      await this.user.findByIdAndUpdate(userId, {
+        $pull: { favoriteSpecies: speciesName },
+      });
+    } catch (error) {
+      logger.error('Error removing favorite species:', error);
+      throw new Error('Failed to remove favorite species');
+    }
+  }
+
+  async addBadge(userId: mongoose.Types.ObjectId, badgeName: string): Promise<void> {
+    try {
+      await this.user.findByIdAndUpdate(userId, {
+        $addToSet: { badges: badgeName },
+      });
+    } catch (error) {
+      logger.error('Error adding badge:', error);
+      throw new Error('Failed to add badge');
+    }
+  }
+
+  async incrementFriendCount(userId: mongoose.Types.ObjectId): Promise<void> {
+    try {
+      await this.user.findByIdAndUpdate(userId, {
+        $inc: { friendCount: 1 },
+      });
+    } catch (error) {
+      logger.error('Error incrementing friend count:', error);
+      throw new Error('Failed to update friend count');
+    }
+  }
+
+  async decrementFriendCount(userId: mongoose.Types.ObjectId): Promise<void> {
+    try {
+      await this.user.findByIdAndUpdate(userId, {
+        $inc: { friendCount: -1 },
+      });
+    } catch (error) {
+      logger.error('Error decrementing friend count:', error);
+      throw new Error('Failed to update friend count');
+    }
+  }
+
+  async getUserStats(userId: mongoose.Types.ObjectId): Promise<{
+    observationCount: number;
+    speciesDiscovered: number;
+    friendCount: number;
+    badges: string[];
+  } | null> {
+    try {
+      const user = await this.user.findById(userId).select('observationCount speciesDiscovered friendCount badges');
+      if (!user) {
+        return null;
+      }
+      return {
+        observationCount: user.observationCount,
+        speciesDiscovered: user.speciesDiscovered,
+        friendCount: user.friendCount,
+        badges: user.badges,
+      };
+    } catch (error) {
+      logger.error('Error getting user stats:', error);
+      throw new Error('Failed to get user stats');
     }
   }
 }

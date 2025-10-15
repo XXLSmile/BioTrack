@@ -71,4 +71,78 @@ export class UserController {
       next(error);
     }
   }
+
+  // BioTrack specific endpoints
+  async getUserStats(req: Request, res: Response, next: NextFunction) {
+    try {
+      const user = req.user!;
+
+      const stats = await userModel.getUserStats(user._id);
+
+      if (!stats) {
+        return res.status(404).json({
+          message: 'User stats not found',
+        });
+      }
+
+      res.status(200).json({
+        message: 'User stats fetched successfully',
+        data: stats,
+      });
+    } catch (error) {
+      logger.error('Failed to fetch user stats:', error);
+
+      if (error instanceof Error) {
+        return res.status(500).json({
+          message: error.message || 'Failed to fetch user stats',
+        });
+      }
+
+      next(error);
+    }
+  }
+
+  async addFavoriteSpecies(req: Request, res: Response, next: NextFunction) {
+    try {
+      const user = req.user!;
+      const { speciesName } = req.body;
+
+      if (!speciesName) {
+        return res.status(400).json({
+          message: 'Species name is required',
+        });
+      }
+
+      await userModel.addFavoriteSpecies(user._id, speciesName);
+
+      res.status(200).json({
+        message: 'Favorite species added successfully',
+      });
+    } catch (error) {
+      logger.error('Failed to add favorite species:', error);
+      next(error);
+    }
+  }
+
+  async removeFavoriteSpecies(req: Request, res: Response, next: NextFunction) {
+    try {
+      const user = req.user!;
+      const { speciesName } = req.body;
+
+      if (!speciesName) {
+        return res.status(400).json({
+          message: 'Species name is required',
+        });
+      }
+
+      await userModel.removeFavoriteSpecies(user._id, speciesName);
+
+      res.status(200).json({
+        message: 'Favorite species removed successfully',
+      });
+    } catch (error) {
+      logger.error('Failed to remove favorite species:', error);
+      next(error);
+    }
+  }
 }
