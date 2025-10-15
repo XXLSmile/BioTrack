@@ -2,7 +2,6 @@ import { NextFunction, Request, Response } from 'express';
 
 import { GetProfileResponse, UpdateProfileRequest } from '../user/user.types';
 import logger from '../logger.util';
-import { MediaService } from '../media/media.service';
 import { userModel } from '../user/user.model';
 
 export class UserController {
@@ -22,6 +21,17 @@ export class UserController {
   ) {
     try {
       const user = req.user!;
+      const { username } = req.body;
+
+      // Check if username is being changed and if it's available
+      if (username && username !== user.username) {
+        const isAvailable = await userModel.isUsernameAvailable(username);
+        if (!isAvailable) {
+          return res.status(409).json({
+            message: 'Username already taken. Please choose a different username.',
+          });
+        }
+      }
 
       const updatedUser = await userModel.update(user._id, req.body);
 
@@ -39,6 +49,13 @@ export class UserController {
       logger.error('Failed to update user info:', error);
 
       if (error instanceof Error) {
+        // Handle duplicate username error from MongoDB
+        if (error.message.includes('duplicate key') || error.message.includes('E11000')) {
+          return res.status(409).json({
+            message: 'Username already taken. Please choose a different username.',
+          });
+        }
+
         return res.status(500).json({
           message: error.message || 'Failed to update user info',
         });
@@ -52,7 +69,6 @@ export class UserController {
     try {
       const user = req.user!;
 
-      await MediaService.deleteAllUserImages(user._id.toString());
 
       await userModel.delete(user._id);
 
@@ -73,6 +89,175 @@ export class UserController {
   }
 
   // BioTrack specific endpoints
+  async getUserByUsername(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { username } = req.params;
+
+      // Search by username (no spaces!)
+      const user = await userModel.findByUsername(username);
+
+      if (!user) {
+        return res.status(404).json({
+          message: 'User not found',
+        });
+      }
+
+      // Only show public profiles or own profile
+      const requestingUser = req.user;
+      if (!user.isPublicProfile && (!requestingUser || requestingUser._id.toString() !== user._id.toString())) {
+        return res.status(403).json({
+          message: 'This profile is private',
+        });
+      }
+
+      // Don't expose sensitive info for other users
+      const publicProfile = {
+        _id: user._id,
+        name: user.name,
+        username: user.username,
+        profilePicture: user.profilePicture,
+        location: user.location,
+        region: user.region,
+        observationCount: user.observationCount,
+        speciesDiscovered: user.speciesDiscovered,
+        badges: user.badges,
+        friendCount: user.friendCount,
+        createdAt: user.createdAt,
+      };
+
+      res.status(200).json({
+        message: 'User profile fetched successfully',
+        data: { user: publicProfile },
+      });
+    } catch (error) {
+      logger.error('Failed to fetch user profile by username:', error);
+      next(error);
+    }
+  }
+
+  async getUserByName(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { username } = req.params;
+
+      // Search by name (case-insensitive)
+      const user = await userModel.findByName(username);
+
+      if (!user) {
+        return res.status(404).json({
+          message: 'User not found',
+        });
+      }
+
+      // Only show public profiles or own profile
+      const requestingUser = req.user;
+      if (!user.isPublicProfile && (!requestingUser || requestingUser._id.toString() !== user._id.toString())) {
+        return res.status(403).json({
+          message: 'This profile is private',
+        });
+      }
+
+      // Don't expose sensitive info for other users
+      const publicProfile = {
+        _id: user._id,
+        name: user.name,
+        profilePicture: user.profilePicture,
+        location: user.location,
+        region: user.region,
+        observationCount: user.observationCount,
+        speciesDiscovered: user.speciesDiscovered,
+        badges: user.badges,
+        friendCount: user.friendCount,
+        createdAt: user.createdAt,
+      };
+
+      res.status(200).json({
+        message: 'User profile fetched successfully',
+        data: { user: publicProfile },
+      });
+    } catch (error) {
+      logger.error('Failed to fetch user profile by name:', error);
+      next(error);
+    }
+  }
+
+  async getUserById(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { userId } = req.params;
+
+      const user = await userModel.findById(new (require('mongoose').Types.ObjectId)(userId));
+
+      if (!user) {
+        return res.status(404).json({
+          message: 'User not found',
+        });
+      }
+
+      // Only show public profiles or own profile
+      const requestingUser = req.user;
+      if (!user.isPublicProfile && (!requestingUser || requestingUser._id.toString() !== userId)) {
+        return res.status(403).json({
+          message: 'This profile is private',
+        });
+      }
+
+      // Don't expose sensitive info for other users
+      const publicProfile = {
+        _id: user._id,
+        name: user.name,
+        profilePicture: user.profilePicture,
+        location: user.location,
+        region: user.region,
+        observationCount: user.observationCount,
+        speciesDiscovered: user.speciesDiscovered,
+        badges: user.badges,
+        friendCount: user.friendCount,
+        createdAt: user.createdAt,
+      };
+
+      res.status(200).json({
+        message: 'User profile fetched successfully',
+        data: { user: publicProfile },
+      });
+    } catch (error) {
+      logger.error('Failed to fetch user profile:', error);
+      next(error);
+    }
+  }
+
+  async searchUsers(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { query } = req.query;
+
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({
+          message: 'Search query is required',
+        });
+      }
+
+      const users = await userModel.searchByName(query);
+
+      // Filter to only show public profiles
+      const publicUsers = users
+        .filter(user => user.isPublicProfile)
+        .map(user => ({
+          _id: user._id,
+          name: user.name,
+          profilePicture: user.profilePicture,
+          location: user.location,
+          observationCount: user.observationCount,
+          speciesDiscovered: user.speciesDiscovered,
+        }));
+
+      res.status(200).json({
+        message: 'Search completed successfully',
+        data: { users: publicUsers, count: publicUsers.length },
+      });
+    } catch (error) {
+      logger.error('Failed to search users:', error);
+      next(error);
+    }
+  }
+
   async getUserStats(req: Request, res: Response, next: NextFunction) {
     try {
       const user = req.user!;
@@ -142,6 +327,44 @@ export class UserController {
       });
     } catch (error) {
       logger.error('Failed to remove favorite species:', error);
+      next(error);
+    }
+  }
+
+  async checkUsernameAvailability(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { username } = req.query;
+
+      if (!username || typeof username !== 'string') {
+        return res.status(400).json({
+          message: 'Username is required',
+        });
+      }
+
+      // Validate username format
+      if (!/^[a-z0-9_]+$/.test(username)) {
+        return res.status(400).json({
+          message: 'Invalid username format. Use only lowercase letters, numbers, and underscores.',
+          available: false,
+        });
+      }
+
+      if (username.length < 3 || username.length > 30) {
+        return res.status(400).json({
+          message: 'Username must be between 3 and 30 characters.',
+          available: false,
+        });
+      }
+
+      const isAvailable = await userModel.isUsernameAvailable(username);
+
+      res.status(200).json({
+        message: isAvailable ? 'Username is available' : 'Username is already taken',
+        available: isAvailable,
+        username: username.toLowerCase(),
+      });
+    } catch (error) {
+      logger.error('Failed to check username availability:', error);
       next(error);
     }
   }

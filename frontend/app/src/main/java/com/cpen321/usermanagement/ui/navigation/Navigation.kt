@@ -28,6 +28,10 @@ import com.cpen321.usermanagement.ui.viewmodels.ProfileViewModel
 import com.cpen321.usermanagement.ui.viewmodels.ThemeViewModel
 
 import com.cpen321.usermanagement.ui.screens.CameraScreen
+import com.cpen321.usermanagement.ui.screens.CatalogDetailScreen
+import com.cpen321.usermanagement.ui.screens.CatalogListScreen
+import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
+
 
 
 object NavRoutes {
@@ -38,8 +42,11 @@ object NavRoutes {
     const val MANAGE_PROFILE = "manage_profile"
     const val MANAGE_HOBBIES = "manage_hobbies"
     const val PROFILE_COMPLETION = "profile_completion"
-
     const val CAMERA = "camera"
+
+    const val CATALOG_LIST = "catalog_list"
+
+    const val CATALOG_DETAIL = "catalog_detail/{catalogId}"
 }
 
 @Composable
@@ -227,6 +234,19 @@ private fun AppNavHost(
                 onBack = { navController.popBackStack() }
             )
         }
+
+        composable(NavRoutes.CATALOG_LIST) {
+            val catalogViewModel: CatalogViewModel = hiltViewModel()
+            CatalogListScreen(catalogViewModel, navController)
+        }
+
+        composable("catalog_detail/{catalogId}") { backStackEntry ->
+            val catalogId = backStackEntry.arguments?.getString("catalogId") ?: return@composable
+            val catalogViewModel: CatalogViewModel = hiltViewModel()
+            CatalogDetailScreen(catalogId = catalogId, viewModel = catalogViewModel, navController = navController)
+        }
+
+
 
     }
 }

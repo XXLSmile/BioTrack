@@ -1,15 +1,19 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.cpen321.usermanagement.ui.screens
 
-import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
-import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,22 +22,26 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
 import com.cpen321.usermanagement.data.remote.RetrofitClient
+import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
 import java.io.FileOutputStream
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-
+import androidx.hilt.navigation.compose.hiltViewModel
 
 @Composable
-fun CameraScreen(onBack: () -> Unit) {
+fun CameraScreen(
+    onBack: () -> Unit,
+    viewModel: CatalogViewModel = hiltViewModel()
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
     var imageUri by remember { mutableStateOf<Uri?>(null) }
     var resultText by remember { mutableStateOf<String?>(null) }
+    var showCatalogDialog by remember { mutableStateOf(false) }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
@@ -46,19 +54,21 @@ fun CameraScreen(onBack: () -> Unit) {
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        imageUri = uri
-    }
+    ) { uri: Uri? -> imageUri = uri }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Camera / Gallery") },
+                title = { Text("Scan Wildlife") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             )
         }
     ) { padding ->
@@ -66,26 +76,39 @@ fun CameraScreen(onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             imageUri?.let {
-                Image(
-                    painter = rememberAsyncImagePainter(it),
-                    contentDescription = null,
+                Card(
+                    shape = MaterialTheme.shapes.medium,
+                    elevation = CardDefaults.cardElevation(6.dp),
                     modifier = Modifier
                         .size(250.dp)
-                        .padding(16.dp)
-                )
+                        .padding(8.dp)
+                ) {
+                    Image(
+                        painter = rememberAsyncImagePainter(it),
+                        contentDescription = "Selected image",
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
+
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Button(onClick = { cameraLauncher.launch(null) }) {
+                ElevatedButton(onClick = { cameraLauncher.launch(null) }) {
+                    Icon(Icons.Default.CameraAlt, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
                     Text("Take Photo")
                 }
-                Button(onClick = { galleryLauncher.launch("image/*") }) {
-                    Text("Choose from Gallery")
+
+                OutlinedButton(onClick = { galleryLauncher.launch("image/*") }) {
+                    Icon(Icons.Default.Image, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Gallery")
                 }
             }
 
@@ -95,23 +118,50 @@ fun CameraScreen(onBack: () -> Unit) {
                 onClick = {
                     imageUri?.let { uri ->
                         scope.launch {
-                            resultText = "Uploading..."
+                            resultText = "Scanning..."
                             val result = uploadImageToApi(context, uri)
                             resultText = result
+                            // Always show catalog dialog, even on failure
+                            showCatalogDialog = true
                         }
                     }
                 },
-                enabled = imageUri != null
+                enabled = imageUri != null,
+                modifier = Modifier.fillMaxWidth(0.8f)
             ) {
+                Icon(Icons.Default.Search, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
                 Text("Identify Animal")
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             resultText?.let {
-                Text(it, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
+    }
+
+    // Show Add to Catalog dialog after scan
+    if (showCatalogDialog) {
+        AddToCatalogDialog(
+            viewModel = viewModel,
+            onSave = { catalogId ->
+                // Here you would save the result + photo to catalog
+                showCatalogDialog = false
+                imageUri = null
+                resultText = null
+            },
+            onDismiss = {
+                showCatalogDialog = false
+                imageUri = null
+                resultText = null
+            }
+        )
     }
 }
 
