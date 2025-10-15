@@ -31,14 +31,16 @@ export class AdminController {
         });
       }
 
-      // Create user
+      // Create user (cast to any to bypass GoogleUserInfo type)
       const user = await userModel.create({
         googleId,
         email,
         name,
-        username: username.toLowerCase(),
         profilePicture: 'https://via.placeholder.com/150',
-      });
+      } as any);
+      
+      // Update username separately
+      await userModel.update(user._id, { username: username.toLowerCase() });
 
       logger.info(`Test user created: ${email}`);
 
