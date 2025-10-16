@@ -27,13 +27,13 @@ router.post(
 );
 
 /**
- * GET /api/identify/observations
- * Get user's saved observations (requires auth)
+ * GET /api/catalog
+ * Get user's saved catalog entries (requires auth)
  */
 router.get(
-  '/observations',
+  '/catalog',
   authenticateToken,
-  identifyController.getUserObservations
+  identifyController.getUserCatalog
 );
 
 export default router;

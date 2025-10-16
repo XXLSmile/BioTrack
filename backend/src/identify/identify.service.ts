@@ -22,6 +22,12 @@ export class IdentifyService {
     try {
       logger.info('Starting species identification via iNaturalist API');
 
+      // DEVELOPMENT MODE: Use mock data for testing
+      if (process.env.NODE_ENV === 'development' && process.env.USE_MOCK_IDENTIFICATION === 'true') {
+        logger.info('Using mock identification for development');
+        return this.getMockIdentificationResult();
+      }
+
       // Create form data for the API request
       const formData = new FormData();
       formData.append('image', imageBuffer, {
@@ -107,6 +113,57 @@ export class IdentifyService {
       logger.error('Error identifying species:', error instanceof Error ? error.message : String(error));
       throw new Error('Failed to identify species from image');
     }
+  }
+
+  /**
+   * Mock identification result for development/testing
+   */
+  private getMockIdentificationResult(): IdentificationResult {
+    const mockSpecies = [
+      {
+        id: 12345,
+        scientificName: 'Corvus brachyrhynchos',
+        commonName: 'American Crow',
+        rank: 'species',
+        taxonomy: 'Aves',
+        wikipediaUrl: 'https://en.wikipedia.org/wiki/American_crow',
+        imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c6/American_Crow.jpg/256px-American_Crow.jpg',
+      },
+      {
+        id: 12346,
+        scientificName: 'Turdus migratorius',
+        commonName: 'American Robin',
+        rank: 'species',
+        taxonomy: 'Aves',
+        wikipediaUrl: 'https://en.wikipedia.org/wiki/American_robin',
+        imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/Turdus-migratorius-002.jpg/256px-Turdus-migratorius-002.jpg',
+      },
+      {
+        id: 12347,
+        scientificName: 'Cardinalis cardinalis',
+        commonName: 'Northern Cardinal',
+        rank: 'species',
+        taxonomy: 'Aves',
+        wikipediaUrl: 'https://en.wikipedia.org/wiki/Northern_cardinal',
+        imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Cardinalis_cardinalis_-Illinois-8.jpg/256px-Cardinalis_cardinalis_-Illinois-8.jpg',
+      }
+    ];
+
+    // Randomly select a species for variety
+    const selectedSpecies = mockSpecies[Math.floor(Math.random() * mockSpecies.length)];
+
+    return {
+      species: selectedSpecies,
+      confidence: 0.85 + Math.random() * 0.1, // 0.85-0.95 confidence
+      alternatives: mockSpecies
+        .filter(s => s.id !== selectedSpecies.id)
+        .slice(0, 3)
+        .map(species => ({
+          scientificName: species.scientificName,
+          commonName: species.commonName,
+          confidence: 0.3 + Math.random() * 0.4, // 0.3-0.7 confidence
+        })),
+    };
   }
 }
 

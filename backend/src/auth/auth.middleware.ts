@@ -9,6 +9,26 @@ export const authenticateToken: RequestHandler = async (
   next: NextFunction
 ) => {
   try {
+    // DEVELOPMENT BYPASS: Skip authentication if DISABLE_AUTH is set to 'true'
+    if (process.env.DISABLE_AUTH === 'true') {
+      // Use a test user ID or create one
+      const testUserId = process.env.TEST_USER_ID;
+      
+      if (testUserId) {
+        const user = await userModel.findById(new mongoose.Types.ObjectId(testUserId));
+        if (user) {
+          req.user = user;
+          next();
+          return;
+        }
+      }
+      
+      // If no test user found, just proceed without user (will fail on endpoints that need req.user)
+      console.warn('⚠️ AUTHENTICATION DISABLED - No test user set. Set TEST_USER_ID in .env');
+      next();
+      return;
+    }
+
     const authHeader = req.headers.authorization;
     const token = authHeader?.split(' ')[1];
 
