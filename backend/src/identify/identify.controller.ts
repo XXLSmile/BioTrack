@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { identifyService } from './identify.service';
-import { observationRepository } from './observation.model';
+import { catalogRepository } from './catalog.model';
 import { speciesRepository } from './species.model';
 import { userModel } from '../user/user.model';
 import logger from '../logger.util';
@@ -67,7 +67,7 @@ export class IdentifyController {
 
   /**
    * POST /api/identify/save
-   * Identify and save observation
+   * Identify and save to catalog
    */
   async identifyAndSave(
     req: Request,
@@ -105,8 +105,8 @@ export class IdentifyController {
       // Save image (in uploads folder)
       const imageUrl = `/uploads/${req.file.filename}`;
 
-      // Create observation
-      const observation = await observationRepository.create({
+      // Create catalog entry
+      const catalogEntry = await catalogRepository.create({
         userId: user._id.toString(),
         speciesId: species._id.toString(),
         imageUrl,
@@ -120,8 +120,8 @@ export class IdentifyController {
       await userModel.incrementObservationCount(user._id);
       
       // Check if this is a new species for this user
-      const userObservations = await observationRepository.findByUserId(user._id.toString());
-      const uniqueSpeciesIds = new Set(userObservations.map(obs => obs.speciesId.toString()));
+      const userCatalog = await catalogRepository.findByUserId(user._id.toString());
+      const uniqueSpeciesIds = new Set(userCatalog.map(entry => entry.speciesId.toString()));
       const newSpeciesCount = uniqueSpeciesIds.size;
       
       // Award badges
@@ -135,12 +135,12 @@ export class IdentifyController {
         await userModel.addBadge(user._id, 'Naturalist');
       }
 
-      logger.info(`Observation created: ${observation._id}`);
+      logger.info(`Catalog entry created: ${catalogEntry._id}`);
 
       return res.status(201).json({
-        message: 'Species identified and observation saved successfully',
+        message: 'Species identified and saved to catalog successfully',
         data: {
-          observation,
+          catalogEntry,
           identification: identificationResult,
         },
       });
@@ -151,10 +151,10 @@ export class IdentifyController {
   }
 
   /**
-   * GET /api/identify/observations
-   * Get user's observations
+   * GET /api/catalog
+   * Get user's catalog entries
    */
-  async getUserObservations(
+  async getUserCatalog(
     req: Request,
     res: Response,
     next: NextFunction
@@ -163,17 +163,17 @@ export class IdentifyController {
       const user = req.user!;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
 
-      const observations = await observationRepository.findByUserId(user._id.toString(), limit);
+      const catalogEntries = await catalogRepository.findByUserId(user._id.toString(), limit);
 
       return res.status(200).json({
-        message: 'Observations fetched successfully',
+        message: 'Catalog entries fetched successfully',
         data: {
-          observations,
-          count: observations.length,
+          entries: catalogEntries,
+          count: catalogEntries.length,
         },
       });
     } catch (error) {
-      logger.error('Error fetching observations:', error);
+      logger.error('Error fetching catalog entries:', error);
       next(error);
     }
   }

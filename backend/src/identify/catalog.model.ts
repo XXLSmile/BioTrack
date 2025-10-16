@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export interface IObservation extends Document {
+// Catalog entry interface (represents a user's saved wildlife sighting)
+export interface ICatalogEntry extends Document {
   _id: mongoose.Types.ObjectId;
   userId: mongoose.Types.ObjectId;
   speciesId: mongoose.Types.ObjectId;
@@ -13,7 +14,7 @@ export interface IObservation extends Document {
   updatedAt: Date;
 }
 
-const observationSchema = new Schema<IObservation>(
+const catalogSchema = new Schema<ICatalogEntry>(
   {
     userId: {
       type: Schema.Types.ObjectId,
@@ -54,13 +55,13 @@ const observationSchema = new Schema<IObservation>(
 );
 
 // Indexes for common queries
-observationSchema.index({ userId: 1, createdAt: -1 });
-observationSchema.index({ speciesId: 1, createdAt: -1 });
+catalogSchema.index({ userId: 1, createdAt: -1 });
+catalogSchema.index({ speciesId: 1, createdAt: -1 });
 
-export const ObservationModel = mongoose.model<IObservation>('Observation', observationSchema);
+export const CatalogModel = mongoose.model<ICatalogEntry>('CatalogEntry', catalogSchema);
 
-// Observation Repository
-export class ObservationRepository {
+// Catalog Repository
+export class CatalogRepository {
   async create(data: {
     userId: string;
     speciesId: string;
@@ -69,27 +70,27 @@ export class ObservationRepository {
     longitude?: number;
     confidence: number;
     notes?: string;
-  }): Promise<IObservation> {
-    const observation = await ObservationModel.create(data);
-    return observation;
+  }): Promise<ICatalogEntry> {
+    const catalogEntry = await CatalogModel.create(data);
+    return catalogEntry;
   }
 
-  async findByUserId(userId: string, limit: number = 50): Promise<IObservation[]> {
-    return await ObservationModel.find({ userId })
+  async findByUserId(userId: string, limit: number = 50): Promise<ICatalogEntry[]> {
+    return await CatalogModel.find({ userId })
       .sort({ createdAt: -1 })
       .limit(limit)
       .populate('speciesId');
   }
 
   async countByUserId(userId: string): Promise<number> {
-    return await ObservationModel.countDocuments({ userId });
+    return await CatalogModel.countDocuments({ userId });
   }
 
   async countUniqueSpeciesByUserId(userId: string): Promise<number> {
-    const unique = await ObservationModel.distinct('speciesId', { userId });
+    const unique = await CatalogModel.distinct('speciesId', { userId });
     return unique.length;
   }
 }
 
-export const observationRepository = new ObservationRepository();
+export const catalogRepository = new CatalogRepository();
 
