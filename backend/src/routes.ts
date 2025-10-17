@@ -6,6 +6,7 @@ import usersRoutes from './user/user.routes';
 import catalogRoutes from './catalog/catalog.routes';
 import adminRoutes from './admin/admin.routes';
 import identifyRoutes from './identify/identify.routes';
+import mediaRoutes from './media/media.routes';
 
 const router = Router();
 

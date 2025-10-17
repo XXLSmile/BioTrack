@@ -21,7 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
-import com.cpen321.usermanagement.data.remote.RetrofitClient
+import com.cpen321.usermanagement.data.remote.api.RetrofitClient
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -30,6 +30,8 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
 import java.io.FileOutputStream
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.cpen321.usermanagement.data.remote.dto.ScanResponse
+
 
 @Composable
 fun CameraScreen(
@@ -182,17 +184,29 @@ private suspend fun uploadImageToApi(context: Context, uri: Uri): String {
         outputStream.close()
 
         val requestFile = file.asRequestBody("image/jpeg".toMediaTypeOrNull())
-        val body = MultipartBody.Part.createFormData("image", file.name, requestFile)
+        val body = MultipartBody.Part.createFormData("media", file.name, requestFile)
 
-        val response = RetrofitClient.wildlifeApi.identifyAnimal(body)
+        val response = RetrofitClient.mediaApi.uploadImage(body)
 
-        if (response.isSuccessful) {
-            val result = response.body()
-            "Detected: ${result?.animal ?: "Unknown"} (${result?.confidence ?: 0f}%)"
+        if (response.isSuccessful && response.body() != null) {
+            val result = response.body()!!
+            val species = result.data.species
+            val confidence = String.format("%.2f", result.data.confidence * 100)
+
+            if (species != null) {
+                "✅ ${species.commonName ?: species.scientificName}\n" +
+                        "(${species.scientificName})\n" +
+                        "Confidence: $confidence%"
+            } else {
+                "⚠️ No species identified. Try again!"
+            }
         } else {
-            "Error: ${response.message()}"
+            "❌ Error: ${response.message()}"
         }
     } catch (e: Exception) {
-        "Failed: ${e.message}"
+        "⚠️ Upload failed: ${e.localizedMessage}"
     }
 }
+
+
+
