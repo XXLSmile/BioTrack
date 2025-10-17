@@ -66,4 +66,9 @@ object RetrofitClient {
             picturePath
         }
     }
+
+    val mediaApi: MediaInterface by lazy {
+        retrofit.create(MediaInterface::class.java)
+    }
+
 }
