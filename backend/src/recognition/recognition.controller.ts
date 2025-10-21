@@ -120,7 +120,7 @@ export class RecognitionController {
       
       const imageUrl = `/uploads/images/${filename}`;
 
-      // Create catalog entry with image data stored in database
+      // Create observation entry with image data stored in database
       const catalogEntry = await catalogRepository.create({
         userId: user._id.toString(),
         speciesId: species._id.toString(),
@@ -152,12 +152,12 @@ export class RecognitionController {
         await userModel.addBadge(user._id, 'Naturalist');
       }
 
-      logger.info(`Catalog entry created: ${catalogEntry._id}`);
+      logger.info(`Observation entry created: ${catalogEntry._id}`);
 
       return res.status(201).json({
-        message: 'Species recognized and saved to catalog successfully',
+        message: 'Species recognized and saved successfully',
         data: {
-          catalogEntry,
+          entry: catalogEntry,
           recognition: recognitionResult,
         },
       });
