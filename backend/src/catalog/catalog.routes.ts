@@ -1,16 +1,21 @@
 import { Router } from 'express';
 
 import {
-  AddCatalogEntryRequest,
   CreateCatalogRequest,
-  UpdateCatalogEntryRequest,
   UpdateCatalogRequest,
-  addCatalogEntrySchema,
   createCatalogSchema,
-  updateCatalogEntrySchema,
   updateCatalogSchema,
 } from './catalog.types';
 import { CatalogController } from './catalog.controller';
+import { catalogShareController } from './catalogShare.controller';
+import {
+  inviteCollaboratorSchema,
+  respondToInvitationSchema,
+  updateCollaboratorSchema,
+  InviteCollaboratorRequest,
+  RespondToInvitationRequest,
+  UpdateCollaboratorRequest,
+} from './catalogShare.types';
 import { validateBody } from '../validation.middleware';
 
 const router = Router();
@@ -21,6 +26,17 @@ router.post(
   '/',
   validateBody<CreateCatalogRequest>(createCatalogSchema),
   catalogController.createCatalog
+);
+
+router.get(
+  '/shared-with/me',
+  catalogShareController.listSharedWithMe.bind(catalogShareController)
+);
+
+router.patch(
+  '/share/:shareId/respond',
+  validateBody<RespondToInvitationRequest>(respondToInvitationSchema),
+  catalogShareController.respondToInvitation.bind(catalogShareController)
 );
 
 router.get(
@@ -38,18 +54,29 @@ router.delete(
 );
 
 router.post(
-  '/:catalogId/entries',
-  validateBody<AddCatalogEntryRequest>(addCatalogEntrySchema),
-  catalogController.addCatalogEntry
-);
-router.patch(
   '/:catalogId/entries/:entryId',
-  validateBody<UpdateCatalogEntryRequest>(updateCatalogEntrySchema),
-  catalogController.updateCatalogEntry
+  catalogController.linkCatalogEntry.bind(catalogController)
 );
 router.delete(
   '/:catalogId/entries/:entryId',
-  catalogController.removeCatalogEntry
+  catalogController.unlinkCatalogEntry.bind(catalogController)
+);
+
+router.get(
+  '/:catalogId/share',
+  catalogShareController.listCollaborators.bind(catalogShareController)
+);
+
+router.post(
+  '/:catalogId/share',
+  validateBody<InviteCollaboratorRequest>(inviteCollaboratorSchema),
+  catalogShareController.inviteCollaborator.bind(catalogShareController)
+);
+
+router.patch(
+  '/:catalogId/share/:shareId',
+  validateBody<UpdateCollaboratorRequest>(updateCollaboratorSchema),
+  catalogShareController.updateCollaborator.bind(catalogShareController)
 );
 
 export default router;

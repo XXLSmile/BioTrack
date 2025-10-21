@@ -150,9 +150,9 @@ All responses follow:
 `/save` returns:
 ```json
 {
-  "message": "Species recognized and saved to catalog successfully",
+  "message": "Species recognized and saved successfully",
   "data": {
-    "catalogEntry": { ... },
+    "entry": { ... },
     "recognition": { ...same as above... }
   }
 }
@@ -214,9 +214,13 @@ Responses follow the standard pattern:
 | GET | `/:catalogId` | — | Retrieve catalog (with entries). |
 | PATCH | `/:catalogId` | `{ "name"?, "description"?, "isPublic"?, ... }` | Update catalog. |
 | DELETE | `/:catalogId` | — | Delete catalog and its entries. |
-| POST | `/:catalogId/entries` | `{ speciesId, speciesName?, confidence?, notes?, latitude?, longitude?, capturedAt?, imageUrl? }` | Add observation entry. |
-| PATCH | `/:catalogId/entries/:entryId` | `{ notes?, confidence?, latitude?, longitude?, capturedAt?, imageUrl? }` | Update entry. |
-| DELETE | `/:catalogId/entries/:entryId` | — | Remove entry. |
+| POST | `/:catalogId/entries/:entryId` | — | Link an existing observation entry to the catalog. |
+| DELETE | `/:catalogId/entries/:entryId` | — | Unlink an observation from the catalog. |
+| GET | `/shared-with/me` | — | Catalogs others have shared with the user (accepted invites). |
+| GET | `/:catalogId/share` | — | Owner: list pending/accepted collaborators. |
+| POST | `/:catalogId/share` | `{ "inviteeId": "<userId>", "role": "viewer" \| "editor" }` | Owner: invite collaborator. |
+| PATCH | `/:catalogId/share/:shareId` | `{ "role": "viewer" \| "editor" }` or `{ "action": "revoke" }` | Owner: change role or revoke invite. |
+| PATCH | `/share/:shareId/respond` | `{ "action": "accept" \| "decline" }` | Invitee: respond to pending invitation. |
 
 Each catalog response:
 ```json
@@ -236,30 +240,64 @@ Each catalog response:
 }
 ```
 
-Entry response (`POST /entries` / `PATCH /entries/:entryId`):
+Link response (`POST /:catalogId/entries/:entryId`):
 ```json
 {
-  "message": "Catalog entry added successfully",
+  "message": "Entry linked to catalog successfully",
   "data": {
     "catalog": {
       "_id": "...",
+      "name": "Spring Birds",
+      "description": "...",
+      "owner": "...",
+      "createdAt": "...",
+      "updatedAt": "...",
       "entries": [
         {
-          "_id": "...",
-          "speciesName": "American Crow",
-          "confidence": 0.91,
-          "notes": "Perched on cedar tree",
-          "latitude": 49.28,
-          "longitude": -123.12,
-          "capturedAt": "2024-05-01T19:24:00.000Z",
-          "createdAt": "...",
-          "updatedAt": "..."
+          "entry": {
+            "_id": "...",
+            "userId": "...",
+            "speciesId": {
+              "_id": "...",
+              "scientificName": "Corvus brachyrhynchos",
+              "commonName": "American Crow",
+              "...": "..."
+            },
+            "confidence": 0.91,
+            "latitude": 49.28,
+            "longitude": -123.12,
+            "imageUrl": "/uploads/images/....jpg",
+            "notes": "Perched on cedar tree",
+            "createdAt": "...",
+            "updatedAt": "..."
+          },
+          "linkedAt": "2024-05-01T19:30:00.000Z",
+          "addedBy": "..."
         }
       ]
     }
   }
 }
 ```
+
+**Share invitation example**
+```json
+POST /api/catalogs/665f9f452f5eab3c6a02d90b/share
+{
+  "inviteeId": "665fa4c12f5eab3c6a02d917",
+  "role": "editor"
+}
+```
+
+**Invitee response**
+```json
+PATCH /api/catalogs/share/665fb1bf2f5eab3c6a02d920/respond
+{
+  "action": "accept"
+}
+```
+
+Accepted collaborators with the `editor` role can add/update/remove entries; `viewer` can only read. Only the catalog owner can rename/delete the catalog or modify collaborator roles.
 
 ---
 
@@ -294,7 +332,7 @@ Validation errors come from Zod schemas in `validation.middleware.ts`.
 1. Sign up/sign in to retrieve the JWT.
 2. Set `Authorization: Bearer <token>` for all protected routes.
 3. Recognition endpoints require `multipart/form-data`; key must be named `image`.
-4. For catalog entry creation via recognition, call `/api/recognition/save`.
+4. Use `/api/recognition/save` to create observation entries, then link them into catalogs with `POST /api/catalogs/{catalogId}/entries/{entryId}` (unlink with `DELETE`).
 
 ---
 
