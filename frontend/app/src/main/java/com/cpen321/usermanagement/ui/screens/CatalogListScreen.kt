@@ -85,7 +85,7 @@ fun CatalogListScreen(
                             modifier = Modifier.fillMaxWidth(),
                             onClick = {
                                 // Navigate to CatalogDetailScreen with the catalog ID
-                                navController.navigate("${NavRoutes.CATALOG_DETAIL}/${catalog.id}")
+                                navController.navigate("${NavRoutes.CATALOG_DETAIL}/${catalog._id}")
                             }
                         ) {
                             Row(
@@ -100,7 +100,7 @@ fun CatalogListScreen(
                                     style = MaterialTheme.typography.titleMedium
                                 )
                                 IconButton(
-                                    onClick = { viewModel.deleteCatalog(catalog.id) }
+                                    onClick = { viewModel.deleteCatalog(catalog._id) }
                                 ) {
                                     Icon(
                                         Icons.Outlined.Delete,

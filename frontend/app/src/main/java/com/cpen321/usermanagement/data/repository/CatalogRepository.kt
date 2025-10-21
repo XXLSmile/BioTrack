@@ -1,26 +1,43 @@
 package com.cpen321.usermanagement.data.repository
 
-import com.cpen321.usermanagement.data.model.Catalog
-import com.cpen321.usermanagement.data.model.CatalogEntry
-import java.util.UUID
+import com.cpen321.usermanagement.data.remote.api.CatalogApi
+import com.cpen321.usermanagement.data.model.*
+import javax.inject.Inject
 
-object CatalogRepository {
-    private val catalogs = mutableListOf<Catalog>()
+class CatalogRepository @Inject constructor(
+    private val api: CatalogApi
+) {
 
-    fun getCatalogs(): List<Catalog> = catalogs
-    fun getCatalog(id: String): Catalog? = catalogs.find { it.id == id }
-
-    fun addCatalog(name: String): Catalog {
-        val newCatalog = Catalog(id = UUID.randomUUID().toString(), name = name)
-        catalogs.add(newCatalog)
-        return newCatalog
+    suspend fun getCatalogs(): List<Catalog> {
+        val response = api.listCatalogs()
+        return response.body()?.data?.catalogs ?: emptyList()
     }
 
-    fun deleteCatalog(id: String) {
-        catalogs.removeAll { it.id == id }
+    suspend fun createCatalog(name: String, description: String? = null): Catalog? {
+        val response = api.createCatalog(
+            mapOf("name" to name, "description" to (description ?: ""))
+        )
+        return response.body()?.data?.catalog
     }
 
-    fun addEntryToCatalog(catalogId: String, entry: CatalogEntry) {
-        getCatalog(catalogId)?.entries?.add(entry)
+    suspend fun linkEntryToCatalog(catalogId: String, entryId: String): Boolean {
+        val response = api.linkEntry(catalogId, entryId)
+        return response.isSuccessful
     }
+
+    suspend fun getCatalogById(catalogId: String): com.cpen321.usermanagement.data.model.CatalogData? {
+        val response = api.getCatalog(catalogId)
+        return response.body()?.data
+    }
+
+    suspend fun deleteCatalog(catalogId: String): Boolean {
+        return try {
+            val response = api.deleteCatalog(catalogId)
+            response.isSuccessful
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
 }

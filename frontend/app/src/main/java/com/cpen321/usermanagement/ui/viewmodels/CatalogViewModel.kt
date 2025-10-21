@@ -2,100 +2,96 @@ package com.cpen321.usermanagement.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cpen321.usermanagement.data.model.Catalog
+import com.cpen321.usermanagement.data.model.CatalogData
+import com.cpen321.usermanagement.data.repository.CatalogRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
-import java.util.UUID
 import javax.inject.Inject
 
-data class Catalog(
-    val id: String,
-    val name: String,
-    val entries: MutableList<CatalogEntry> = mutableListOf()
-)
-
-data class CatalogEntry(
-    val id: String,
-    val speciesName: String,
-    val description: String,
-    val imageUrl: String? = null,
-    val timestamp: Long = System.currentTimeMillis(),
-    val location: String? = null
-)
-
 @HiltViewModel
-class CatalogViewModel @Inject constructor() : ViewModel() {
+class CatalogViewModel @Inject constructor(
+    private val repository: CatalogRepository
+) : ViewModel() {
 
     private val _catalogs = MutableStateFlow<List<Catalog>>(emptyList())
     val catalogs: StateFlow<List<Catalog>> = _catalogs.asStateFlow()
 
+    // NEW: catalog detail state (contains catalog + entries for a single catalog)
+    private val _catalogDetail = MutableStateFlow<CatalogData?>(null)
+    val catalogDetail: StateFlow<CatalogData?> = _catalogDetail.asStateFlow()
+
     init {
-        loadSampleCatalogs()
+        loadCatalogs()
     }
 
-    private fun loadSampleCatalogs() {
+    fun loadCatalogs() {
         viewModelScope.launch {
-            _catalogs.value = listOf(
-                Catalog(
-                    id = "1",
-                    name = "Birds of Summer",
-                    entries = mutableListOf(
-                        CatalogEntry(
-                            id = UUID.randomUUID().toString(),
-                            speciesName = "Blue Jay",
-                            description = "A bright blue songbird with a noisy call.",
-                            imageUrl = null,
-                            location = "Backyard"
-                        )
-                    )
-                ),
-                Catalog(
-                    id = "2",
-                    name = "Forest Mammals",
-                    entries = mutableListOf()
-                )
-            )
+            try {
+                _catalogs.value = repository.getCatalogs()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
-    fun createCatalog(name: String) {
-        val newCatalog = Catalog(
-            id = UUID.randomUUID().toString(),
-            name = name
-        )
-        _catalogs.value = _catalogs.value + newCatalog
+    fun createCatalog(name: String, description: String? = null) {
+        viewModelScope.launch {
+            try {
+                println("Attempting to create catalog: $name")
+                val created = repository.createCatalog(name, description)
+                println("Created catalog: $created") 
+                if (created != null) {
+                    _catalogs.value = _catalogs.value + created
+                } else {
+                    println("Catalog creation failed (null returned)")
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+
+    fun linkEntryToCatalog(catalogId: String, entryId: String) {
+        viewModelScope.launch {
+            try {
+                val success = repository.linkEntryToCatalog(catalogId, entryId)
+                if (success) {
+                    loadCatalogs() // refresh
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun loadCatalogDetail(catalogId: String) {
+        viewModelScope.launch {
+            try {
+                _catalogDetail.value = repository.getCatalogById(catalogId)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _catalogDetail.value = null
+            }
+        }
     }
 
     fun deleteCatalog(catalogId: String) {
-        _catalogs.value = _catalogs.value.filterNot { it.id == catalogId }
-    }
-
-    fun getCatalogById(catalogId: String) = flowOf(
-        _catalogs.value.find { it.id == catalogId }
-    )
-
-    fun addEntryToCatalog(
-        catalogId: String,
-        speciesName: String,
-        description: String,
-        imageUrl: String? = null,
-        location: String? = null
-    ) {
-        val updated = _catalogs.value.map { catalog ->
-            if (catalog.id == catalogId) {
-                val newEntry = CatalogEntry(
-                    id = UUID.randomUUID().toString(),
-                    speciesName = speciesName,
-                    description = description,
-                    imageUrl = imageUrl,
-                    location = location
-                )
-                catalog.copy(entries = (catalog.entries + newEntry).toMutableList())
-            } else catalog
+        viewModelScope.launch {
+            try {
+                val success = repository.deleteCatalog(catalogId)
+                if (success) {
+                    _catalogs.value = _catalogs.value.filterNot { it._id == catalogId }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
-        _catalogs.value = updated
     }
+
 }
