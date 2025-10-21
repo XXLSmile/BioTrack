@@ -26,8 +26,8 @@ export interface INaturalistResponse {
   common_ancestor?: INaturalistTaxon;
 }
 
-// Our App's Identification Result
-export interface IdentificationResult {
+// Our application's recognition result shape
+export interface RecognitionResult {
   species: {
     id: number;
     scientificName: string;
@@ -45,10 +45,9 @@ export interface IdentificationResult {
   }[];
 }
 
-// Request/Response Types
-export interface IdentifyImageResponse {
+// Request/response types
+export interface RecognitionImageResponse {
   message: string;
-  data?: IdentificationResult | any;
+  data?: RecognitionResult | any;
   available?: boolean;
 }
-

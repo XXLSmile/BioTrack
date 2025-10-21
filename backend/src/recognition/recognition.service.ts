@@ -3,29 +3,29 @@ import FormData from 'form-data';
 import logger from '../logger.util';
 import {
   INaturalistResponse,
-  IdentificationResult,
-} from './identify.types';
+  RecognitionResult,
+} from './recognition.types';
 import { speciesRepository } from './species.model';
 
-export class IdentifyService {
+export class RecognitionService {
   private apiBaseUrl = 'https://api.inaturalist.org/v1';
   private userAgent = 'BioTrack/1.0';
 
   /**
-   * Identify species from an image using iNaturalist API
+   * Recognize species from an image using iNaturalist API
    */
-  async identifyFromImage(
+  async recognizeFromImage(
     imageBuffer: Buffer,
     latitude?: number,
     longitude?: number
-  ): Promise<IdentificationResult> {
+  ): Promise<RecognitionResult> {
     try {
-      logger.info('Starting species identification via iNaturalist API');
+      logger.info('Starting species recognition via iNaturalist API');
 
       // DEVELOPMENT MODE: Use mock data for testing
       if (process.env.NODE_ENV === 'development' && process.env.USE_MOCK_IDENTIFICATION === 'true') {
-        logger.info('Using mock identification for development');
-        return this.getMockIdentificationResult();
+        logger.info('Using mock recognition for development');
+        return this.getMockRecognitionResult();
       }
 
       // Create form data for the API request
@@ -55,7 +55,7 @@ export class IdentifyService {
       );
 
       if (!response.data.results || response.data.results.length === 0) {
-        throw new Error('No species identified from image');
+        throw new Error('No species recognized from image');
       }
 
       // Process the top result
@@ -73,8 +73,8 @@ export class IdentifyService {
         imageUrl: taxon.default_photo?.medium_url,
       });
 
-      // Build identification result
-      const identificationResult: IdentificationResult = {
+      // Build recognition result
+      const recognitionResult: RecognitionResult = {
         species: {
           id: taxon.id,
           scientificName: taxon.name,
@@ -92,8 +92,8 @@ export class IdentifyService {
         })),
       };
 
-      logger.info(`Species identified: ${taxon.name} with confidence ${identificationResult.confidence}`);
-      return identificationResult;
+      logger.info(`Species recognized: ${taxon.name} with confidence ${recognitionResult.confidence}`);
+      return recognitionResult;
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         logger.error('iNaturalist API error:', {
@@ -110,15 +110,15 @@ export class IdentifyService {
         }
       }
 
-      logger.error('Error identifying species:', error instanceof Error ? error.message : String(error));
-      throw new Error('Failed to identify species from image');
+      logger.error('Error recognizing species:', error instanceof Error ? error.message : String(error));
+      throw new Error('Failed to recognize species from image');
     }
   }
 
   /**
-   * Mock identification result for development/testing
+   * Mock recognition result for development/testing
    */
-  private getMockIdentificationResult(): IdentificationResult {
+  private getMockRecognitionResult(): RecognitionResult {
     const mockSpecies = [
       {
         id: 12345,
@@ -167,5 +167,4 @@ export class IdentifyService {
   }
 }
 
-export const identifyService = new IdentifyService();
-
+export const recognitionService = new RecognitionService();

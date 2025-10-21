@@ -120,7 +120,7 @@ fun CameraScreen(
                 onClick = {
                     imageUri?.let { uri ->
                         scope.launch {
-                            resultText = "Scanning..."
+                            resultText = "Recognizing..."
                             val result = uploadImageToApi(context, uri)
                             resultText = result
                             // Always show catalog dialog, even on failure
@@ -133,7 +133,7 @@ fun CameraScreen(
             ) {
                 Icon(Icons.Default.Search, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Identify Animal")
+                Text("Recognize Animal")
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -186,7 +186,7 @@ private suspend fun uploadImageToApi(context: Context, uri: Uri): String {
         val requestFile = file.asRequestBody("image/jpeg".toMediaTypeOrNull())
         val body = MultipartBody.Part.createFormData("media", file.name, requestFile)
 
-        val response = RetrofitClient.mediaApi.uploadImage(body)
+        val response = RetrofitClient.wildlifeApi.identifyAnimal(body)
 
         if (response.isSuccessful && response.body() != null) {
             val result = response.body()!!
