@@ -6,6 +6,8 @@ export interface ICatalogEntry extends Document {
   userId: mongoose.Types.ObjectId;
   speciesId: mongoose.Types.ObjectId;
   imageUrl: string;
+  imageData?: Buffer; // Store the actual image data
+  imageMimeType?: string; // Store the image type (e.g., 'image/jpeg')
   latitude?: number;
   longitude?: number;
   confidence: number;
@@ -31,6 +33,14 @@ const catalogSchema = new Schema<ICatalogEntry>(
     imageUrl: {
       type: String,
       required: true,
+    },
+    imageData: {
+      type: Buffer,
+      required: false,
+    },
+    imageMimeType: {
+      type: String,
+      required: false,
     },
     latitude: {
       type: Number,
@@ -66,6 +76,8 @@ export class CatalogRepository {
     userId: string;
     speciesId: string;
     imageUrl: string;
+    imageData?: Buffer;
+    imageMimeType?: string;
     latitude?: number;
     longitude?: number;
     confidence: number;
@@ -73,6 +85,13 @@ export class CatalogRepository {
   }): Promise<ICatalogEntry> {
     const catalogEntry = await CatalogModel.create(data);
     return catalogEntry;
+  }
+
+  async findById(entryId: string): Promise<ICatalogEntry | null> {
+    if (!mongoose.Types.ObjectId.isValid(entryId)) {
+      return null;
+    }
+    return await CatalogModel.findById(entryId).populate('speciesId');
   }
 
   async findByUserId(userId: string, limit: number = 50): Promise<ICatalogEntry[]> {

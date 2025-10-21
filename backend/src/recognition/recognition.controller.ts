@@ -1,19 +1,21 @@
 import { Request, Response, NextFunction } from 'express';
-import { identifyService } from './identify.service';
+import fs from 'fs';
+import path from 'path';
+import { recognitionService } from './recognition.service';
 import { catalogRepository } from './catalog.model';
 import { speciesRepository } from './species.model';
 import { userModel } from '../user/user.model';
 import logger from '../logger.util';
-import { IdentifyImageResponse } from './identify.types';
+import { RecognitionImageResponse } from './recognition.types';
 
-export class IdentifyController {
+export class RecognitionController {
   /**
-   * POST /api/identify
-   * Identify species from uploaded image
+   * POST /api/recognition
+   * Recognize species from uploaded image
    */
-  async identifyImage(
+  async recognizeImage(
     req: Request,
-    res: Response<IdentifyImageResponse>,
+    res: Response<RecognitionImageResponse>,
     next: NextFunction
   ) {
     try {
@@ -26,25 +28,25 @@ export class IdentifyController {
 
       const { latitude, longitude } = req.body;
 
-      // Identify species using iNaturalist API
-      logger.info('Processing image identification request');
-      const identificationResult = await identifyService.identifyFromImage(
+      // Recognize species using iNaturalist API
+      logger.info('Processing image recognition request');
+      const recognitionResult = await recognitionService.recognizeFromImage(
         req.file.buffer,
         latitude ? parseFloat(latitude) : undefined,
         longitude ? parseFloat(longitude) : undefined
       );
 
       return res.status(200).json({
-        message: 'Species identified successfully',
-        data: identificationResult,
+        message: 'Species recognized successfully',
+        data: recognitionResult,
       });
     } catch (error) {
-      logger.error('Error in identifyImage controller:', error);
+      logger.error('Error in recognizeImage controller:', error);
 
       if (error instanceof Error) {
-        if (error.message.includes('No species identified')) {
+        if (error.message.includes('No species recognized')) {
           return res.status(404).json({
-            message: 'Could not identify any species from the image. Try a clearer photo.',
+            message: 'Could not recognize any species from the image. Try a clearer photo.',
           });
         }
 
@@ -66,10 +68,10 @@ export class IdentifyController {
   }
 
   /**
-   * POST /api/identify/save
-   * Identify and save to catalog
+   * POST /api/recognition/save
+   * Recognize and save to catalog
    */
-  async identifyAndSave(
+  async recognizeAndSave(
     req: Request,
     res: Response,
     next: NextFunction
@@ -84,8 +86,8 @@ export class IdentifyController {
       const user = req.user!;
       const { latitude, longitude, notes } = req.body;
 
-      // Identify species
-      const identificationResult = await identifyService.identifyFromImage(
+      // Recognize species
+      const recognitionResult = await recognitionService.recognizeFromImage(
         req.file.buffer,
         latitude ? parseFloat(latitude) : undefined,
         longitude ? parseFloat(longitude) : undefined
@@ -93,26 +95,41 @@ export class IdentifyController {
 
       // Get species from database
       const species = await speciesRepository.findOrCreate({
-        inaturalistId: identificationResult.species.id,
-        scientificName: identificationResult.species.scientificName,
-        commonName: identificationResult.species.commonName,
-        rank: identificationResult.species.rank,
-        taxonomy: identificationResult.species.taxonomy,
-        wikipediaUrl: identificationResult.species.wikipediaUrl,
-        imageUrl: identificationResult.species.imageUrl,
+        inaturalistId: recognitionResult.species.id,
+        scientificName: recognitionResult.species.scientificName,
+        commonName: recognitionResult.species.commonName,
+        rank: recognitionResult.species.rank,
+        taxonomy: recognitionResult.species.taxonomy,
+        wikipediaUrl: recognitionResult.species.wikipediaUrl,
+        imageUrl: recognitionResult.species.imageUrl,
       });
 
-      // Save image (in uploads folder)
-      const imageUrl = `/uploads/${req.file.filename}`;
+      // Save image to disk (for backwards compatibility and quick access)
+      const IMAGES_DIR = path.join(__dirname, '../../uploads/images');
+      if (!fs.existsSync(IMAGES_DIR)) {
+        fs.mkdirSync(IMAGES_DIR, { recursive: true });
+      }
+      
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+      const extension = path.extname(req.file.originalname) || '.jpg';
+      const filename = `${uniqueSuffix}${extension}`;
+      const filepath = path.join(IMAGES_DIR, filename);
+      
+      // Write buffer to disk
+      fs.writeFileSync(filepath, req.file.buffer);
+      
+      const imageUrl = `/uploads/images/${filename}`;
 
-      // Create catalog entry
+      // Create catalog entry with image data stored in database
       const catalogEntry = await catalogRepository.create({
         userId: user._id.toString(),
         speciesId: species._id.toString(),
         imageUrl,
+        imageData: req.file.buffer, // Save the actual image data to DB
+        imageMimeType: req.file.mimetype, // Save the image MIME type
         latitude: latitude ? parseFloat(latitude) : undefined,
         longitude: longitude ? parseFloat(longitude) : undefined,
-        confidence: identificationResult.confidence,
+        confidence: recognitionResult.confidence,
         notes,
       });
 
@@ -138,14 +155,14 @@ export class IdentifyController {
       logger.info(`Catalog entry created: ${catalogEntry._id}`);
 
       return res.status(201).json({
-        message: 'Species identified and saved to catalog successfully',
+        message: 'Species recognized and saved to catalog successfully',
         data: {
           catalogEntry,
-          identification: identificationResult,
+          recognition: recognitionResult,
         },
       });
     } catch (error) {
-      logger.error('Error in identifyAndSave controller:', error);
+      logger.error('Error in recognizeAndSave controller:', error);
       next(error);
     }
   }
@@ -177,7 +194,50 @@ export class IdentifyController {
       next(error);
     }
   }
+
+  /**
+   * GET /api/recognition/image/:entryId
+   * Get image from database by catalog entry ID
+   */
+  async getImageFromDatabase(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const { entryId } = req.params;
+      
+      if (!entryId) {
+        return res.status(400).json({
+          message: 'Entry ID is required',
+        });
+      }
+
+      const entry = await catalogRepository.findById(entryId);
+
+      if (!entry) {
+        return res.status(404).json({
+          message: 'Catalog entry not found',
+        });
+      }
+
+      if (!entry.imageData) {
+        return res.status(404).json({
+          message: 'Image data not found in database. Image may only exist on disk.',
+        });
+      }
+
+      // Set appropriate content type
+      const contentType = entry.imageMimeType || 'image/jpeg';
+      res.set('Content-Type', contentType);
+      res.set('Content-Length', entry.imageData.length.toString());
+
+      return res.send(entry.imageData);
+    } catch (error) {
+      logger.error('Error fetching image from database:', error);
+      next(error);
+    }
+  }
 }
 
-export const identifyController = new IdentifyController();
-
+export const recognitionController = new RecognitionController();
