@@ -54,6 +54,9 @@ object RetrofitClient {
     val hobbyInterface: HobbyInterface = retrofit.create(HobbyInterface::class.java)
     val colorApiInterface: ColorApiInterface = colorApiRetrofit.create(ColorApiInterface::class.java)
 
+    val mediaApi: MediaInterface = retrofit.create(MediaInterface::class.java)
+
+
 
     fun setAuthToken(token: String?) {
         authToken = token
@@ -67,8 +70,8 @@ object RetrofitClient {
         }
     }
 
-    val mediaApi: MediaInterface by lazy {
-        retrofit.create(MediaInterface::class.java)
+    val wildlifeApi: WildlifeApi by lazy {
+        retrofit.create(WildlifeApi::class.java)
     }
 
 }

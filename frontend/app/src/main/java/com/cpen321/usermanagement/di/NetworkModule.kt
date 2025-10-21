@@ -7,11 +7,13 @@ import com.cpen321.usermanagement.data.remote.api.ImageInterface
 import com.cpen321.usermanagement.data.remote.api.MediaInterface
 import com.cpen321.usermanagement.data.remote.api.RetrofitClient
 import com.cpen321.usermanagement.data.remote.api.UserInterface
+import com.cpen321.usermanagement.data.remote.api.WildlifeApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
+
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -51,5 +53,11 @@ object NetworkModule {
     @Singleton
     fun provideColorApiService(): ColorApiInterface {
         return RetrofitClient.colorApiInterface
+    }
+
+    @Provides
+    @Singleton
+    fun provideWildlifeService(): WildlifeApi {
+        return RetrofitClient.wildlifeApi
     }
 }
