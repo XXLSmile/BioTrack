@@ -1,0 +1,60 @@
+# macOS
+.DS_Store
+
+# Node / TypeScript
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+build/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.*
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Coverage reports
+coverage/
+*.lcov
+
+# Backend caches
+tmp/
+*.pid
+*.seed
+
+# Android / Gradle
+.gradle/
+local.properties
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+frontend/app/build/
+*.apk
+*.aab
+*.dex
+*.class
+*.keystore
+
+# Xcode / iOS
+DerivedData/
+*.xcworkspace/
+*.xcuserstate
+*.xcuserdata/
+*.pbxuser
+
+# Editors
+.vscode/
+.history/
+*.swp
+
+# System files
+Thumbs.db

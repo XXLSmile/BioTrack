@@ -49,3 +49,9 @@ uploads/
 ehthumbs.db
 Thumbs.db
 .env
+
+# Compiled binary files
+*.exe
+*.dll
+*.so
+*.dylib
