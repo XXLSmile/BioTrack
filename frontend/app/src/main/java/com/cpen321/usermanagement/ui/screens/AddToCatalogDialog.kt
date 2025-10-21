@@ -41,8 +41,8 @@ fun AddToCatalogDialog(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             RadioButton(
-                                selected = selectedCatalogId == catalog.id,
-                                onClick = { selectedCatalogId = catalog.id }
+                                selected = selectedCatalogId == catalog._id,
+                                onClick = { selectedCatalogId = catalog._id }
                             )
                             Text(catalog.name)
                         }

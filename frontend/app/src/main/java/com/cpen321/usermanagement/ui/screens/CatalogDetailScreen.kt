@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
-import com.cpen321.usermanagement.ui.viewmodels.CatalogEntry
+import com.cpen321.usermanagement.data.model.CatalogEntry as RemoteCatalogEntry
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -32,8 +32,14 @@ fun CatalogDetailScreen(
     viewModel: CatalogViewModel,
     navController: NavController
 ) {
-    val catalogState = viewModel.getCatalogById(catalogId).collectAsState(initial = null)
-    val catalog = catalogState.value
+    // Load detail when composable enters composition
+    LaunchedEffect(catalogId) {
+        viewModel.loadCatalogDetail(catalogId)
+    }
+
+    val catalogDetailState by viewModel.catalogDetail.collectAsState()
+    val catalog = catalogDetailState?.catalog
+    val entries = catalogDetailState?.entries ?: emptyList()
 
     Scaffold(
         topBar = {
@@ -64,7 +70,7 @@ fun CatalogDetailScreen(
                 }
             }
 
-            catalog.entries.isEmpty() -> {
+            entries.isEmpty() -> {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -89,7 +95,7 @@ fun CatalogDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(catalog.entries) { entry ->
+                    items(entries) { entry -> // entry: RemoteCatalogEntry
                         EntryCard(entry = entry)
                     }
                 }
@@ -98,9 +104,14 @@ fun CatalogDetailScreen(
     }
 }
 
-
 @Composable
-private fun EntryCard(entry: CatalogEntry) {
+private fun EntryCard(entry: RemoteCatalogEntry) {
+    // RemoteCatalogEntry has shape: { entry: Entry, linkedAt: String?, addedBy: String? }
+    val item = entry.entry
+    val speciesName = item.species ?: (item._id ?: "Unknown")
+    val imageUrl = item.imageUrl
+    val linkedAt = entry.linkedAt
+
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = {
@@ -112,10 +123,10 @@ private fun EntryCard(entry: CatalogEntry) {
             verticalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier.padding(8.dp)
         ) {
-            if (!entry.imageUrl.isNullOrBlank()) {
+            if (!imageUrl.isNullOrBlank()) {
                 Image(
-                    painter = rememberAsyncImagePainter(entry.imageUrl),
-                    contentDescription = entry.speciesName,
+                    painter = rememberAsyncImagePainter(imageUrl),
+                    contentDescription = speciesName,
                     modifier = Modifier
                         .size(100.dp)
                         .background(Color.LightGray, shape = MaterialTheme.shapes.medium),
@@ -133,19 +144,13 @@ private fun EntryCard(entry: CatalogEntry) {
             }
 
             Text(
-                entry.speciesName,
+                speciesName,
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 maxLines = 1
             )
 
             Text(
-                entry.location ?: "Unknown Location",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Text(
-                formatTimestamp(entry.timestamp),
+                linkedAt?.let { formatIsoToPrettyDate(it) } ?: "Unknown Date",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -153,7 +158,13 @@ private fun EntryCard(entry: CatalogEntry) {
     }
 }
 
-private fun formatTimestamp(timestamp: Long): String {
-    val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
-    return sdf.format(Date(timestamp))
+private fun formatIsoToPrettyDate(iso: String): String {
+    return try {
+        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
+        val date = sdf.parse(iso)
+        val out = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+        out.format(date!!)
+    } catch (e: Exception) {
+        iso.take(10)
+    }
 }
