@@ -184,9 +184,10 @@ private suspend fun uploadImageToApi(context: Context, uri: Uri): String {
         outputStream.close()
 
         val requestFile = file.asRequestBody("image/jpeg".toMediaTypeOrNull())
-        val body = MultipartBody.Part.createFormData("media", file.name, requestFile)
+        val body = MultipartBody.Part.createFormData("image", file.name, requestFile)
 
-        val response = RetrofitClient.wildlifeApi.identifyAnimal(body)
+        // Call your backend API now
+        val response = RetrofitClient.wildlifeApi.recognizeAnimal(body)
 
         if (response.isSuccessful && response.body() != null) {
             val result = response.body()!!
@@ -207,6 +208,7 @@ private suspend fun uploadImageToApi(context: Context, uri: Uri): String {
         "⚠️ Upload failed: ${e.localizedMessage}"
     }
 }
+
 
 
 
