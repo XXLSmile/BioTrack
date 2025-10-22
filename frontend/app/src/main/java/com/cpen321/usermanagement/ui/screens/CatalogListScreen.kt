@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.*
@@ -20,7 +20,8 @@ import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
 @Composable
 fun CatalogListScreen(
     viewModel: CatalogViewModel,
-    navController: NavController
+    navController: NavController,
+    showNavigationIcon: Boolean = true
 ) {
     val catalogs by viewModel.catalogs.collectAsState()
     var showDialog by remember { mutableStateOf(false) }
@@ -31,11 +32,13 @@ fun CatalogListScreen(
             TopAppBar(
                 title = { Text("My Catalogs") },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            imageVector = Icons.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
+                    if (showNavigationIcon) {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

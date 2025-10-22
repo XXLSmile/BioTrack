@@ -45,4 +45,10 @@
     <string name="profile_add_favorite_action">Add</string>
     <string name="profile_remove_favorite_action">Remove</string>
     <string name="profile_save_changes">Save changes</string>
+
+    <string name="bottom_nav_home">Home</string>
+    <string name="bottom_nav_catalogs">Catalogs</string>
+    <string name="bottom_nav_identify">Identify</string>
+    <string name="bottom_nav_friends">Friends</string>
+    <string name="bottom_nav_profile">Profile</string>
 </resources>
