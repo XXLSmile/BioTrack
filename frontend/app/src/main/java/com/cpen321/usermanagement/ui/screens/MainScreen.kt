@@ -60,6 +60,18 @@ fun MainScreen(
     val profileUiState by profileViewModel.uiState.collectAsState()
     val snackBarHostState: SnackbarHostState = remember { SnackbarHostState() }
 
+    val navigateToRoute = remember(navController) {
+        { route: String ->
+            navController.navigate(route) {
+                popUpTo(NavRoutes.HOME) {
+                    saveState = true
+                }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
         if (profileUiState.user == null) {
             profileViewModel.loadProfile()
@@ -101,8 +113,8 @@ fun MainScreen(
                     location = user?.region?.takeIf { it.isNotBlank() }
                         ?: user?.location?.takeIf { it.isNotBlank() }
                         ?: "Unknown location",
-                    onIdentifyClick = { navController.navigate(NavRoutes.IDENTIFY) },
-                    onViewCatalogs = { navController.navigate(NavRoutes.CATALOGS) }
+                    onIdentifyClick = { navigateToRoute(NavRoutes.IDENTIFY) },
+                    onViewCatalogs = { navigateToRoute(NavRoutes.CATALOGS) }
                 )
             }
 
@@ -206,11 +218,10 @@ private fun StatsRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        StatCard(title = "Observations", value = observations, modifier = Modifier.fillMaxWidth(0.3f))
-        StatCard(title = "Species", value = species, modifier = Modifier.fillMaxWidth(0.3f))
-        StatCard(title = "Friends", value = friends, modifier = Modifier.fillMaxWidth(0.3f))
+        StatCard(title = "Observations", value = observations, modifier = Modifier.weight(1f))
+        StatCard(title = "Friends", value = friends, modifier = Modifier.weight(1f))
     }
 }
 
