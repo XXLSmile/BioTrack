@@ -121,7 +121,6 @@ fun MainScreen(
             item {
                 StatsRow(
                     observations = stats?.observationCount ?: user?.observationCount ?: 0,
-                    species = stats?.speciesDiscovered ?: user?.speciesDiscovered ?: 0,
                     friends = stats?.friendCount ?: user?.friendCount ?: 0
                 )
             }
@@ -148,7 +147,10 @@ private fun WelcomeCard(
     onViewCatalogs: () -> Unit
 ) {
     val gradient = Brush.verticalGradient(
-        colors = listOf(Color(0xFF1C1B33), Color(0xFF2C2F63))
+        colors = listOf(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.primaryContainer
+        )
     )
 
     Card(
@@ -191,14 +193,14 @@ private fun WelcomeCard(
                     onClick = onViewCatalogs,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White.copy(alpha = 0.15f),
-                        contentColor = Color.White
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Collections,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.padding(end = 8.dp)
                     )
                     Text(
@@ -213,7 +215,6 @@ private fun WelcomeCard(
 @Composable
 private fun StatsRow(
     observations: Int,
-    species: Int,
     friends: Int
 ) {
     Row(
@@ -234,7 +235,7 @@ private fun StatCard(
     Card(
         modifier = modifier
             .height(96.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.18f))
     ) {
         Column(
             modifier = Modifier
@@ -294,7 +295,8 @@ private fun MonthlyGoalCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp),
-                trackColor = MaterialTheme.colorScheme.surface,
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
 
             val remaining = (goal - current).coerceAtLeast(0)
