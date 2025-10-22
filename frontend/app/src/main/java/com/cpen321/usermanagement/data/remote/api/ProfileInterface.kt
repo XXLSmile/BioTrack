@@ -3,6 +3,7 @@ package com.cpen321.usermanagement.data.remote.api
 import com.cpen321.usermanagement.data.remote.dto.ApiResponse
 import com.cpen321.usermanagement.data.remote.dto.FavoriteSpeciesRequest
 import com.cpen321.usermanagement.data.remote.dto.ProfileData
+import com.cpen321.usermanagement.data.remote.dto.SearchUsersResponse
 import com.cpen321.usermanagement.data.remote.dto.UpdateProfileRequest
 import com.cpen321.usermanagement.data.remote.dto.UserStatsData
 import com.cpen321.usermanagement.data.remote.dto.UsernameAvailabilityResponse
@@ -42,4 +43,9 @@ interface UserInterface {
     suspend fun removeFavoriteSpecies(
         @Body request: FavoriteSpeciesRequest
     ): Response<ApiResponse<Unit>>
+
+    @GET("user/search")
+    suspend fun searchUsers(
+        @Query("query") query: String
+    ): Response<ApiResponse<SearchUsersResponse>>
 }

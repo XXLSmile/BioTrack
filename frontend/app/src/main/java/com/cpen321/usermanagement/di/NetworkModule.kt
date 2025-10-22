@@ -4,11 +4,13 @@ import com.cpen321.usermanagement.BuildConfig
 import com.cpen321.usermanagement.data.remote.api.AuthInterface
 import com.cpen321.usermanagement.data.remote.api.CatalogApi
 import com.cpen321.usermanagement.data.remote.api.ColorApiInterface
+import com.cpen321.usermanagement.data.remote.api.FriendApi
 import com.cpen321.usermanagement.data.remote.api.MediaInterface
 import com.cpen321.usermanagement.data.remote.api.RetrofitClient
 import com.cpen321.usermanagement.data.remote.api.UserInterface
 import com.cpen321.usermanagement.data.remote.api.WildlifeApi
 import com.cpen321.usermanagement.data.repository.CatalogRepository
+import com.cpen321.usermanagement.data.repository.FriendRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -42,6 +44,7 @@ object NetworkModule {
     @Provides @Singleton fun provideMediaApiService(): MediaInterface = RetrofitClient.mediaApi
     @Provides @Singleton fun provideColorApiService(): ColorApiInterface = RetrofitClient.colorApiInterface
     @Provides @Singleton fun provideWildlifeService(): WildlifeApi = RetrofitClient.wildlifeApi
+    @Provides @Singleton fun provideFriendApi(): FriendApi = RetrofitClient.friendApi
 
     // For catalog
     @Provides
@@ -53,4 +56,9 @@ object NetworkModule {
     @Singleton
     fun provideCatalogRepository(api: CatalogApi): CatalogRepository =
         CatalogRepository(api)
+
+    @Provides
+    @Singleton
+    fun provideFriendRepository(api: FriendApi, userInterface: UserInterface): FriendRepository =
+        FriendRepository(api, userInterface)
 }
