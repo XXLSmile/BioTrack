@@ -1,38 +1,45 @@
 package com.cpen321.usermanagement.data.remote.api
 
 import com.cpen321.usermanagement.data.remote.dto.ApiResponse
+import com.cpen321.usermanagement.data.remote.dto.FavoriteSpeciesRequest
 import com.cpen321.usermanagement.data.remote.dto.ProfileData
 import com.cpen321.usermanagement.data.remote.dto.UpdateProfileRequest
-import com.cpen321.usermanagement.data.remote.dto.UploadImageData
-import okhttp3.MultipartBody
+import com.cpen321.usermanagement.data.remote.dto.UserStatsData
+import com.cpen321.usermanagement.data.remote.dto.UsernameAvailabilityResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
-import retrofit2.http.Header
-import retrofit2.http.Multipart
 import retrofit2.http.POST
-import retrofit2.http.Part
+import retrofit2.http.Query
 
 interface UserInterface {
     @GET("user/profile")
-    suspend fun getProfile(@Header("Authorization") authHeader: String): Response<ApiResponse<ProfileData>>
+    suspend fun getProfile(): Response<ApiResponse<ProfileData>>
 
     @POST("user/profile")
     suspend fun updateProfile(
-        @Header("Authorization") authHeader: String,
         @Body request: UpdateProfileRequest
     ): Response<ApiResponse<ProfileData>>
 
     @DELETE("user/profile")
-    suspend fun deleteProfile(): Response<Unit>
-}
+    suspend fun deleteProfile(): Response<ApiResponse<Unit>>
 
-interface ImageInterface {
-    @Multipart
-    @POST("media/upload")
-    suspend fun uploadPicture(
-        @Header("Authorization") authHeader: String,
-        @Part media: MultipartBody.Part
-    ): Response<ApiResponse<UploadImageData>>
+    @GET("user/stats")
+    suspend fun getUserStats(): Response<ApiResponse<UserStatsData>>
+
+    @GET("user/check-username")
+    suspend fun checkUsername(
+        @Query("username") username: String
+    ): Response<UsernameAvailabilityResponse>
+
+    @POST("user/favorite-species")
+    suspend fun addFavoriteSpecies(
+        @Body request: FavoriteSpeciesRequest
+    ): Response<ApiResponse<Unit>>
+
+    @DELETE("user/favorite-species")
+    suspend fun removeFavoriteSpecies(
+        @Body request: FavoriteSpeciesRequest
+    ): Response<ApiResponse<Unit>>
 }

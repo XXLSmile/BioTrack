@@ -62,8 +62,6 @@ class AuthViewModel @Inject constructor(
 
                 val isAuthenticated = authRepository.isUserAuthenticated()
                 val user = if (isAuthenticated) authRepository.getCurrentUser() else null
-                val needsProfileCompletion = user?.bio == null || user.bio.isBlank()
-
                 _uiState.value = _uiState.value.copy(
                     isAuthenticated = isAuthenticated,
                     user = user,
@@ -72,7 +70,6 @@ class AuthViewModel @Inject constructor(
 
                 updateNavigationState(
                     isAuthenticated = isAuthenticated,
-                    needsProfileCompletion = needsProfileCompletion,
                     isLoading = false
                 )
             } catch (e: java.net.SocketTimeoutException) {
@@ -87,12 +84,10 @@ class AuthViewModel @Inject constructor(
 
     private fun updateNavigationState(
         isAuthenticated: Boolean = false,
-        needsProfileCompletion: Boolean = false,
         isLoading: Boolean = false
     ) {
         navigationStateManager.updateAuthenticationState(
             isAuthenticated = isAuthenticated,
-            needsProfileCompletion = needsProfileCompletion,
             isLoading = isLoading,
             currentRoute = NavRoutes.LOADING
         )
@@ -126,9 +121,6 @@ class AuthViewModel @Inject constructor(
 
             authOperation(credential.idToken)
                 .onSuccess { authData ->
-                    val needsProfileCompletion =
-                        authData.user.bio == null || authData.user.bio.isBlank()
-
                     _uiState.value = _uiState.value.copy(
                         isSigningIn = false,
                         isSigningUp = false,
@@ -140,7 +132,6 @@ class AuthViewModel @Inject constructor(
                     // Trigger navigation through NavigationStateManager
                     navigationStateManager.updateAuthenticationState(
                         isAuthenticated = true,
-                        needsProfileCompletion = needsProfileCompletion,
                         isLoading = false,
                         currentRoute = NavRoutes.AUTH
                     )

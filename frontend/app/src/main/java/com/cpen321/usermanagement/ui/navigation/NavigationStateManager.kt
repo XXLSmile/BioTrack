@@ -9,10 +9,8 @@ import javax.inject.Singleton
 sealed class NavigationEvent {
     object NavigateToAuth : NavigationEvent()
     object NavigateToMain : NavigationEvent()
-    object NavigateToProfileCompletion : NavigationEvent()
     object NavigateToProfile : NavigationEvent()
     object NavigateToManageProfile : NavigationEvent()
-    object NavigateToManageHobbies : NavigationEvent()
     data class NavigateToAuthWithMessage(val message: String) : NavigationEvent()
     data class NavigateToMainWithMessage(val message: String) : NavigationEvent()
     object NavigateBack : NavigationEvent()
@@ -23,7 +21,6 @@ sealed class NavigationEvent {
 data class NavigationState(
     val currentRoute: String = NavRoutes.LOADING,
     val isAuthenticated: Boolean = false,
-    val needsProfileCompletion: Boolean = false,
     val isLoading: Boolean = true,
     val isNavigating: Boolean = false
 )
@@ -41,13 +38,11 @@ class NavigationStateManager @Inject constructor() {
      */
     fun updateAuthenticationState(
         isAuthenticated: Boolean,
-        needsProfileCompletion: Boolean,
         isLoading: Boolean = false,
         currentRoute: String = _navigationState.value.currentRoute
     ) {
         val newState = _navigationState.value.copy(
             isAuthenticated = isAuthenticated,
-            needsProfileCompletion = needsProfileCompletion,
             isLoading = isLoading,
             currentRoute = currentRoute
         )
@@ -55,7 +50,7 @@ class NavigationStateManager @Inject constructor() {
 
         // Trigger navigation based on state
         if (!isLoading) {
-            handleAuthenticationNavigation(currentRoute, isAuthenticated, needsProfileCompletion)
+            handleAuthenticationNavigation(currentRoute, isAuthenticated)
         }
     }
 
@@ -64,29 +59,20 @@ class NavigationStateManager @Inject constructor() {
      */
     private fun handleAuthenticationNavigation(
         currentRoute: String,
-        isAuthenticated: Boolean,
-        needsProfileCompletion: Boolean
+        isAuthenticated: Boolean
     ) {
         when {
             // From loading screen after auth check
             currentRoute == NavRoutes.LOADING -> {
                 if (isAuthenticated) {
-                    if (needsProfileCompletion) {
-                        navigateToProfileCompletion()
-                    } else {
-                        navigateToMain()
-                    }
+                    navigateToMain()
                 } else {
                     navigateToAuth()
                 }
             }
             // From auth screen after successful login
             currentRoute.startsWith(NavRoutes.AUTH) && isAuthenticated -> {
-                if (needsProfileCompletion) {
-                    navigateToProfileCompletion()
-                } else {
-                    navigateToMain()
-                }
+                navigateToMain()
             }
         }
     }
@@ -124,15 +110,6 @@ class NavigationStateManager @Inject constructor() {
     }
 
     /**
-     * Navigate to profile completion screen
-     */
-    fun navigateToProfileCompletion() {
-        _navigationEvent.value = NavigationEvent.NavigateToProfileCompletion
-        _navigationState.value =
-            _navigationState.value.copy(currentRoute = NavRoutes.PROFILE_COMPLETION)
-    }
-
-    /**
      * Navigate to profile screen
      */
     fun navigateToProfile() {
@@ -150,15 +127,6 @@ class NavigationStateManager @Inject constructor() {
     }
 
     /**
-     * Navigate to manage hobbies screen
-     */
-    fun navigateToManageHobbies() {
-        _navigationEvent.value = NavigationEvent.NavigateToManageHobbies
-        _navigationState.value =
-            _navigationState.value.copy(currentRoute = NavRoutes.MANAGE_HOBBIES)
-    }
-
-    /**
      * Navigate back
      */
     fun navigateBack() {
@@ -173,26 +141,9 @@ class NavigationStateManager @Inject constructor() {
 
         updateAuthenticationState(
             isAuthenticated = false,
-            needsProfileCompletion = false,
             isLoading = false
         )
         navigateToAuthWithMessage("Account deleted successfully!")
-    }
-
-    /**
-     * Handle profile completion
-     */
-    fun handleProfileCompletion() {
-        _navigationState.value = _navigationState.value.copy(needsProfileCompletion = false)
-        navigateToMain()
-    }
-
-    /**
-     * Handle profile completion with success message
-     */
-    fun handleProfileCompletionWithMessage(message: String) {
-        _navigationState.value = _navigationState.value.copy(needsProfileCompletion = false)
-        navigateToMainWithMessage(message)
     }
 
     /**
