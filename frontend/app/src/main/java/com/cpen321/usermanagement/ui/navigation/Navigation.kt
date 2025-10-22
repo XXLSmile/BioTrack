@@ -8,6 +8,7 @@ import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -247,7 +248,6 @@ private fun AppNavHost(
                 authViewModel = authViewModel,
                 profileViewModel = profileViewModel,
                 actions = ProfileScreenActions(
-                    onBackClick = { navigationStateManager.navigateBack() },
                     onManageProfileClick = { navigationStateManager.navigateToManageProfile() },
                     onAccountDeleted = { navigationStateManager.handleAccountDeletion() },
                     onLogoutClick = { authViewModel.logout() }
@@ -282,7 +282,9 @@ private fun BottomNavigationBar(
     currentRoute: String?,
     onItemSelected: (String) -> Unit
 ) {
-    NavigationBar {
+    NavigationBar(
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
         items.forEach { item ->
             val selected = currentRoute != null && currentRoute == item.route
             NavigationBarItem(
@@ -296,7 +298,13 @@ private fun BottomNavigationBar(
                 },
                 label = { Text(text = stringResource(item.labelRes)) },
                 alwaysShowLabel = true,
-                colors = NavigationBarItemDefaults.colors()
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             )
         }
     }
