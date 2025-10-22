@@ -148,12 +148,30 @@ fun CameraScreen(
         }
     }
 
+//    // Show Add to Catalog dialog after scan
+//    if (showCatalogDialog) {
+//        AddToCatalogDialog(
+//            viewModel = viewModel,
+//            onSave = { catalogId ->
+//                // Here you would save the result + photo to catalog
+//                showCatalogDialog = false
+//                imageUri = null
+//                resultText = null
+//            },
+//            onDismiss = {
+//                showCatalogDialog = false
+//                imageUri = null
+//                resultText = null
+//            }
+//        )
+//    }
     // Show Add to Catalog dialog after scan
     if (showCatalogDialog) {
         AddToCatalogDialog(
-            viewModel = viewModel,
-            onSave = { catalogId ->
-                // Here you would save the result + photo to catalog
+            entrySpeciesName = "American Crow",
+            entryScientificName = "Corvus brachyrhynchos",
+            entryImageUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c6/American_Crow.jpg/256px-American_Crow.jpg",
+            onSave = {
                 showCatalogDialog = false
                 imageUri = null
                 resultText = null
@@ -175,8 +193,44 @@ private fun saveBitmapToCache(context: Context, bitmap: Bitmap): Uri {
     return Uri.fromFile(file)
 }
 
+//MOCK FOR DEMO
+//private suspend fun uploadImageToApi(context: Context, uri: Uri): String {
+//    return try {
+//        val inputStream = context.contentResolver.openInputStream(uri)
+//        val file = File(context.cacheDir, "upload.jpg")
+//        val outputStream = FileOutputStream(file)
+//        inputStream?.copyTo(outputStream)
+//        outputStream.close()
+//
+//        val requestFile = file.asRequestBody("image/jpeg".toMediaTypeOrNull())
+//        val body = MultipartBody.Part.createFormData("image", file.name, requestFile)
+//
+//        // Call your backend API now
+//        val response = RetrofitClient.wildlifeApi.recognizeAnimal(body)
+//
+//        if (response.isSuccessful && response.body() != null) {
+//            val result = response.body()!!
+//            val species = result.data.species
+//            val confidence = String.format("%.2f", result.data.confidence * 100)
+//
+//            if (species != null) {
+//                "${species.commonName ?: species.scientificName}\n" +
+//                        "(${species.scientificName})\n" +
+//                        "Confidence: $confidence%"
+//            } else {
+//                "⚠No species identified. Try again!"
+//            }
+//        } else {
+//            "Error: ${response.message()}"
+//        }
+//    } catch (e: Exception) {
+//        "Upload failed: ${e.localizedMessage}"
+//    }
+//}
+
 private suspend fun uploadImageToApi(context: Context, uri: Uri): String {
     return try {
+        // Optional: keep your file creation if you want to simulate upload
         val inputStream = context.contentResolver.openInputStream(uri)
         val file = File(context.cacheDir, "upload.jpg")
         val outputStream = FileOutputStream(file)
@@ -186,26 +240,24 @@ private suspend fun uploadImageToApi(context: Context, uri: Uri): String {
         val requestFile = file.asRequestBody("image/jpeg".toMediaTypeOrNull())
         val body = MultipartBody.Part.createFormData("image", file.name, requestFile)
 
-        // Call your backend API now
-        val response = RetrofitClient.wildlifeApi.recognizeAnimal(body)
-
-        if (response.isSuccessful && response.body() != null) {
-            val result = response.body()!!
-            val species = result.data.species
-            val confidence = String.format("%.2f", result.data.confidence * 100)
-
-            if (species != null) {
-                "✅ ${species.commonName ?: species.scientificName}\n" +
-                        "(${species.scientificName})\n" +
-                        "Confidence: $confidence%"
-            } else {
-                "⚠️ No species identified. Try again!"
-            }
-        } else {
-            "❌ Error: ${response.message()}"
+        // Instead of calling the real API, always return mock species
+        val mockSpecies = object {
+            val id = 12345
+            val scientificName = "Corvus brachyrhynchos"
+            val commonName = "American Crow"
+            val rank = "species"
+            val taxonomy = "Aves"
+            val wikipediaUrl = "https://en.wikipedia.org/wiki/American_crow"
+            val imageUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c6/American_Crow.jpg/256px-American_Crow.jpg"
         }
+
+        val confidence = 0.95 // 95% confidence for demo
+
+        "${mockSpecies.commonName} (${mockSpecies.scientificName})\n" +
+                "Confidence: ${String.format("%.2f", confidence * 100)}%"
     } catch (e: Exception) {
-        "⚠️ Upload failed: ${e.localizedMessage}"
+        // Even on exception, still return the mock
+        "American Crow (Corvus brachyrhynchos)\nConfidence: 95%"
     }
 }
 
