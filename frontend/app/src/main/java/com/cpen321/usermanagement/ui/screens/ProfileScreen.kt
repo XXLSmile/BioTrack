@@ -58,14 +58,12 @@ private data class ProfileDialogState(
 )
 
 data class ProfileScreenActions(
-    val onBackClick: () -> Unit,
     val onManageProfileClick: () -> Unit,
     val onAccountDeleted: () -> Unit,
     val onLogoutClick: () -> Unit
 )
 
 private data class ProfileScreenCallbacks(
-    val onBackClick: () -> Unit,
     val onManageProfileClick: () -> Unit,
     val onDeleteAccountClick: () -> Unit,
     val onLogoutClick: () -> Unit,
@@ -101,7 +99,6 @@ fun ProfileScreen(
         dialogState = dialogState,
         snackBarHostState = snackBarHostState,
         callbacks = ProfileScreenCallbacks(
-            onBackClick = actions.onBackClick,
             onManageProfileClick = actions.onManageProfileClick,
             onDeleteAccountClick = {
                 dialogState = dialogState.copy(showDeleteDialog = true)
@@ -132,9 +129,6 @@ private fun ProfileContent(
 ) {
     Scaffold(
         modifier = modifier,
-        topBar = {
-            ProfileTopBar(onBackClick = callbacks.onBackClick)
-        },
         snackbarHost = {
             MessageSnackbar(
                 hostState = snackBarHostState,
@@ -162,33 +156,6 @@ private fun ProfileContent(
             onConfirm = callbacks.onDeleteDialogConfirm
         )
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ProfileTopBar(
-    onBackClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    TopAppBar(
-        modifier = modifier,
-        title = {
-            Text(
-                text = stringResource(R.string.profile),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Medium
-            )
-        },
-        navigationIcon = {
-            IconButton(onClick = onBackClick) {
-                Icon(name = R.drawable.ic_arrow_back)
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            titleContentColor = MaterialTheme.colorScheme.onSurface
-        )
-    )
 }
 
 @Composable

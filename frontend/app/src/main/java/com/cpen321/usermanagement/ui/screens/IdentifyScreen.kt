@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -47,7 +48,7 @@ fun IdentifyScreen(
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f))
             ) {
                 Column(
                     modifier = Modifier
@@ -69,7 +70,11 @@ fun IdentifyScreen(
 
             Button(
                 onClick = onOpenCamera,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
             ) {
                 Text("Open Camera")
             }
