@@ -72,7 +72,7 @@ class NavigationStateManager @Inject constructor() {
             }
             // From auth screen after successful login
             currentRoute.startsWith(NavRoutes.AUTH) && isAuthenticated -> {
-                navigateToMain()
+                    navigateToMain()
             }
         }
     }
@@ -98,7 +98,7 @@ class NavigationStateManager @Inject constructor() {
      */
     fun navigateToMain() {
         _navigationEvent.value = NavigationEvent.NavigateToMain
-        _navigationState.value = _navigationState.value.copy(currentRoute = NavRoutes.MAIN)
+        _navigationState.value = _navigationState.value.copy(currentRoute = NavRoutes.HOME)
     }
 
     /**
@@ -106,7 +106,7 @@ class NavigationStateManager @Inject constructor() {
      */
     fun navigateToMainWithMessage(message: String) {
         _navigationEvent.value = NavigationEvent.NavigateToMainWithMessage(message)
-        _navigationState.value = _navigationState.value.copy(currentRoute = NavRoutes.MAIN)
+        _navigationState.value = _navigationState.value.copy(currentRoute = NavRoutes.HOME)
     }
 
     /**
