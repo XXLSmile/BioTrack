@@ -3,15 +3,24 @@ package com.cpen321.usermanagement.ui.screens
 import Button
 import Icon
 import MenuButtonItem
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
@@ -30,15 +39,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import com.cpen321.usermanagement.R
+import com.cpen321.usermanagement.data.remote.dto.User
+import com.cpen321.usermanagement.data.remote.dto.UserStatsData
 import com.cpen321.usermanagement.ui.components.MessageSnackbar
 import com.cpen321.usermanagement.ui.components.MessageSnackbarState
+import com.cpen321.usermanagement.ui.theme.LocalSpacing
 import com.cpen321.usermanagement.ui.viewmodels.AuthViewModel
 import com.cpen321.usermanagement.ui.viewmodels.ProfileUiState
 import com.cpen321.usermanagement.ui.viewmodels.ProfileViewModel
-import com.cpen321.usermanagement.ui.theme.LocalSpacing
 
 private data class ProfileDialogState(
     val showDeleteDialog: Boolean = false
@@ -47,7 +60,6 @@ private data class ProfileDialogState(
 data class ProfileScreenActions(
     val onBackClick: () -> Unit,
     val onManageProfileClick: () -> Unit,
-    val onManageHobbiesClick: () -> Unit,
     val onAccountDeleted: () -> Unit,
     val onLogoutClick: () -> Unit
 )
@@ -55,7 +67,6 @@ data class ProfileScreenActions(
 private data class ProfileScreenCallbacks(
     val onBackClick: () -> Unit,
     val onManageProfileClick: () -> Unit,
-    val onManageHobbiesClick: () -> Unit,
     val onDeleteAccountClick: () -> Unit,
     val onLogoutClick: () -> Unit,
     val onDeleteDialogDismiss: () -> Unit,
@@ -73,13 +84,14 @@ fun ProfileScreen(
     val uiState by profileViewModel.uiState.collectAsState()
     val snackBarHostState = remember { SnackbarHostState() }
 
-    // Dialog state
     var dialogState by remember {
         mutableStateOf(ProfileDialogState())
     }
 
-    // Side effects
     LaunchedEffect(Unit) {
+        if (uiState.user == null) {
+            profileViewModel.loadProfile()
+        }
         profileViewModel.clearSuccessMessage()
         profileViewModel.clearError()
     }
@@ -91,7 +103,6 @@ fun ProfileScreen(
         callbacks = ProfileScreenCallbacks(
             onBackClick = actions.onBackClick,
             onManageProfileClick = actions.onManageProfileClick,
-            onManageHobbiesClick = actions.onManageHobbiesClick,
             onDeleteAccountClick = {
                 dialogState = dialogState.copy(showDeleteDialog = true)
             },
@@ -138,9 +149,8 @@ private fun ProfileContent(
     ) { paddingValues ->
         ProfileBody(
             paddingValues = paddingValues,
-            isLoading = uiState.isLoadingProfile,
+            uiState = uiState,
             onManageProfileClick = callbacks.onManageProfileClick,
-            onManageHobbiesClick = callbacks.onManageHobbiesClick,
             onDeleteAccountClick = callbacks.onDeleteAccountClick,
             onLogoutClick = callbacks.onLogoutClick
         )
@@ -184,31 +194,43 @@ private fun ProfileTopBar(
 @Composable
 private fun ProfileBody(
     paddingValues: PaddingValues,
-    isLoading: Boolean,
+    uiState: ProfileUiState,
     onManageProfileClick: () -> Unit,
-    onManageHobbiesClick: () -> Unit,
     onDeleteAccountClick: () -> Unit,
     onLogoutClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val spacing = LocalSpacing.current
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .padding(paddingValues)
     ) {
         when {
-            isLoading -> {
-                LoadingIndicator(
-                    modifier = Modifier.align(Alignment.Center)
+            uiState.isLoadingProfile -> {
+                LoadingIndicator(Modifier.align(Alignment.Center))
+            }
+
+            uiState.user != null -> {
+                ProfileDetailsContent(
+                    user = uiState.user,
+                    isLoadingStats = uiState.isLoadingStats,
+                    stats = uiState.stats,
+                    onManageProfileClick = onManageProfileClick,
+                    onLogoutClick = onLogoutClick,
+                    onDeleteAccountClick = onDeleteAccountClick,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(spacing.large)
                 )
             }
 
             else -> {
-                ProfileMenuItems(
-                    onManageProfileClick = onManageProfileClick,
-                    onManageHobbiesClick = onManageHobbiesClick,
-                    onDeleteAccountClick = onDeleteAccountClick,
-                    onLogoutClick = onLogoutClick
+                Text(
+                    text = stringResource(R.string.profile_failed_to_load),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.align(Alignment.Center)
                 )
             }
         }
@@ -216,107 +238,248 @@ private fun ProfileBody(
 }
 
 @Composable
-private fun ProfileMenuItems(
+private fun ProfileDetailsContent(
+    user: User,
+    isLoadingStats: Boolean,
+    stats: UserStatsData?,
     onManageProfileClick: () -> Unit,
-    onManageHobbiesClick: () -> Unit,
-    onDeleteAccountClick: () -> Unit,
     onLogoutClick: () -> Unit,
+    onDeleteAccountClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val spacing = LocalSpacing.current
     val scrollState = rememberScrollState()
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(spacing.large)
-            .verticalScroll(scrollState),
+        modifier = modifier.verticalScroll(scrollState),
+        verticalArrangement = Arrangement.spacedBy(spacing.large)
+    ) {
+        ProfileOverviewCard(user)
+
+        ProfileStatsCard(isLoadingStats = isLoadingStats, stats = stats, user = user)
+
+        FavoriteSpeciesCard(favoriteSpecies = user.favoriteSpecies)
+
+        ActionSection(
+            onManageProfileClick = onManageProfileClick,
+            onLogoutClick = onLogoutClick,
+            onDeleteAccountClick = onDeleteAccountClick
+        )
+    }
+}
+
+@Composable
+private fun ProfileOverviewCard(user: User, modifier: Modifier = Modifier) {
+    val spacing = LocalSpacing.current
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(spacing.large), verticalArrangement = Arrangement.spacedBy(spacing.small)) {
+            Text(
+                text = user.name,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Text(text = stringResource(R.string.profile_username_format, user.username), style = MaterialTheme.typography.bodyMedium)
+            Text(text = user.email, style = MaterialTheme.typography.bodyMedium)
+
+            Spacer(modifier = Modifier.height(spacing.small))
+
+            user.location?.takeIf { it.isNotBlank() }?.let {
+                Text(text = stringResource(R.string.profile_location_format, it), style = MaterialTheme.typography.bodyMedium)
+            }
+            user.region?.takeIf { it.isNotBlank() }?.let {
+                Text(text = stringResource(R.string.profile_region_format, it), style = MaterialTheme.typography.bodyMedium)
+            }
+
+            val privacyLabel = if (user.isPublicProfile) {
+                stringResource(R.string.profile_public_label)
+            } else {
+                stringResource(R.string.profile_private_label)
+            }
+
+            Box(
+                modifier = Modifier
+                    .padding(top = spacing.small)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .padding(horizontal = spacing.medium, vertical = spacing.extraSmall)
+            ) {
+                Text(
+                    text = privacyLabel,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileStatsCard(
+    isLoadingStats: Boolean,
+    stats: UserStatsData?,
+    user: User,
+    modifier: Modifier = Modifier
+) {
+    val spacing = LocalSpacing.current
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(spacing.large)) {
+            Text(
+                text = stringResource(R.string.profile_stats_heading),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Spacer(modifier = Modifier.height(spacing.medium))
+
+            if (isLoadingStats) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = spacing.small),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                StatsRow(
+                    observationCount = stats?.observationCount ?: user.observationCount,
+                    speciesDiscovered = stats?.speciesDiscovered ?: user.speciesDiscovered,
+                    friendCount = stats?.friendCount ?: user.friendCount
+                )
+
+                if (!stats?.badges.isNullOrEmpty()) {
+                    Spacer(modifier = Modifier.height(spacing.medium))
+                    Text(
+                        text = stringResource(R.string.profile_badges_heading),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                    )
+
+                    Spacer(modifier = Modifier.height(spacing.small))
+                    BadgesRow(badges = stats?.badges ?: emptyList())
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsRow(
+    observationCount: Int,
+    speciesDiscovered: Int,
+    friendCount: Int,
+    modifier: Modifier = Modifier
+) {
+    val spacing = LocalSpacing.current
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        StatItem(title = stringResource(R.string.profile_stat_observations), value = observationCount)
+        Spacer(modifier = Modifier.width(spacing.medium))
+        StatItem(title = stringResource(R.string.profile_stat_species), value = speciesDiscovered)
+        Spacer(modifier = Modifier.width(spacing.medium))
+        StatItem(title = stringResource(R.string.profile_stat_friends), value = friendCount)
+    }
+}
+
+@Composable
+private fun StatItem(title: String, value: Int, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(text = value.toString(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(text = title, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun BadgesRow(badges: List<String>, modifier: Modifier = Modifier) {
+    val spacing = LocalSpacing.current
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(spacing.extraSmall)) {
+        badges.forEach { badge ->
+            Text(
+                text = "• $badge",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+
+@Composable
+private fun FavoriteSpeciesCard(favoriteSpecies: List<String>, modifier: Modifier = Modifier) {
+    val spacing = LocalSpacing.current
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(spacing.large), verticalArrangement = Arrangement.spacedBy(spacing.small)) {
+            Text(
+                text = stringResource(R.string.profile_favorites_heading),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            if (favoriteSpecies.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.profile_no_favorites),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            } else {
+                favoriteSpecies.forEach { species ->
+                    Text(
+                        text = "• $species",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionSection(
+    onManageProfileClick: () -> Unit,
+    onLogoutClick: () -> Unit,
+    onDeleteAccountClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val spacing = LocalSpacing.current
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(spacing.medium)
     ) {
-        ProfileSection(
-            onManageProfileClick = onManageProfileClick,
-            onManageHobbiesClick = onManageHobbiesClick
+        MenuButtonItem(
+            text = stringResource(R.string.manage_profile),
+            iconRes = R.drawable.ic_manage_profile,
+            onClick = onManageProfileClick
         )
 
-        AccountSection(
-            onDeleteAccountClick = onDeleteAccountClick,
-            onLogoutClick = onLogoutClick
+        MenuButtonItem(
+            text = stringResource(R.string.logout),
+            iconRes = R.drawable.ic_logout,
+            onClick = onLogoutClick
+        )
+
+        MenuButtonItem(
+            text = stringResource(R.string.delete_account),
+            iconRes = R.drawable.ic_delete_forever,
+            onClick = onDeleteAccountClick
         )
     }
-}
-
-@Composable
-private fun ProfileSection(
-    onManageProfileClick: () -> Unit,
-    onManageHobbiesClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.medium)
-    ) {
-        ManageProfileButton(onClick = onManageProfileClick)
-        ManageHobbiesButton(onClick = onManageHobbiesClick)
-    }
-}
-
-@Composable
-private fun AccountSection(
-    onDeleteAccountClick: () -> Unit,
-    onLogoutClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.medium)
-    ) {
-        LogoutButton(onClick = onLogoutClick)
-        DeleteAccountButton(onClick = onDeleteAccountClick)
-    }
-}
-
-@Composable
-private fun ManageProfileButton(
-    onClick: () -> Unit,
-) {
-    MenuButtonItem(
-        text = stringResource(R.string.manage_profile),
-        iconRes = R.drawable.ic_manage_profile,
-        onClick = onClick,
-    )
-}
-
-@Composable
-private fun ManageHobbiesButton(
-    onClick: () -> Unit,
-) {
-    MenuButtonItem(
-        text = stringResource(R.string.manage_hobbies),
-        iconRes = R.drawable.ic_heart_smile,
-        onClick = onClick,
-    )
-}
-
-@Composable
-private fun LogoutButton(
-    onClick: () -> Unit,
-) {
-    MenuButtonItem(
-        text = stringResource(R.string.logout),
-        iconRes = R.drawable.ic_logout,
-        onClick = onClick,
-    )
-}
-
-@Composable
-private fun DeleteAccountButton(
-    onClick: () -> Unit,
-) {
-    MenuButtonItem(
-        text = stringResource(R.string.delete_account),
-        iconRes = R.drawable.ic_delete_forever,
-        onClick = onClick,
-    )
 }
 
 @Composable
@@ -329,70 +492,36 @@ private fun DeleteAccountDialog(
         modifier = modifier,
         onDismissRequest = onDismiss,
         title = {
-            DeleteDialogTitle()
+            Text(
+                text = stringResource(R.string.delete_account),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
         },
         text = {
-            DeleteDialogText()
+            Text(text = stringResource(R.string.delete_account_confirmation))
         },
         confirmButton = {
-            DeleteDialogConfirmButton(onClick = onConfirm)
+            Button(
+                fullWidth = false,
+                onClick = onConfirm
+            ) {
+                Text(stringResource(R.string.confirm))
+            }
         },
         dismissButton = {
-            DeleteDialogDismissButton(onClick = onDismiss)
+            Button(
+                fullWidth = false,
+                type = "secondary",
+                onClick = onDismiss
+            ) {
+                Text(stringResource(R.string.cancel))
+            }
         }
     )
 }
 
 @Composable
-private fun DeleteDialogTitle(
-    modifier: Modifier = Modifier
-) {
-    Text(
-        text = stringResource(R.string.delete_account),
-        style = MaterialTheme.typography.headlineSmall,
-        fontWeight = FontWeight.Bold,
-        modifier = modifier
-    )
-}
-
-@Composable
-private fun DeleteDialogText(
-    modifier: Modifier = Modifier
-) {
-    Text(
-        text = stringResource(R.string.delete_account_confirmation),
-        modifier = modifier
-    )
-}
-
-@Composable
-private fun DeleteDialogConfirmButton(
-    onClick: () -> Unit,
-) {
-    Button(
-        fullWidth = false,
-        onClick = onClick,
-    ) {
-        Text(stringResource(R.string.confirm))
-    }
-}
-
-@Composable
-private fun DeleteDialogDismissButton(
-    onClick: () -> Unit,
-) {
-    Button(
-        fullWidth = false,
-        type = "secondary",
-        onClick = onClick,
-    ) {
-        Text(stringResource(R.string.cancel))
-    }
-}
-
-@Composable
-private fun LoadingIndicator(
-    modifier: Modifier = Modifier
-) {
+private fun LoadingIndicator(modifier: Modifier = Modifier) {
     CircularProgressIndicator(modifier = modifier)
 }

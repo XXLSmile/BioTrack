@@ -167,7 +167,7 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun getCurrentUser(): User? {
         return try {
-            val response = userInterface.getProfile("") // Auth header is handled by interceptor
+            val response = userInterface.getProfile()
             if (response.isSuccessful && response.body()?.data != null) {
                 response.body()!!.data!!.user
             } else {

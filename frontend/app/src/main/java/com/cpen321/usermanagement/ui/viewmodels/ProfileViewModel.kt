@@ -1,10 +1,9 @@
 package com.cpen321.usermanagement.ui.viewmodels
 
-import android.net.Uri
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cpen321.usermanagement.data.remote.dto.User
+import com.cpen321.usermanagement.data.remote.dto.UserStatsData
 import com.cpen321.usermanagement.data.repository.ProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,18 +12,19 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+data class UsernameAvailabilityResult(
+    val isAvailable: Boolean,
+    val message: String
+)
+
 data class ProfileUiState(
-    // Loading states
     val isLoadingProfile: Boolean = false,
     val isSavingProfile: Boolean = false,
-    val isLoadingPhoto: Boolean = false,
-
-    // Data states
+    val isLoadingStats: Boolean = false,
+    val isCheckingUsername: Boolean = false,
     val user: User? = null,
-    val allHobbies: List<String> = emptyList(),
-    val selectedHobbies: Set<String> = emptySet(),
-
-    // Message states
+    val stats: UserStatsData? = null,
+    val usernameResult: UsernameAvailabilityResult? = null,
     val errorMessage: String? = null,
     val successMessage: String? = null
 )
@@ -34,103 +34,131 @@ class ProfileViewModel @Inject constructor(
     private val profileRepository: ProfileRepository
 ) : ViewModel() {
 
-    companion object {
-        private const val TAG = "ProfileViewModel"
-    }
-
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
     fun loadProfile() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoadingProfile = true, errorMessage = null)
+            _uiState.value = _uiState.value.copy(
+                isLoadingProfile = true,
+                errorMessage = null,
+                successMessage = null
+            )
 
             val profileResult = profileRepository.getProfile()
-            val hobbiesResult = profileRepository.getAvailableHobbies()
 
-            if (profileResult.isSuccess && hobbiesResult.isSuccess) {
+            if (profileResult.isSuccess) {
                 val user = profileResult.getOrNull()!!
-                val availableHobbies = hobbiesResult.getOrNull()!!
-                //val selectedHobbies = user.hobbies.toSet()
-                val selectedHobbies = user.hobbies?.toSet() ?: emptySet()
-
-
                 _uiState.value = _uiState.value.copy(
                     isLoadingProfile = false,
-                    user = user,
-                    allHobbies = availableHobbies,
-                    selectedHobbies = selectedHobbies
+                    user = user
                 )
+                loadStats()
             } else {
-                val errorMessage = when {
-                    profileResult.isFailure -> {
-                        val error = profileResult.exceptionOrNull()
-                        Log.e(TAG, "Failed to load profile", error)
-                        error?.message ?: "Failed to load profile"
-                    }
-
-                    hobbiesResult.isFailure -> {
-                        val error = hobbiesResult.exceptionOrNull()
-                        Log.e(TAG, "Failed to load hobbies", error)
-                        error?.message ?: "Failed to load hobbies"
-                    }
-
-                    else -> {
-                        Log.e(TAG, "Failed to load data")
-                        "Failed to load data"
-                    }
-                }
-
+                val error = profileResult.exceptionOrNull()
                 _uiState.value = _uiState.value.copy(
                     isLoadingProfile = false,
-                    errorMessage = errorMessage
+                    errorMessage = error?.message ?: "Failed to load profile"
                 )
             }
         }
     }
 
-    fun toggleHobby(hobby: String) {
-        val currentSelected = _uiState.value.selectedHobbies.toMutableSet()
-        if (currentSelected.contains(hobby)) {
-            currentSelected.remove(hobby)
-        } else {
-            currentSelected.add(hobby)
-        }
-        _uiState.value = _uiState.value.copy(selectedHobbies = currentSelected)
-    }
-
-    fun saveHobbies() {
+    private fun loadStats() {
         viewModelScope.launch {
-            val originalHobbies = _uiState.value.user?.hobbies?.toSet() ?: emptySet()
+            _uiState.value = _uiState.value.copy(isLoadingStats = true)
 
-            _uiState.value =
-                _uiState.value.copy(
-                    isSavingProfile = true,
-                    errorMessage = null,
-                    successMessage = null
-                )
-
-            val selectedHobbiesList = _uiState.value.selectedHobbies.toList()
-            val result = profileRepository.updateUserHobbies(selectedHobbiesList)
-
-            if (result.isSuccess) {
-                val updatedUser = result.getOrNull()!!
+            val statsResult = profileRepository.getUserStats()
+            if (statsResult.isSuccess) {
                 _uiState.value = _uiState.value.copy(
-                    isSavingProfile = false,
-                    user = updatedUser,
-                    successMessage = "Hobbies updated successfully!"
+                    isLoadingStats = false,
+                    stats = statsResult.getOrNull()
                 )
             } else {
-                // Revert to original hobbies on failure
-                val error = result.exceptionOrNull()
-                Log.d(TAG, "error: $error")
-                Log.e(TAG, "Failed to update hobbies", error)
-                val errorMessage = error?.message ?: "Failed to update hobbies"
+                val error = statsResult.exceptionOrNull()
+                _uiState.value = _uiState.value.copy(
+                    isLoadingStats = false,
+                    errorMessage = error?.message ?: "Failed to load user stats"
+                )
+            }
+        }
+    }
 
+    fun updateProfile(
+        name: String?,
+        username: String?,
+        location: String?,
+        region: String?,
+        isPublicProfile: Boolean,
+        favoriteSpecies: List<String>,
+        onSuccess: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isSavingProfile = true,
+                errorMessage = null,
+                successMessage = null
+            )
+
+            val result = profileRepository.updateProfile(
+                name = name,
+                username = username,
+                location = location,
+                region = region,
+                isPublicProfile = isPublicProfile,
+                favoriteSpecies = favoriteSpecies
+            )
+
+            if (result.isSuccess) {
                 _uiState.value = _uiState.value.copy(
                     isSavingProfile = false,
-                    selectedHobbies = originalHobbies, // Revert the selected hobbies
-                    errorMessage = errorMessage
+                    user = result.getOrNull(),
+                    successMessage = "Profile updated successfully!",
+                    usernameResult = null
+                )
+                loadStats()
+                onSuccess()
+            } else {
+                val error = result.exceptionOrNull()
+                _uiState.value = _uiState.value.copy(
+                    isSavingProfile = false,
+                    errorMessage = error?.message ?: "Failed to update profile"
+                )
+            }
+        }
+    }
+
+    fun checkUsernameAvailability(username: String) {
+        if (username.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                usernameResult = null,
+                isCheckingUsername = false
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isCheckingUsername = true,
+                usernameResult = null,
+                errorMessage = null
+            )
+
+            val result = profileRepository.checkUsernameAvailability(username)
+            if (result.isSuccess) {
+                val response = result.getOrNull()!!
+                _uiState.value = _uiState.value.copy(
+                    isCheckingUsername = false,
+                    usernameResult = UsernameAvailabilityResult(
+                        isAvailable = response.available,
+                        message = response.message
+                    )
+                )
+            } else {
+                val error = result.exceptionOrNull()
+                _uiState.value = _uiState.value.copy(
+                    isCheckingUsername = false,
+                    errorMessage = error?.message ?: "Failed to check username"
                 )
             }
         }
@@ -144,74 +172,7 @@ class ProfileViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(successMessage = null)
     }
 
-    fun setLoadingPhoto(isLoading: Boolean) {
-        _uiState.value = _uiState.value.copy(isLoadingPhoto = isLoading)
-    }
-
-    fun uploadProfilePicture(pictureUri: Uri) {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoadingPhoto = true)
-            val uploadResult = profileRepository.uploadProfilePicture(pictureUri)
-
-            if (uploadResult.isSuccess) {
-                val imageUrl = uploadResult.getOrNull()!!
-                val name = _uiState.value.user?.name ?: ""
-                val bio = _uiState.value.user?.bio ?: ""
-                val updateResult = profileRepository.updateProfile(name, bio, imageUrl)
-
-                if (updateResult.isSuccess) {
-                    val updatedUser = updateResult.getOrNull()!!
-                    _uiState.value = _uiState.value.copy(
-                        isLoadingPhoto = false,
-                        user = updatedUser,
-                        successMessage = "Profile picture updated successfully!"
-                    )
-                } else {
-                    val error = updateResult.exceptionOrNull()
-                    Log.e(TAG, "Failed to update profile with new picture", error)
-                    _uiState.value = _uiState.value.copy(
-                        isLoadingPhoto = false,
-                        errorMessage = error?.message ?: "Failed to update profile"
-                    )
-                }
-            } else {
-                val error = uploadResult.exceptionOrNull()
-                Log.e(TAG, "Failed to upload profile picture", error)
-                _uiState.value = _uiState.value.copy(
-                    isLoadingPhoto = false,
-                    errorMessage = error?.message ?: "Failed to upload profile picture"
-                )
-            }
-        }
-    }
-
-    fun updateProfile(name: String, bio: String, onSuccess: () -> Unit = {}) {
-        viewModelScope.launch {
-            _uiState.value =
-                _uiState.value.copy(
-                    isSavingProfile = true,
-                    errorMessage = null,
-                    successMessage = null
-                )
-
-            val result = profileRepository.updateProfile(name, bio)
-            if (result.isSuccess) {
-                val updatedUser = result.getOrNull()!!
-                _uiState.value = _uiState.value.copy(
-                    isSavingProfile = false,
-                    user = updatedUser,
-                    successMessage = "Profile updated successfully!"
-                )
-                onSuccess()
-            } else {
-                val error = result.exceptionOrNull()
-                Log.e(TAG, "Failed to update profile", error)
-                val errorMessage = error?.message ?: "Failed to update profile"
-                _uiState.value = _uiState.value.copy(
-                    isSavingProfile = false,
-                    errorMessage = errorMessage
-                )
-            }
-        }
+    fun clearUsernameResult() {
+        _uiState.value = _uiState.value.copy(usernameResult = null)
     }
 }

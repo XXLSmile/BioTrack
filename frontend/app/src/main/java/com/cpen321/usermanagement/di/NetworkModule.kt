@@ -1,7 +1,13 @@
 package com.cpen321.usermanagement.di
 
 import com.cpen321.usermanagement.BuildConfig
-import com.cpen321.usermanagement.data.remote.api.*
+import com.cpen321.usermanagement.data.remote.api.AuthInterface
+import com.cpen321.usermanagement.data.remote.api.CatalogApi
+import com.cpen321.usermanagement.data.remote.api.ColorApiInterface
+import com.cpen321.usermanagement.data.remote.api.MediaInterface
+import com.cpen321.usermanagement.data.remote.api.RetrofitClient
+import com.cpen321.usermanagement.data.remote.api.UserInterface
+import com.cpen321.usermanagement.data.remote.api.WildlifeApi
 import com.cpen321.usermanagement.data.repository.CatalogRepository
 import dagger.Module
 import dagger.Provides
@@ -33,9 +39,7 @@ object NetworkModule {
     // Existing services (if they depend on RetrofitClient)
     @Provides @Singleton fun provideAuthService(): AuthInterface = RetrofitClient.authInterface
     @Provides @Singleton fun provideUserService(): UserInterface = RetrofitClient.userInterface
-    @Provides @Singleton fun provideMediaService(): ImageInterface = RetrofitClient.imageInterface
     @Provides @Singleton fun provideMediaApiService(): MediaInterface = RetrofitClient.mediaApi
-    @Provides @Singleton fun provideHobbyService(): HobbyInterface = RetrofitClient.hobbyInterface
     @Provides @Singleton fun provideColorApiService(): ColorApiInterface = RetrofitClient.colorApiInterface
     @Provides @Singleton fun provideWildlifeService(): WildlifeApi = RetrofitClient.wildlifeApi
 

@@ -1,6 +1,5 @@
 package com.cpen321.usermanagement.ui.navigation
 
-import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -15,10 +14,8 @@ import com.cpen321.usermanagement.R
 import com.cpen321.usermanagement.ui.screens.AuthScreen
 import com.cpen321.usermanagement.ui.screens.LoadingScreen
 import com.cpen321.usermanagement.ui.screens.MainScreen
-import com.cpen321.usermanagement.ui.screens.ManageHobbiesScreen
 import com.cpen321.usermanagement.ui.screens.ManageProfileScreen
 import com.cpen321.usermanagement.ui.screens.ProfileScreenActions
-import com.cpen321.usermanagement.ui.screens.ProfileCompletionScreen
 import com.cpen321.usermanagement.ui.screens.ProfileScreen
 import com.cpen321.usermanagement.ui.viewmodels.AuthViewModel
 import com.cpen321.usermanagement.ui.viewmodels.MainViewModel
@@ -40,8 +37,6 @@ object NavRoutes {
     const val MAIN = "main"
     const val PROFILE = "profile"
     const val MANAGE_PROFILE = "manage_profile"
-    const val MANAGE_HOBBIES = "manage_hobbies"
-    const val PROFILE_COMPLETION = "profile_completion"
     const val CAMERA = "camera"
 
     const val CATALOG_LIST = "catalog_list"
@@ -122,13 +117,6 @@ private fun handleNavigationEvent(
             navigationStateManager.clearNavigationEvent()
         }
 
-        is NavigationEvent.NavigateToProfileCompletion -> {
-            navController.navigate(NavRoutes.PROFILE_COMPLETION) {
-                popUpTo(0) { inclusive = true }
-            }
-            navigationStateManager.clearNavigationEvent()
-        }
-
         is NavigationEvent.NavigateToProfile -> {
             navController.navigate(NavRoutes.PROFILE)
             navigationStateManager.clearNavigationEvent()
@@ -136,11 +124,6 @@ private fun handleNavigationEvent(
 
         is NavigationEvent.NavigateToManageProfile -> {
             navController.navigate(NavRoutes.MANAGE_PROFILE)
-            navigationStateManager.clearNavigationEvent()
-        }
-
-        is NavigationEvent.NavigateToManageHobbies -> {
-            navController.navigate(NavRoutes.MANAGE_HOBBIES)
             navigationStateManager.clearNavigationEvent()
         }
 
@@ -181,17 +164,6 @@ private fun AppNavHost(
             AuthScreen(authViewModel = authViewModel, profileViewModel = profileViewModel)
         }
 
-        composable(NavRoutes.PROFILE_COMPLETION) {
-            ProfileCompletionScreen(
-                profileViewModel = profileViewModel,
-                onProfileCompleted = { navigationStateManager.handleProfileCompletion() },
-                onProfileCompletedWithMessage = { message ->
-                    Log.d("AppNavigation", "Profile completed with message: $message")
-                    navigationStateManager.handleProfileCompletionWithMessage(message)
-                }
-            )
-        }
-
         composable(NavRoutes.MAIN) {
             MainScreen(
                 mainViewModel = mainViewModel,
@@ -208,7 +180,6 @@ private fun AppNavHost(
                 actions = ProfileScreenActions(
                     onBackClick = { navigationStateManager.navigateBack() },
                     onManageProfileClick = { navigationStateManager.navigateToManageProfile() },
-                    onManageHobbiesClick = { navigationStateManager.navigateToManageHobbies() },
                     onAccountDeleted = { navigationStateManager.handleAccountDeletion() },
                     onLogoutClick = { authViewModel.logout() }
                 )
@@ -217,13 +188,6 @@ private fun AppNavHost(
 
         composable(NavRoutes.MANAGE_PROFILE) {
             ManageProfileScreen(
-                profileViewModel = profileViewModel,
-                onBackClick = { navigationStateManager.navigateBack() }
-            )
-        }
-
-        composable(NavRoutes.MANAGE_HOBBIES) {
-            ManageHobbiesScreen(
                 profileViewModel = profileViewModel,
                 onBackClick = { navigationStateManager.navigateBack() }
             )

@@ -49,11 +49,8 @@ object RetrofitClient {
         .build()
 
     val authInterface: AuthInterface = retrofit.create(AuthInterface::class.java)
-    val imageInterface: ImageInterface = retrofit.create(ImageInterface::class.java)
     val userInterface: UserInterface = retrofit.create(UserInterface::class.java)
-    val hobbyInterface: HobbyInterface = retrofit.create(HobbyInterface::class.java)
     val colorApiInterface: ColorApiInterface = colorApiRetrofit.create(ColorApiInterface::class.java)
-
     val mediaApi: MediaInterface = retrofit.create(MediaInterface::class.java)
 
 

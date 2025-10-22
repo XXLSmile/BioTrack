@@ -2,10 +2,6 @@ package com.cpen321.usermanagement.ui.screens
 
 import Button
 import Icon
-import android.net.Uri
-import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,10 +12,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,6 +25,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -42,76 +40,42 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.cpen321.usermanagement.R
-import com.cpen321.usermanagement.data.remote.api.RetrofitClient
 import com.cpen321.usermanagement.data.remote.dto.User
-import com.cpen321.usermanagement.ui.components.ImagePicker
 import com.cpen321.usermanagement.ui.components.MessageSnackbar
 import com.cpen321.usermanagement.ui.components.MessageSnackbarState
+import com.cpen321.usermanagement.ui.theme.LocalSpacing
 import com.cpen321.usermanagement.ui.viewmodels.ProfileUiState
 import com.cpen321.usermanagement.ui.viewmodels.ProfileViewModel
-import com.cpen321.usermanagement.ui.theme.LocalSpacing
 
 private data class ProfileFormState(
     val name: String = "",
     val email: String = "",
-    val bio: String = "",
+    val username: String = "",
+    val location: String = "",
+    val region: String = "",
+    val isPublicProfile: Boolean = true,
+    val favoriteSpecies: List<String> = emptyList(),
+    val newFavoriteSpecies: String = "",
     val originalName: String = "",
-    val originalBio: String = ""
+    val originalUsername: String = "",
+    val originalLocation: String = "",
+    val originalRegion: String = "",
+    val originalIsPublic: Boolean = true,
+    val originalFavoriteSpecies: List<String> = emptyList()
 ) {
     fun hasChanges(): Boolean {
-        return (name.isNotBlank() && name != originalName) ||
-                (bio != originalBio && bio.isNotBlank())
+        return name != originalName ||
+            username != originalUsername ||
+            location != originalLocation ||
+            region != originalRegion ||
+            isPublicProfile != originalIsPublic ||
+            favoriteSpecies != originalFavoriteSpecies
     }
 }
-
-private data class ManageProfileScreenActions(
-    val onBackClick: () -> Unit,
-    val onNameChange: (String) -> Unit,
-    val onBioChange: (String) -> Unit,
-    val onEditPictureClick: () -> Unit,
-    val onSaveClick: () -> Unit,
-    val onImagePickerDismiss: () -> Unit,
-    val onImageSelected: (Uri) -> Unit,
-    val onLoadingPhotoChange: (Boolean) -> Unit,
-    val onSuccessMessageShown: () -> Unit,
-    val onErrorMessageShown: () -> Unit
-)
-
-private data class ProfileFormData(
-    val user: User,
-    val formState: ProfileFormState,
-    val isLoadingPhoto: Boolean,
-    val isSavingProfile: Boolean,
-    val onNameChange: (String) -> Unit,
-    val onBioChange: (String) -> Unit,
-    val onEditPictureClick: () -> Unit,
-    val onSaveClick: () -> Unit,
-    val onLoadingPhotoChange: (Boolean) -> Unit
-)
-
-private data class ProfileBodyData(
-    val uiState: ProfileUiState,
-    val formState: ProfileFormState,
-    val onNameChange: (String) -> Unit,
-    val onBioChange: (String) -> Unit,
-    val onEditPictureClick: () -> Unit,
-    val onSaveClick: () -> Unit,
-    val onLoadingPhotoChange: (Boolean) -> Unit
-)
-
-private data class ProfileFieldsData(
-    val name: String,
-    val email: String,
-    val bio: String,
-    val onNameChange: (String) -> Unit,
-    val onBioChange: (String) -> Unit
-)
 
 @Composable
 fun ManageProfileScreen(
@@ -121,58 +85,63 @@ fun ManageProfileScreen(
     val uiState by profileViewModel.uiState.collectAsState()
     val snackBarHostState = remember { SnackbarHostState() }
 
-    var showImagePickerDialog by remember { mutableStateOf(false) }
+    var formState by remember { mutableStateOf(ProfileFormState()) }
 
-    // Form state
-    var formState by remember {
-        mutableStateOf(ProfileFormState())
-    }
-
-    // Side effects
     LaunchedEffect(Unit) {
-        profileViewModel.clearSuccessMessage()
-        profileViewModel.clearError()
         if (uiState.user == null) {
             profileViewModel.loadProfile()
         }
+        profileViewModel.clearSuccessMessage()
+        profileViewModel.clearError()
+        profileViewModel.clearUsernameResult()
     }
 
     LaunchedEffect(uiState.user) {
         uiState.user?.let { user ->
-            formState = ProfileFormState(
-                name = user.name,
-                email = user.email,
-                bio = user.bio ?: "",
-                originalName = user.name,
-                originalBio = user.bio ?: ""
-            )
+            formState = formState.populateFromUser(user)
         }
     }
-
-    val actions = ManageProfileScreenActions(
-        onBackClick = onBackClick,
-        onNameChange = { formState = formState.copy(name = it) },
-        onBioChange = { formState = formState.copy(bio = it) },
-        onEditPictureClick = { showImagePickerDialog = true },
-        onSaveClick = {
-            profileViewModel.updateProfile(formState.name, formState.bio)
-        },
-        onImagePickerDismiss = { showImagePickerDialog = false },
-        onImageSelected = { uri ->
-            showImagePickerDialog = false
-            profileViewModel.uploadProfilePicture(uri)
-        },
-        onLoadingPhotoChange = profileViewModel::setLoadingPhoto,
-        onSuccessMessageShown = profileViewModel::clearSuccessMessage,
-        onErrorMessageShown = profileViewModel::clearError
-    )
 
     ManageProfileContent(
         uiState = uiState,
         formState = formState,
         snackBarHostState = snackBarHostState,
-        showImagePickerDialog = showImagePickerDialog,
-        actions = actions
+        onFormChange = { formState = it },
+        onCheckUsername = profileViewModel::checkUsernameAvailability,
+        onClearUsernameResult = profileViewModel::clearUsernameResult,
+        onSaveProfile = { updatedState ->
+            profileViewModel.updateProfile(
+                name = updatedState.name,
+                username = updatedState.username,
+                location = updatedState.location.ifBlank { null },
+                region = updatedState.region.ifBlank { null },
+                isPublicProfile = updatedState.isPublicProfile,
+                favoriteSpecies = updatedState.favoriteSpecies,
+                onSuccess = onBackClick
+            )
+        },
+        onBackClick = onBackClick,
+        onSuccessMessageShown = profileViewModel::clearSuccessMessage,
+        onErrorMessageShown = profileViewModel::clearError
+    )
+}
+
+private fun ProfileFormState.populateFromUser(user: User): ProfileFormState {
+    return copy(
+        name = user.name,
+        email = user.email,
+        username = user.username,
+        location = user.location.orEmpty(),
+        region = user.region.orEmpty(),
+        isPublicProfile = user.isPublicProfile,
+        favoriteSpecies = user.favoriteSpecies,
+        newFavoriteSpecies = "",
+        originalName = user.name,
+        originalUsername = user.username,
+        originalLocation = user.location.orEmpty(),
+        originalRegion = user.region.orEmpty(),
+        originalIsPublic = user.isPublicProfile,
+        originalFavoriteSpecies = user.favoriteSpecies
     )
 }
 
@@ -182,14 +151,19 @@ private fun ManageProfileContent(
     uiState: ProfileUiState,
     formState: ProfileFormState,
     snackBarHostState: SnackbarHostState,
-    showImagePickerDialog: Boolean,
-    actions: ManageProfileScreenActions,
+    onFormChange: (ProfileFormState) -> Unit,
+    onCheckUsername: (String) -> Unit,
+    onClearUsernameResult: () -> Unit,
+    onSaveProfile: (ProfileFormState) -> Unit,
+    onBackClick: () -> Unit,
+    onSuccessMessageShown: () -> Unit,
+    onErrorMessageShown: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
         modifier = modifier,
         topBar = {
-            ProfileTopBar(onBackClick = actions.onBackClick)
+            ManageProfileTopBar(onBackClick = onBackClick)
         },
         snackbarHost = {
             MessageSnackbar(
@@ -197,37 +171,27 @@ private fun ManageProfileContent(
                 messageState = MessageSnackbarState(
                     successMessage = uiState.successMessage,
                     errorMessage = uiState.errorMessage,
-                    onSuccessMessageShown = actions.onSuccessMessageShown,
-                    onErrorMessageShown = actions.onErrorMessageShown
+                    onSuccessMessageShown = onSuccessMessageShown,
+                    onErrorMessageShown = onErrorMessageShown
                 )
             )
         }
     ) { paddingValues ->
-        ProfileBody(
+        ManageProfileBody(
             paddingValues = paddingValues,
-            data = ProfileBodyData(
-                uiState = uiState,
-                formState = formState,
-                onNameChange = actions.onNameChange,
-                onBioChange = actions.onBioChange,
-                onEditPictureClick = actions.onEditPictureClick,
-                onSaveClick = actions.onSaveClick,
-                onLoadingPhotoChange = actions.onLoadingPhotoChange
-            )
-        )
-    }
-
-    if (showImagePickerDialog) {
-        ImagePicker(
-            onDismiss = actions.onImagePickerDismiss,
-            onImageSelected = actions.onImageSelected
+            uiState = uiState,
+            formState = formState,
+            onFormChange = onFormChange,
+            onCheckUsername = onCheckUsername,
+            onClearUsernameResult = onClearUsernameResult,
+            onSaveProfile = onSaveProfile
         )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProfileTopBar(
+private fun ManageProfileTopBar(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -253,36 +217,47 @@ private fun ProfileTopBar(
 }
 
 @Composable
-private fun ProfileBody(
+private fun ManageProfileBody(
     paddingValues: PaddingValues,
-    data: ProfileBodyData,
+    uiState: ProfileUiState,
+    formState: ProfileFormState,
+    onFormChange: (ProfileFormState) -> Unit,
+    onCheckUsername: (String) -> Unit,
+    onClearUsernameResult: () -> Unit,
+    onSaveProfile: (ProfileFormState) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val spacing = LocalSpacing.current
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .padding(paddingValues)
     ) {
         when {
-            data.uiState.isLoadingProfile -> {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center)
+            uiState.isLoadingProfile -> {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            }
+
+            uiState.user != null -> {
+                ProfileFormContent(
+                    formState = formState,
+                    uiState = uiState,
+                    onFormChange = onFormChange,
+                    onCheckUsername = onCheckUsername,
+                    onClearUsernameResult = onClearUsernameResult,
+                    onSaveProfile = onSaveProfile,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(spacing.large)
                 )
             }
 
-            data.uiState.user != null -> {
-                ProfileForm(
-                    data = ProfileFormData(
-                        user = data.uiState.user,
-                        formState = data.formState,
-                        isLoadingPhoto = data.uiState.isLoadingPhoto,
-                        isSavingProfile = data.uiState.isSavingProfile,
-                        onNameChange = data.onNameChange,
-                        onBioChange = data.onBioChange,
-                        onEditPictureClick = data.onEditPictureClick,
-                        onSaveClick = data.onSaveClick,
-                        onLoadingPhotoChange = data.onLoadingPhotoChange
-                    )
+            else -> {
+                Text(
+                    text = stringResource(R.string.profile_failed_to_load),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.align(Alignment.Center)
                 )
             }
         }
@@ -290,198 +265,313 @@ private fun ProfileBody(
 }
 
 @Composable
-private fun ProfileForm(
-    data: ProfileFormData,
+private fun ProfileFormContent(
+    formState: ProfileFormState,
+    uiState: ProfileUiState,
+    onFormChange: (ProfileFormState) -> Unit,
+    onCheckUsername: (String) -> Unit,
+    onClearUsernameResult: () -> Unit,
+    onSaveProfile: (ProfileFormState) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val spacing = LocalSpacing.current
-    val scrollState = rememberScrollState()
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(spacing.large)
-            .verticalScroll(scrollState),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    LazyColumn(
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(spacing.large)
     ) {
-        ProfilePictureCard(
-            profilePicture = data.user.profilePicture,
-            isLoadingPhoto = data.isLoadingPhoto,
-            onEditClick = data.onEditPictureClick,
-            onLoadingChange = data.onLoadingPhotoChange
-        )
-
-        ProfileFields(
-            data = ProfileFieldsData(
-                name = data.formState.name,
-                email = data.user.email,
-                bio = data.formState.bio,
-                onNameChange = data.onNameChange,
-                onBioChange = data.onBioChange
+        item {
+            ProfileInfoCard(
+                formState = formState,
+                onFormChange = onFormChange,
+                uiState = uiState,
+                onCheckUsername = onCheckUsername,
+                onClearUsernameResult = onClearUsernameResult
             )
-        )
+        }
 
-        SaveButton(
-            isSaving = data.isSavingProfile,
-            isEnabled = data.formState.hasChanges(),
-            onClick = data.onSaveClick
-        )
+        item {
+            FavoriteSpeciesEditor(
+                formState = formState,
+                onFormChange = onFormChange
+            )
+        }
+
+        item {
+            SaveProfileButton(
+                enabled = formState.hasChanges() && !uiState.isSavingProfile,
+                isSaving = uiState.isSavingProfile,
+                onClick = { onSaveProfile(formState) }
+            )
+        }
     }
 }
 
 @Composable
-private fun ProfilePictureCard(
-    profilePicture: String,
-    isLoadingPhoto: Boolean,
-    onEditClick: () -> Unit,
-    onLoadingChange: (Boolean) -> Unit,
+private fun ProfileInfoCard(
+    formState: ProfileFormState,
+    onFormChange: (ProfileFormState) -> Unit,
+    uiState: ProfileUiState,
+    onCheckUsername: (String) -> Unit,
+    onClearUsernameResult: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val spacing = LocalSpacing.current
+    val usernameResult = uiState.usernameResult
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(spacing.large),
+            verticalArrangement = Arrangement.spacedBy(spacing.medium)
+        ) {
+            Text(
+                text = stringResource(R.string.manage_profile_details_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            OutlinedTextField(
+                value = formState.name,
+                onValueChange = { onFormChange(formState.copy(name = it)) },
+                label = { Text(stringResource(R.string.profile_field_name)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = formState.email,
+                onValueChange = {},
+                enabled = false,
+                label = { Text(stringResource(R.string.profile_field_email)) },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = formState.username,
+                onValueChange = {
+                    onFormChange(formState.copy(username = it))
+                    onClearUsernameResult()
+                },
+                label = { Text(stringResource(R.string.profile_field_username)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(spacing.medium),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    fullWidth = false,
+                    onClick = { onCheckUsername(formState.username) },
+                    enabled = formState.username.isNotBlank() && !uiState.isCheckingUsername
+                ) {
+                    if (uiState.isCheckingUsername) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text(stringResource(R.string.profile_check_username))
+                    }
+                }
+
+                usernameResult?.let {
+                    val color = if (it.isAvailable) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    }
+
+                    Text(
+                        text = it.message,
+                        color = color,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
+            OutlinedTextField(
+                value = formState.location,
+                onValueChange = { onFormChange(formState.copy(location = it)) },
+                label = { Text(stringResource(R.string.profile_field_location)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = formState.region,
+                onValueChange = { onFormChange(formState.copy(region = it)) },
+                label = { Text(stringResource(R.string.profile_field_region)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            PrivacyToggle(
+                isPublic = formState.isPublicProfile,
+                onValueChange = { onFormChange(formState.copy(isPublicProfile = it)) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun PrivacyToggle(isPublic: Boolean, onValueChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    val spacing = LocalSpacing.current
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(spacing.medium),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.profile_privacy_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = stringResource(R.string.profile_privacy_subtitle),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            Switch(
+                checked = isPublic,
+                onCheckedChange = onValueChange,
+                colors = SwitchDefaults.colors()
+            )
+        }
+    }
+}
+
+@Composable
+private fun FavoriteSpeciesEditor(
+    formState: ProfileFormState,
+    onFormChange: (ProfileFormState) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val spacing = LocalSpacing.current
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(spacing.extraLarge),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.padding(spacing.large),
+            verticalArrangement = Arrangement.spacedBy(spacing.medium)
         ) {
-            ProfilePictureWithEdit(
-                profilePicture = profilePicture,
-                isLoadingPhoto = isLoadingPhoto,
-                onEditClick = onEditClick,
-                onLoadingChange = onLoadingChange
+            Text(
+                text = stringResource(R.string.profile_favorites_heading),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
             )
-        }
-    }
-}
 
-@Composable
-private fun ProfilePictureWithEdit(
-    profilePicture: String,
-    isLoadingPhoto: Boolean,
-    onEditClick: () -> Unit,
-    onLoadingChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val spacing = LocalSpacing.current
-
-    Box(
-        modifier = modifier.size(spacing.extraLarge5)
-    ) {
-        AsyncImage(
-            model = RetrofitClient.getPictureUri(profilePicture),
-            onLoading = { onLoadingChange(true) },
-            onSuccess = { onLoadingChange(false) },
-            onError = { onLoadingChange(false) },
-            contentDescription = stringResource(R.string.profile_picture),
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(CircleShape)
-        )
-
-        if (isLoadingPhoto) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(spacing.medium),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(spacing.large),
-                    color = MaterialTheme.colorScheme.primary,
-                    strokeWidth = 2.dp
+                OutlinedTextField(
+                    value = formState.newFavoriteSpecies,
+                    onValueChange = { onFormChange(formState.copy(newFavoriteSpecies = it)) },
+                    label = { Text(stringResource(R.string.profile_add_favorite_placeholder)) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
                 )
+
+                Button(
+                    fullWidth = false,
+                    onClick = {
+                        val trimmed = formState.newFavoriteSpecies.trim()
+                        if (trimmed.isNotEmpty() && !formState.favoriteSpecies.contains(trimmed, ignoreCase = true)) {
+                            onFormChange(
+                                formState.copy(
+                                    favoriteSpecies = formState.favoriteSpecies + trimmed,
+                                    newFavoriteSpecies = ""
+                                )
+                            )
+                        }
+                    },
+                    enabled = formState.newFavoriteSpecies.isNotBlank()
+                ) {
+                    Text(stringResource(R.string.profile_add_favorite_action))
+                }
+            }
+
+            if (formState.favoriteSpecies.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.profile_no_favorites),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
+                    formState.favoriteSpecies.forEach { species ->
+                        FavoriteSpeciesItem(
+                            species = species,
+                            onRemove = {
+                                onFormChange(
+                                    formState.copy(
+                                        favoriteSpecies = formState.favoriteSpecies.filterNot { it.equals(species, ignoreCase = true) }
+                                    )
+                                )
+                            }
+                        )
+                    }
+                }
             }
         }
-
-        IconButton(
-            onClick = onEditClick,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .size(spacing.extraLarge)
-                .background(
-                    color = MaterialTheme.colorScheme.primary,
-                    shape = CircleShape
-                )
-        ) {
-            Icon(
-                name = R.drawable.ic_edit,
-                type = "light"
-            )
-        }
     }
 }
 
-@Composable
-private fun ProfileFields(
-    data: ProfileFieldsData,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        OutlinedTextField(
-            value = data.name,
-            onValueChange = data.onNameChange,
-            label = { Text(stringResource(R.string.name)) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
-
-        OutlinedTextField(
-            value = data.email,
-            onValueChange = { /* Read-only */ },
-            label = { Text(stringResource(R.string.email)) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            enabled = false
-        )
-
-        OutlinedTextField(
-            value = data.bio,
-            onValueChange = data.onBioChange,
-            label = { Text(stringResource(R.string.bio)) },
-            placeholder = { Text(stringResource(R.string.bio_placeholder)) },
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 3,
-            maxLines = 5
-        )
-    }
+private fun List<String>.contains(value: String, ignoreCase: Boolean): Boolean {
+    return any { it.equals(value, ignoreCase = ignoreCase) }
 }
 
 @Composable
-private fun SaveButton(
-    isSaving: Boolean,
-    isEnabled: Boolean,
-    onClick: () -> Unit,
-) {
+private fun FavoriteSpeciesItem(species: String, onRemove: () -> Unit, modifier: Modifier = Modifier) {
     val spacing = LocalSpacing.current
 
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .padding(spacing.medium),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = species,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f)
+        )
+
+        Button(
+            fullWidth = false,
+            type = "secondary",
+            onClick = onRemove
+        ) {
+            Text(stringResource(R.string.profile_remove_favorite_action))
+        }
+    }
+}
+
+@Composable
+private fun SaveProfileButton(enabled: Boolean, isSaving: Boolean, onClick: () -> Unit) {
     Button(
+        fullWidth = true,
         onClick = onClick,
-        enabled = !isSaving && isEnabled,
+        enabled = enabled
     ) {
         if (isSaving) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(spacing.medium),
-                color = MaterialTheme.colorScheme.onPrimary,
-                strokeWidth = 2.dp
-            )
-            Spacer(modifier = Modifier.height(spacing.small))
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+        } else {
+            Text(text = stringResource(R.string.profile_save_changes))
         }
-        Text(
-            text = stringResource(if (isSaving) R.string.saving else R.string.save),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Medium
-        )
     }
 }
