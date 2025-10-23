@@ -235,12 +235,22 @@ export class UserModel {
     }
   }
 
-  async searchByName(query: string, limit: number = 10): Promise<IUser[]> {
+  async searchByName(
+    query: string,
+    limit: number = 10,
+    excludeUserId?: mongoose.Types.ObjectId
+  ): Promise<IUser[]> {
     try {
       // Case-insensitive partial match
-      const users = await this.user.find({
+      const filter: Record<string, unknown> = {
         name: new RegExp(query, 'i')
-      }).limit(limit);
+      };
+
+      if (excludeUserId) {
+        filter._id = { $ne: excludeUserId };
+      }
+
+      const users = await this.user.find(filter).limit(limit);
 
       return users;
     } catch (error) {

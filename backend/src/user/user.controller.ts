@@ -1,5 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 
+import mongoose from 'mongoose';
+
 import { GetProfileResponse, UpdateProfileRequest } from '../user/user.types';
 import logger from '../logger.util';
 import { userModel } from '../user/user.model';
@@ -234,7 +236,13 @@ export class UserController {
         });
       }
 
-      const users = await userModel.searchByName(query);
+      const excludeUserId = req.user?._id
+        ? req.user._id instanceof mongoose.Types.ObjectId
+          ? req.user._id
+          : new mongoose.Types.ObjectId(req.user._id)
+        : undefined;
+
+      const users = await userModel.searchByName(query, 10, excludeUserId);
       const currentUserId = req.user?._id?.toString();
 
       // Filter to only show public profiles
