@@ -1,6 +1,7 @@
 package com.cpen321.usermanagement.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,15 +41,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import com.cpen321.usermanagement.data.model.RecentObservation
 import com.cpen321.usermanagement.ui.navigation.NavRoutes
 import com.cpen321.usermanagement.ui.viewmodels.MainViewModel
 import com.cpen321.usermanagement.ui.viewmodels.ProfileViewModel
-
-private data class ObservationStub(
-    val title: String,
-    val subtitle: String,
-    val location: String
-)
 
 @Composable
 fun MainScreen(
@@ -89,14 +85,6 @@ fun MainScreen(
     val user = profileUiState.user
     val stats = profileUiState.stats
 
-    val recentObservations = remember {
-        listOf(
-            ObservationStub("American Robin", "Turdus migratorius", "Stanley Park"),
-            ObservationStub("Bald Eagle", "Haliaeetus leucocephalus", "Fraser River"),
-            ObservationStub("Great Blue Heron", "Ardea herodias", "Reifel Bird Sanctuary")
-        )
-    }
-
     Scaffold(
         snackbarHost = { SnackbarHost(snackBarHostState) }
     ) { paddingValues ->
@@ -131,8 +119,11 @@ fun MainScreen(
 
             item {
                 RecentObservationsSection(
-                    observations = recentObservations,
-                    onViewAll = { /* Stub: no-op */ }
+                    observations = mainUiState.recentObservations,
+                    isLoading = mainUiState.isLoadingRecent,
+                    errorMessage = mainUiState.recentError,
+                    onRetry = { mainViewModel.loadRecentObservations() },
+                    onViewAll = { /* TODO: navigate to observations list */ }
                 )
             }
         }
@@ -315,7 +306,10 @@ private fun MonthlyGoalCard(
 
 @Composable
 private fun RecentObservationsSection(
-    observations: List<ObservationStub>,
+    observations: List<RecentObservation>,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onRetry: () -> Unit,
     onViewAll: () -> Unit
 ) {
     Card(
@@ -341,6 +335,7 @@ private fun RecentObservationsSection(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .padding(horizontal = 4.dp)
+                        .clickable(onClick = onViewAll)
                 ) {
                     Text(
                         text = "View All",
@@ -356,10 +351,39 @@ private fun RecentObservationsSection(
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                observations.forEachIndexed { index, observation ->
-                    ObservationListItem(observation)
-                    if (index != observations.lastIndex) {
-                        HorizontalDivider()
+                when {
+                    isLoading -> {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                    errorMessage != null -> {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = errorMessage,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Button(onClick = onRetry) {
+                                Text("Retry")
+                            }
+                        }
+                    }
+                    observations.isEmpty() -> {
+                        Text(
+                            text = "No recent observations",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    else -> {
+                        observations.forEachIndexed { index, observation ->
+                            ObservationListItem(observation)
+                            if (index != observations.lastIndex) {
+                                HorizontalDivider()
+                            }
+                        }
                     }
                 }
             }
@@ -368,7 +392,7 @@ private fun RecentObservationsSection(
 }
 
 @Composable
-private fun ObservationListItem(observation: ObservationStub) {
+private fun ObservationListItem(observation: RecentObservation) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -391,6 +415,20 @@ private fun ObservationListItem(observation: ObservationStub) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            observation.createdAt?.let { createdAt ->
+                Text(
+                    text = "Observed ${createdAt.toLocalDate()} at ${createdAt.toLocalTime().withNano(0)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            observation.notes?.takeIf { it.isNotBlank() }?.let { notes ->
+                Text(
+                    text = notes,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         Icon(

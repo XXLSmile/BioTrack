@@ -36,6 +36,12 @@ router.get(
   recognitionController.getUserCatalog
 );
 
+router.get(
+  '/recent',
+  authenticateToken,
+  recognitionController.getRecentEntries
+);
+
 /**
  * GET /api/recognition/image/:entryId
  * Get image from database by catalog entry ID

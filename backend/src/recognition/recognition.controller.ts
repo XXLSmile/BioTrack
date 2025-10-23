@@ -195,6 +195,30 @@ export class RecognitionController {
     }
   }
 
+  async getRecentEntries(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const user = req.user!;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
+
+      const entries = await catalogRepository.findRecentByUserId(user._id.toString(), limit);
+
+      return res.status(200).json({
+        message: 'Recent catalog entries fetched successfully',
+        data: {
+          entries,
+          count: entries.length,
+        },
+      });
+    } catch (error) {
+      logger.error('Error fetching recent catalog entries:', error);
+      next(error);
+    }
+  }
+
   /**
    * GET /api/recognition/image/:entryId
    * Get image from database by catalog entry ID

@@ -101,6 +101,13 @@ export class CatalogRepository {
       .populate('speciesId');
   }
 
+  async findRecentByUserId(userId: string, limit: number = 10): Promise<ICatalogEntry[]> {
+    return CatalogModel.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .populate('speciesId');
+  }
+
   async countByUserId(userId: string): Promise<number> {
     return await CatalogModel.countDocuments({ userId });
   }
@@ -112,4 +119,3 @@ export class CatalogRepository {
 }
 
 export const catalogRepository = new CatalogRepository();
-
