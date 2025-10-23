@@ -10,7 +10,6 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
     private const val BASE_URL = BuildConfig.API_BASE_URL
-    private const val IMAGE_BASE_URL = BuildConfig.IMAGE_BASE_URL
     private const val COLOR_API_BASE_URL = "http://colormind.io/"
 
     private var authToken: String? = null
