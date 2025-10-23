@@ -51,6 +51,10 @@ class FriendViewModel @Inject constructor(
     val uiState: StateFlow<FriendUiState> = _uiState.asStateFlow()
 
     init {
+        refreshAll()
+    }
+
+    fun refreshAll() {
         refreshFriends()
         refreshIncomingRequests()
         refreshSentRequests()
@@ -88,6 +92,11 @@ class FriendViewModel @Inject constructor(
 
     fun switchTab(tab: FriendUiTab) {
         _uiState.update { it.copy(selectedTab = tab) }
+        when (tab) {
+            FriendUiTab.FRIENDS -> refreshFriends()
+            FriendUiTab.REQUESTS -> refreshIncomingRequests()
+            FriendUiTab.SENT -> refreshSentRequests()
+        }
     }
 
     fun sendFriendRequest(targetUserId: String) {

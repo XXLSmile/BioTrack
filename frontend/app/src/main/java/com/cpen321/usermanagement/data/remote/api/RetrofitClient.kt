@@ -60,14 +60,6 @@ object RetrofitClient {
         authToken = token
     }
 
-    fun getPictureUri(picturePath: String): String {
-        return if (picturePath.startsWith("uploads/")) {
-            IMAGE_BASE_URL + picturePath
-        } else {
-            picturePath
-        }
-    }
-
     val wildlifeApi: WildlifeApi by lazy {
         retrofit.create(WildlifeApi::class.java)
     }

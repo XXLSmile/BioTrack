@@ -1,7 +1,7 @@
 package com.cpen321.usermanagement.ui.screens
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -32,22 +34,30 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.cpen321.usermanagement.data.remote.dto.FriendSummary
 import com.cpen321.usermanagement.data.remote.dto.FriendRequestSummary
 import com.cpen321.usermanagement.data.remote.dto.PublicUserSummary
@@ -58,6 +68,22 @@ import com.cpen321.usermanagement.ui.viewmodels.FriendViewModel
 @Composable
 fun FriendsScreen(viewModel: FriendViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshAll()
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshAll()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     FriendsScreenContent(
         uiState = uiState,
         onSearchQueryChange = viewModel::updateSearchQuery,
@@ -67,7 +93,8 @@ fun FriendsScreen(viewModel: FriendViewModel = hiltViewModel()) {
         onAcceptRequest = viewModel::acceptFriendRequest,
         onDeclineRequest = viewModel::declineFriendRequest,
         onRemoveFriend = viewModel::removeFriend,
-        onCancelRequest = viewModel::cancelFriendRequest
+        onCancelRequest = viewModel::cancelFriendRequest,
+        onClearMessage = viewModel::clearMessages
     )
 }
 
@@ -83,9 +110,27 @@ private fun FriendsScreenContent(
     onDeclineRequest: (String) -> Unit,
     onRemoveFriend: (String) -> Unit,
     onCancelRequest: (String) -> Unit,
+    onClearMessage: () -> Unit,
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.successMessage) {
+        uiState.successMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            onClearMessage()
+        }
+    }
+
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            onClearMessage()
+        }
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -117,7 +162,9 @@ private fun FriendsScreenContent(
                     onDecline = onDeclineRequest,
                     emptyMessage = "No new requests",
                     primaryActionText = "Accept",
-                    secondaryActionText = "Decline"
+                    secondaryActionText = "Decline",
+                    primaryActionEnabled = true,
+                    userResolver = { it.requester }
                 )
                 FriendUiTab.SENT -> FriendRequestSection(
                     requests = uiState.sentRequests,
@@ -127,7 +174,8 @@ private fun FriendsScreenContent(
                     emptyMessage = "No pending requests",
                     primaryActionText = "Pending",
                     secondaryActionText = "Cancel",
-                    primaryActionEnabled = false
+                    primaryActionEnabled = false,
+                    userResolver = { it.addressee }
                 )
             }
 
@@ -149,7 +197,10 @@ private fun FriendsScreenContent(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Medium
                         )
-                        Divider()
+                        Divider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                            thickness = 1.dp
+                        )
                         LazyColumn(
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                             modifier = Modifier.heightIn(max = 280.dp)
@@ -222,38 +273,35 @@ private fun FriendTabRow(
 ) {
     val tabs = FriendUiTab.values()
     val selectedIndex = tabs.indexOf(selected)
-    TabRow(
-        selectedTabIndex = selectedIndex,
-        containerColor = Color(0xFFF4F4F8),
-        contentColor = MaterialTheme.colorScheme.primary,
-        indicator = {},
-        divider = {}
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color(0xFFF4F4F8))
+            .padding(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        tabs.forEachIndexed { index, tab ->
-            Tab(
-                selected = index == selectedIndex,
-                onClick = { onTabSelected(tab) },
+        tabs.forEach { tab ->
+            val isSelected = tab == selected
+            val background = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
+            val contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+
+            Box(
                 modifier = Modifier
-                    .padding(horizontal = 4.dp, vertical = 8.dp)
-                    .clip(RoundedCornerShape(16.dp)),
-                selectedContentColor = MaterialTheme.colorScheme.onPrimary,
-                unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    .weight(1f)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(background)
+                    .clickable { onTabSelected(tab) }
+                    .padding(vertical = 10.dp, horizontal = 12.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .background(
-                            color = if (index == selectedIndex)
-                                MaterialTheme.colorScheme.primary else Color.Transparent,
-                            shape = RoundedCornerShape(16.dp)
-                        )
-                ) {
-                    Text(
-                        text = tab.label,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                }
+                Text(
+                    text = tab.label,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = contentColor
+                )
             }
         }
     }
@@ -290,7 +338,8 @@ private fun FriendRequestSection(
     emptyMessage: String,
     primaryActionText: String,
     secondaryActionText: String,
-    primaryActionEnabled: Boolean = true
+    primaryActionEnabled: Boolean = true,
+    userResolver: (FriendRequestSummary) -> PublicUserSummary?
 ) {
     FriendCardWrapper {
         when {
@@ -300,6 +349,7 @@ private fun FriendRequestSection(
                 items(requests) { request ->
                     FriendRequestRow(
                         request = request,
+                        user = userResolver(request) ?: request.requester ?: request.addressee,
                         primaryActionText = primaryActionText,
                         secondaryActionText = secondaryActionText,
                         onPrimaryAction = { onAccept(request._id) },
@@ -379,8 +429,12 @@ private fun FriendRow(friend: FriendSummary, onRemoveFriend: (String) -> Unit) {
             user = friend.user,
             subtitle = "Friends since ${friend.since}"
         )
-        TextButton(onClick = { onRemoveFriend(friend.friendshipId) }) {
-            Text(text = "Remove", color = MaterialTheme.colorScheme.error)
+        IconButton(onClick = { onRemoveFriend(friend.friendshipId) }) {
+            Icon(
+                imageVector = Icons.Rounded.Delete,
+                contentDescription = "Remove friend",
+                tint = MaterialTheme.colorScheme.error
+            )
         }
     }
 }
@@ -388,13 +442,13 @@ private fun FriendRow(friend: FriendSummary, onRemoveFriend: (String) -> Unit) {
 @Composable
 private fun FriendRequestRow(
     request: FriendRequestSummary,
+    user: PublicUserSummary?,
     primaryActionText: String,
     secondaryActionText: String,
     onPrimaryAction: () -> Unit,
     onSecondaryAction: () -> Unit,
     primaryActionEnabled: Boolean
 ) {
-    val user = request.requester ?: request.addressee
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
