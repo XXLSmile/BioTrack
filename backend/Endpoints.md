@@ -119,6 +119,7 @@ All responses follow:
 | POST | `/` | No | `multipart/form-data` field `image` (+ optional `latitude`, `longitude`) | Runs iNaturalist image recognition and returns candidate species. |
 | POST | `/save` | Yes | Same form-data | Recognize, persist catalog entry (stores image, metadata). |
 | GET | `/catalog` | Yes | — | Shortcut to fetch the authenticated user’s catalog entries. |
+| GET | `/recent` | Yes | `?limit=10` | Latest observations for the current user (sorted by `createdAt` desc). |
 | GET | `/image/:entryId` | Yes | — | Streams stored image buffer for a catalog entry. |
 
 **Recognition success response**
@@ -154,6 +155,34 @@ All responses follow:
   "data": {
     "entry": { ... },
     "recognition": { ...same as above... }
+  }
+}
+```
+
+`/recent` example:
+```json
+{
+  "message": "Recent catalog entries fetched successfully",
+  "data": {
+    "entries": [
+      {
+        "_id": "6648c...",
+        "userId": "6631b...",
+        "speciesId": {
+          "_id": "662f...",
+          "scientificName": "Corvus brachyrhynchos",
+          "commonName": "American Crow",
+          "rank": "species",
+          "imageUrl": "https://..."
+        },
+        "imageUrl": "/uploads/images/1713988123-123456789.jpg",
+        "confidence": 0.92,
+        "notes": "Perched on fence",
+        "createdAt": "2024-05-01T19:24:00.000Z",
+        "updatedAt": "2024-05-01T19:24:00.000Z"
+      }
+    ],
+    "count": 1
   }
 }
 ```
