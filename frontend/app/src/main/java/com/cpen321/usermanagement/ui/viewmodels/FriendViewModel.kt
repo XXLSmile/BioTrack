@@ -50,10 +50,6 @@ class FriendViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(FriendUiState())
     val uiState: StateFlow<FriendUiState> = _uiState.asStateFlow()
 
-    init {
-        refreshAll()
-    }
-
     fun refreshAll() {
         refreshFriends()
         refreshIncomingRequests()
