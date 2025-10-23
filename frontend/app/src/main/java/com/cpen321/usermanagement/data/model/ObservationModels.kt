@@ -11,6 +11,7 @@ data class RecentObservation(
     val location: String,
     val imageUrl: String?,
     val notes: String?,
+    val confidence: Double?,
     val createdAtIso: String?
 ) {
     val createdAt: OffsetDateTime? = createdAtIso?.let {

@@ -44,6 +44,7 @@ private fun RecentEntryDto.toDomain(): RecentObservation {
         location = location,
         imageUrl = species?.imageUrl ?: imageUrl,
         notes = notes,
+        confidence = confidence,
         createdAtIso = createdAt
     )
 }
