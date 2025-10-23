@@ -26,10 +26,6 @@ class MainViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
-    init {
-        loadRecentObservations()
-    }
-
     fun setSuccessMessage(message: String) {
         _uiState.value = _uiState.value.copy(successMessage = message)
     }
