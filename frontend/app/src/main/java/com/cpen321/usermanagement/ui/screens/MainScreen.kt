@@ -81,6 +81,10 @@ fun MainScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        mainViewModel.loadRecentObservations()
+    }
+
     LaunchedEffect(mainUiState.successMessage) {
         val message = mainUiState.successMessage
         if (message != null) {

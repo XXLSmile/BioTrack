@@ -11,11 +11,18 @@ import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
 @Composable
 fun AddToCatalogDialog(
     viewModel: CatalogViewModel,
+    isSaving: Boolean,
     onSave: (catalogId: String) -> Unit,
     onDismiss: () -> Unit
 ) {
     val catalogs by viewModel.catalogs.collectAsState()
     var selectedCatalogId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(catalogs) {
+        if (selectedCatalogId == null && catalogs.isNotEmpty()) {
+            selectedCatalogId = catalogs.first()._id
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -23,12 +30,35 @@ fun AddToCatalogDialog(
             TextButton(
                 onClick = {
                     selectedCatalogId?.let { onSave(it) }
-                    onDismiss()
                 },
-                enabled = selectedCatalogId != null
-            ) { Text("Save") }
+                enabled = selectedCatalogId != null && !isSaving
+            ) {
+                if (isSaving) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Text("Saving…")
+                    }
+                } else {
+                    Text("Save")
+                }
+            }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = {
+            TextButton(
+                onClick = {
+                    if (!isSaving) {
+                        onDismiss()
+                    }
+                },
+                enabled = !isSaving
+            ) { Text("Cancel") }
+        },
         title = { Text("Save to Catalog") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
