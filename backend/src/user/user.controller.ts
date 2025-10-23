@@ -235,10 +235,17 @@ export class UserController {
       }
 
       const users = await userModel.searchByName(query);
+      const currentUserId = req.user?._id?.toString();
 
       // Filter to only show public profiles
       const publicUsers = users
         .filter(user => user.isPublicProfile)
+        .filter(user => {
+          if (!currentUserId) {
+            return true;
+          }
+          return user._id.toString() !== currentUserId;
+        })
         .map(user => ({
           _id: user._id,
           name: user.name,
