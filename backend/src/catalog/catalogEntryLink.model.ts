@@ -90,10 +90,12 @@ export class CatalogEntryLinkModel {
   ): Promise<ICatalogEntryLink[]> {
     return this.link
       .find({ catalog: catalogId })
-      .populate('entry')
+      .populate({
+        path: 'entry',
+        populate: { path: 'speciesId' }
+      })
       .populate('addedBy', 'name username profilePicture');
   }
 }
 
 export const catalogEntryLinkModel = new CatalogEntryLinkModel();
-

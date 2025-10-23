@@ -23,10 +23,13 @@ import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
 import com.cpen321.usermanagement.data.remote.api.RetrofitClient
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.FileOutputStream
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -44,6 +47,8 @@ fun CameraScreen(
     var imageUri by remember { mutableStateOf<Uri?>(null) }
     var resultText by remember { mutableStateOf<String?>(null) }
     var showCatalogDialog by remember { mutableStateOf(false) }
+    var recognitionResult by remember { mutableStateOf<ScanResponse?>(null) }
+    var isSaving by remember { mutableStateOf(false) }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
@@ -121,14 +126,14 @@ fun CameraScreen(
                     imageUri?.let { uri ->
                         scope.launch {
                             resultText = "Recognizing..."
-                            val result = uploadImageToApi(context, uri)
-                            resultText = result
-                            // Always show catalog dialog, even on failure
-                            showCatalogDialog = true
+                            val (message, response) = recognizeImage(context, uri)
+                            resultText = message
+                            recognitionResult = response
+                            showCatalogDialog = response != null
                         }
                     }
                 },
-                enabled = imageUri != null,
+                enabled = imageUri != null && !isSaving,
                 modifier = Modifier.fillMaxWidth(0.8f)
             ) {
                 Icon(Icons.Default.Search, contentDescription = null)
@@ -148,20 +153,42 @@ fun CameraScreen(
         }
     }
 
-    // Show Add to Catalog dialog after scan
-    if (showCatalogDialog) {
+    LaunchedEffect(showCatalogDialog) {
+        if (showCatalogDialog) {
+            viewModel.loadCatalogs()
+        }
+    }
+
+    // Show Add to Catalog dialog after a successful scan
+    if (showCatalogDialog && recognitionResult != null) {
         AddToCatalogDialog(
             viewModel = viewModel,
+            isSaving = isSaving,
             onSave = { catalogId ->
-                // Here you would save the result + photo to catalog
-                showCatalogDialog = false
-                imageUri = null
-                resultText = null
+                if (isSaving) return@AddToCatalogDialog
+                val uriToSave = imageUri
+                if (uriToSave == null) {
+                    resultText = "⚠️ Select an image before saving."
+                    return@AddToCatalogDialog
+                }
+                isSaving = true
+                scope.launch {
+                    val (success, message) = saveRecognitionToCatalog(context, uriToSave, catalogId)
+                    resultText = message
+                    if (success) {
+                        showCatalogDialog = false
+                        recognitionResult = null
+                        imageUri = null
+                        viewModel.loadCatalogs()
+                    }
+                    isSaving = false
+                }
             },
             onDismiss = {
-                showCatalogDialog = false
-                imageUri = null
-                resultText = null
+                if (!isSaving) {
+                    showCatalogDialog = false
+                    recognitionResult = null
+                }
             }
         )
     }
@@ -175,40 +202,98 @@ private fun saveBitmapToCache(context: Context, bitmap: Bitmap): Uri {
     return Uri.fromFile(file)
 }
 
-private suspend fun uploadImageToApi(context: Context, uri: Uri): String {
+private suspend fun recognizeImage(
+    context: Context,
+    uri: Uri
+): Pair<String, ScanResponse?> {
+    var tempFile: File? = null
     return try {
-        val inputStream = context.contentResolver.openInputStream(uri)
-        val file = File(context.cacheDir, "upload.jpg")
-        val outputStream = FileOutputStream(file)
-        inputStream?.copyTo(outputStream)
-        outputStream.close()
+        val (imagePart, file) = createImagePart(context, uri)
+        tempFile = file
+        val response = withContext(Dispatchers.IO) {
+            RetrofitClient.wildlifeApi.recognizeAnimal(imagePart)
+        }
 
-        val requestFile = file.asRequestBody("image/jpeg".toMediaTypeOrNull())
-        val body = MultipartBody.Part.createFormData("image", file.name, requestFile)
-
-        // Call your backend API now
-        val response = RetrofitClient.wildlifeApi.recognizeAnimal(body)
-
-        if (response.isSuccessful && response.body() != null) {
-            val result = response.body()!!
-            val species = result.data.species
-            val confidence = String.format("%.2f", result.data.confidence * 100)
-
-            if (species != null) {
-                "✅ ${species.commonName ?: species.scientificName}\n" +
-                        "(${species.scientificName})\n" +
-                        "Confidence: $confidence%"
+        if (response.isSuccessful) {
+            val body = response.body()
+            if (body?.data?.species != null) {
+                formatRecognitionMessage(body) to body
             } else {
-                "⚠️ No species identified. Try again!"
+                "⚠️ No species identified. Try again!" to null
             }
         } else {
-            "❌ Error: ${response.message()}"
+            val errorMessage = response.errorBody()?.string()?.takeIf { it.isNotBlank() }
+            "❌ Error: ${errorMessage ?: response.message()}" to null
         }
     } catch (e: Exception) {
-        "⚠️ Upload failed: ${e.localizedMessage}"
+        "⚠️ Upload failed: ${e.localizedMessage ?: "Unknown error"}" to null
+    } finally {
+        tempFile?.delete()
     }
 }
 
+private suspend fun saveRecognitionToCatalog(
+    context: Context,
+    uri: Uri,
+    catalogId: String
+): Pair<Boolean, String> {
+    var tempFile: File? = null
+    return try {
+        val (imagePart, file) = createImagePart(context, uri)
+        tempFile = file
+        val catalogIdBody = catalogId.toRequestBody("text/plain".toMediaTypeOrNull())
 
+        val response = withContext(Dispatchers.IO) {
+            RetrofitClient.wildlifeApi.recognizeAndSave(imagePart, catalogIdBody)
+        }
 
+        if (response.isSuccessful) {
+            val body = response.body()
+            if (body?.data?.entry?._id != null) {
+                val speciesName = body.data.recognition?.species?.let {
+                    it.commonName ?: it.scientificName
+                }
+                val message = speciesName?.let { "✅ Saved $it to catalog." }
+                    ?: (body?.message?.takeIf { it.isNotBlank() } ?: "✅ Saved entry to catalog.")
+                true to message
+            } else {
+                false to (body?.message ?: "Failed to save entry.")
+            }
+        } else {
+            val errorMessage = response.errorBody()?.string()?.takeIf { it.isNotBlank() }
+            false to ("❌ Error: ${errorMessage ?: response.message()}")
+        }
+    } catch (e: Exception) {
+        false to ("⚠️ Save failed: ${e.localizedMessage ?: "Unknown error"}")
+    } finally {
+        tempFile?.delete()
+    }
+}
 
+private suspend fun createImagePart(
+    context: Context,
+    uri: Uri
+): Pair<MultipartBody.Part, File> = withContext(Dispatchers.IO) {
+    val inputStream = context.contentResolver.openInputStream(uri)
+        ?: throw IllegalArgumentException("Unable to open selected image.")
+    val tempFile = File.createTempFile("upload_", ".jpg", context.cacheDir)
+    inputStream.use { input ->
+        FileOutputStream(tempFile).use { output ->
+            input.copyTo(output)
+        }
+    }
+
+    val requestFile = tempFile.asRequestBody("image/jpeg".toMediaTypeOrNull())
+    MultipartBody.Part.createFormData("image", tempFile.name, requestFile) to tempFile
+}
+
+private fun formatRecognitionMessage(response: ScanResponse): String {
+    val species = response.data.species
+    return if (species != null) {
+        val displayName = species.commonName ?: species.scientificName
+        val confidencePercent = String.format("%.2f", response.data.confidence * 100)
+        "✅ $displayName\n(${species.scientificName})\nConfidence: $confidencePercent%"
+    } else {
+        "⚠️ No species identified. Try again!"
+    }
+}

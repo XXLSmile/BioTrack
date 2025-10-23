@@ -1,12 +1,17 @@
 import { Request, Response, NextFunction } from 'express';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
+import mongoose from 'mongoose';
+
 import { recognitionService } from './recognition.service';
 import { catalogRepository } from './catalog.model';
 import { speciesRepository } from './species.model';
 import { userModel } from '../user/user.model';
 import logger from '../logger.util';
 import { RecognitionImageResponse } from './recognition.types';
+import { catalogModel } from '../catalog/catalog.model';
+import { catalogEntryLinkModel } from '../catalog/catalogEntryLink.model';
 
 export class RecognitionController {
   /**
@@ -84,7 +89,7 @@ export class RecognitionController {
       }
 
       const user = req.user!;
-      const { latitude, longitude, notes } = req.body;
+      const { latitude, longitude, notes, catalogId } = req.body;
 
       // Recognize species
       const recognitionResult = await recognitionService.recognizeFromImage(
@@ -104,52 +109,138 @@ export class RecognitionController {
         imageUrl: recognitionResult.species.imageUrl,
       });
 
-      // Save image to disk (for backwards compatibility and quick access)
-      const IMAGES_DIR = path.join(__dirname, '../../uploads/images');
-      if (!fs.existsSync(IMAGES_DIR)) {
-        fs.mkdirSync(IMAGES_DIR, { recursive: true });
-      }
-      
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-      const extension = path.extname(req.file.originalname) || '.jpg';
-      const filename = `${uniqueSuffix}${extension}`;
-      const filepath = path.join(IMAGES_DIR, filename);
-      
-      // Write buffer to disk
-      fs.writeFileSync(filepath, req.file.buffer);
-      
-      const imageUrl = `/uploads/images/${filename}`;
+      const imageHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
 
       // Create observation entry with image data stored in database
-      const catalogEntry = await catalogRepository.create({
-        userId: user._id.toString(),
-        speciesId: species._id.toString(),
-        imageUrl,
-        imageData: req.file.buffer, // Save the actual image data to DB
-        imageMimeType: req.file.mimetype, // Save the image MIME type
-        latitude: latitude ? parseFloat(latitude) : undefined,
-        longitude: longitude ? parseFloat(longitude) : undefined,
-        confidence: recognitionResult.confidence,
-        notes,
-      });
+      let catalogToLink: { _id: mongoose.Types.ObjectId } | null = null;
+      if (catalogId) {
+        if (!mongoose.Types.ObjectId.isValid(catalogId)) {
+          return res.status(400).json({
+            message: 'Invalid catalog ID',
+          });
+        }
 
-      // Update user stats
-      await userModel.incrementObservationCount(user._id);
-      
-      // Check if this is a new species for this user
-      const userCatalog = await catalogRepository.findByUserId(user._id.toString());
-      const uniqueSpeciesIds = new Set(userCatalog.map(entry => entry.speciesId.toString()));
-      const newSpeciesCount = uniqueSpeciesIds.size;
-      
-      // Award badges
-      if (newSpeciesCount === 1) {
-        await userModel.addBadge(user._id, 'First Sighting');
+        const catalog = await catalogModel.findById(catalogId);
+        if (!catalog) {
+          return res.status(404).json({
+            message: 'Catalog not found',
+          });
+        }
+
+        if (!catalog.owner.equals(user._id)) {
+          return res.status(403).json({
+            message: 'You do not have permission to modify this catalog',
+          });
+        }
+
+        catalogToLink = { _id: catalog._id };
       }
-      if (newSpeciesCount === 10) {
-        await userModel.addBadge(user._id, 'Explorer');
+
+      let catalogEntry = await catalogRepository.findByHash(
+        user._id.toString(),
+        imageHash
+      );
+
+      let isNewEntry = false;
+
+      if (!catalogEntry) {
+        // Save image to disk (for backwards compatibility and quick access)
+        const IMAGES_DIR = path.join(__dirname, '../../uploads/images');
+        if (!fs.existsSync(IMAGES_DIR)) {
+          fs.mkdirSync(IMAGES_DIR, { recursive: true });
+        }
+
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        const extension = path.extname(req.file.originalname) || '.jpg';
+        const filename = `${uniqueSuffix}${extension}`;
+        const filepath = path.join(IMAGES_DIR, filename);
+
+        try {
+          fs.writeFileSync(filepath, req.file.buffer);
+
+          const imageUrl = `/uploads/images/${filename}`;
+
+          catalogEntry = await catalogRepository.create({
+            userId: user._id.toString(),
+            speciesId: species._id.toString(),
+            imageUrl,
+            imageData: req.file.buffer, // Save the actual image data to DB
+            imageMimeType: req.file.mimetype, // Save the image MIME type
+            latitude: latitude ? parseFloat(latitude) : undefined,
+            longitude: longitude ? parseFloat(longitude) : undefined,
+            confidence: recognitionResult.confidence,
+            notes,
+            imageHash,
+          });
+
+          isNewEntry = true;
+        } catch (error) {
+          if ((error as { code?: number }).code === 11000) {
+            catalogEntry = await catalogRepository.findByHash(
+              user._id.toString(),
+              imageHash
+            );
+
+            if (fs.existsSync(filepath)) {
+              fs.unlinkSync(filepath);
+            }
+          } else {
+            if (fs.existsSync(filepath)) {
+              fs.unlinkSync(filepath);
+            }
+            throw error;
+          }
+        }
       }
-      if (newSpeciesCount === 50) {
-        await userModel.addBadge(user._id, 'Naturalist');
+
+      if (!catalogEntry) {
+        logger.error('Catalog entry could not be created or retrieved for hash', {
+          userId: user._id.toString(),
+          imageHash,
+        });
+
+        return res.status(500).json({
+          message: 'Failed to save catalog entry',
+        });
+      }
+
+      let linkedCatalogId: mongoose.Types.ObjectId | undefined;
+      if (catalogToLink) {
+        const alreadyLinked = await catalogEntryLinkModel.isEntryLinked(
+          catalogToLink._id,
+          catalogEntry._id
+        );
+
+        if (!alreadyLinked) {
+          await catalogEntryLinkModel.linkEntry(
+            catalogToLink._id,
+            catalogEntry._id,
+            user._id
+          );
+        }
+
+        linkedCatalogId = catalogToLink._id;
+      }
+
+      if (isNewEntry) {
+        // Update user stats only when a brand new entry is created
+        await userModel.incrementObservationCount(user._id);
+
+        // Check if this is a new species for this user
+        const userCatalog = await catalogRepository.findByUserId(user._id.toString());
+        const uniqueSpeciesIds = new Set(userCatalog.map(entry => entry.speciesId.toString()));
+        const newSpeciesCount = uniqueSpeciesIds.size;
+
+        // Award badges
+        if (newSpeciesCount === 1) {
+          await userModel.addBadge(user._id, 'First Sighting');
+        }
+        if (newSpeciesCount === 10) {
+          await userModel.addBadge(user._id, 'Explorer');
+        }
+        if (newSpeciesCount === 50) {
+          await userModel.addBadge(user._id, 'Naturalist');
+        }
       }
 
       logger.info(`Observation entry created: ${catalogEntry._id}`);
@@ -159,6 +250,7 @@ export class RecognitionController {
         data: {
           entry: catalogEntry,
           recognition: recognitionResult,
+          linkedCatalogId,
         },
       });
     } catch (error) {
