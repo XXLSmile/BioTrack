@@ -2,6 +2,7 @@
 
 package com.cpen321.usermanagement.ui.screens
 
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -25,6 +26,7 @@ import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
 import com.cpen321.usermanagement.data.model.CatalogEntry as RemoteCatalogEntry
 import java.text.SimpleDateFormat
 import java.util.*
+import com.cpen321.usermanagement.BuildConfig
 
 @Composable
 fun CatalogDetailScreen(
@@ -110,6 +112,7 @@ private fun EntryCard(entry: RemoteCatalogEntry) {
     val item = entry.entry
     val speciesName = item.species ?: (item._id ?: "Unknown")
     val imageUrl = item.imageUrl
+    val resolvedImageUrl = remember(imageUrl) { resolveImageUrl(imageUrl) }
     val linkedAt = entry.linkedAt
 
     ElevatedCard(
@@ -123,9 +126,9 @@ private fun EntryCard(entry: RemoteCatalogEntry) {
             verticalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier.padding(8.dp)
         ) {
-            if (!imageUrl.isNullOrBlank()) {
+            if (!resolvedImageUrl.isNullOrBlank()) {
                 Image(
-                    painter = rememberAsyncImagePainter(imageUrl),
+                    painter = rememberAsyncImagePainter(resolvedImageUrl),
                     contentDescription = speciesName,
                     modifier = Modifier
                         .size(100.dp)
@@ -166,5 +169,29 @@ private fun formatIsoToPrettyDate(iso: String): String {
         out.format(date!!)
     } catch (e: Exception) {
         iso.take(10)
+    }
+}
+
+private fun resolveImageUrl(rawUrl: String?): String? {
+    if (rawUrl.isNullOrBlank()) return null
+
+    val baseUrl = BuildConfig.IMAGE_BASE_URL.trimEnd('/')
+
+    return try {
+        val uri = Uri.parse(rawUrl)
+        val host = uri.host?.lowercase(Locale.ROOT)
+        when {
+            uri.scheme.isNullOrBlank() -> {
+                "$baseUrl/${rawUrl.trimStart('/')}"
+            }
+            host == "localhost" || host == "127.0.0.1" -> {
+                val path = uri.path ?: ""
+                val fullPath = if (path.startsWith("/")) path else "/$path"
+                "$baseUrl$fullPath"
+            }
+            else -> rawUrl
+        }
+    } catch (e: Exception) {
+        "$baseUrl/${rawUrl.trimStart('/')}"
     }
 }

@@ -12,6 +12,7 @@ export interface ICatalogEntry extends Document {
   longitude?: number;
   confidence: number;
   notes?: string;
+  imageHash: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -58,6 +59,11 @@ const catalogSchema = new Schema<ICatalogEntry>(
       type: String,
       maxlength: 500,
     },
+    imageHash: {
+      type: String,
+      required: true,
+      index: true,
+    },
   },
   {
     timestamps: true,
@@ -67,6 +73,7 @@ const catalogSchema = new Schema<ICatalogEntry>(
 // Indexes for common queries
 catalogSchema.index({ userId: 1, createdAt: -1 });
 catalogSchema.index({ speciesId: 1, createdAt: -1 });
+catalogSchema.index({ userId: 1, imageHash: 1 }, { unique: true });
 
 export const CatalogModel = mongoose.model<ICatalogEntry>('CatalogEntry', catalogSchema);
 
@@ -82,9 +89,17 @@ export class CatalogRepository {
     longitude?: number;
     confidence: number;
     notes?: string;
+    imageHash: string;
   }): Promise<ICatalogEntry> {
     const catalogEntry = await CatalogModel.create(data);
     return catalogEntry;
+  }
+
+  async findByHash(
+    userId: string,
+    imageHash: string
+  ): Promise<ICatalogEntry | null> {
+    return CatalogModel.findOne({ userId, imageHash });
   }
 
   async findById(entryId: string): Promise<ICatalogEntry | null> {

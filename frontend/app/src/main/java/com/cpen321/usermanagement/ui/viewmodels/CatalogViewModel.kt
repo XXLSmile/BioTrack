@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import java.util.LinkedHashSet
 
 @HiltViewModel
 class CatalogViewModel @Inject constructor(
@@ -73,7 +74,23 @@ class CatalogViewModel @Inject constructor(
     fun loadCatalogDetail(catalogId: String) {
         viewModelScope.launch {
             try {
-                _catalogDetail.value = repository.getCatalogById(catalogId)
+                val detail = repository.getCatalogById(catalogId)
+                _catalogDetail.value = detail?.let { data ->
+                    val dedupedEntries = data.entries?.let { list ->
+                        val seen = LinkedHashSet<String>()
+                        list.filter { entry ->
+                            val key = buildString {
+                                append(entry.entry._id ?: "")
+                                append("|")
+                                append(entry.linkedAt ?: "")
+                                append("|")
+                                append(entry.entry.imageUrl ?: "")
+                            }
+                            seen.add(key)
+                        }
+                    }
+                    data.copy(entries = dedupedEntries)
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
                 _catalogDetail.value = null
