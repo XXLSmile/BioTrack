@@ -14,9 +14,11 @@ class CatalogRepository @Inject constructor(
     }
 
     suspend fun createCatalog(name: String, description: String? = null): Catalog? {
-        val response = api.createCatalog(
-            mapOf("name" to name, "description" to (description ?: ""))
-        )
+        val payload = mutableMapOf("name" to name)
+        if (!description.isNullOrBlank()) {
+            payload["description"] = description
+        }
+        val response = api.createCatalog(payload)
         return response.body()?.data?.catalog
     }
 

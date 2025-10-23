@@ -1,6 +1,5 @@
 package com.cpen321.usermanagement.di
 
-import com.cpen321.usermanagement.BuildConfig
 import com.cpen321.usermanagement.data.remote.api.AuthInterface
 import com.cpen321.usermanagement.data.remote.api.CatalogApi
 import com.cpen321.usermanagement.data.remote.api.ColorApiInterface
@@ -17,28 +16,11 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import okhttp3.OkHttpClient
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
-
-    @Provides
-    @Singleton
-    fun provideOkHttpClient(): OkHttpClient =
-        OkHttpClient.Builder().build()
-
-    @Provides
-    @Singleton
-    fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit =
-        Retrofit.Builder()
-            .baseUrl(BuildConfig.API_BASE_URL)
-            .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
 
     // Existing services (if they depend on RetrofitClient)
     @Provides @Singleton fun provideAuthService(): AuthInterface = RetrofitClient.authInterface
@@ -52,8 +34,7 @@ object NetworkModule {
     // For catalog
     @Provides
     @Singleton
-    fun provideCatalogApi(retrofit: Retrofit): CatalogApi =
-        retrofit.create(CatalogApi::class.java)
+    fun provideCatalogApi(): CatalogApi = RetrofitClient.catalogApi
 
     @Provides
     @Singleton

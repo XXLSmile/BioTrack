@@ -13,11 +13,14 @@ import { catalogModel } from './catalog.model';
 import { catalogShareModel } from './catalogShare.model';
 import { catalogEntryLinkModel, ICatalogEntryLink } from './catalogEntryLink.model';
 import { catalogRepository, ICatalogEntry } from '../recognition/catalog.model';
+import { ISpecies } from '../recognition/species.model';
 
 const serializeCatalogLinks = (
   links: ICatalogEntryLink[],
   fallbackUserId: mongoose.Types.ObjectId
 ): CatalogEntryLinkResponse[] => {
+  const seen = new Set<string>();
+
   return links.reduce<CatalogEntryLinkResponse[]>((acc, link) => {
     const entryDoc = link.entry as unknown as (ICatalogEntry & {
       toObject?: () => Record<string, unknown>;
@@ -27,10 +30,38 @@ const serializeCatalogLinks = (
       return acc;
     }
 
-    const serializedEntry =
+    const rawEntry =
       typeof entryDoc.toObject === 'function'
-        ? (entryDoc.toObject() as unknown as ICatalogEntry)
-        : entryDoc;
+        ? (entryDoc.toObject() as unknown as ICatalogEntry & { speciesId?: ISpecies | mongoose.Types.ObjectId })
+        : (entryDoc as unknown as ICatalogEntry & { speciesId?: ISpecies | mongoose.Types.ObjectId });
+
+    const speciesDoc = rawEntry.speciesId as (ISpecies & { toObject?: () => Record<string, unknown> }) | undefined;
+    let speciesName: string | undefined;
+    let speciesImageUrl: string | undefined;
+    let normalizedSpeciesId: mongoose.Types.ObjectId | undefined;
+
+    if (speciesDoc && typeof speciesDoc === 'object' && 'commonName' in speciesDoc) {
+      const speciesObj = typeof speciesDoc.toObject === 'function' ? speciesDoc.toObject() : speciesDoc;
+      speciesName = speciesObj.commonName || speciesObj.scientificName;
+      speciesImageUrl = speciesObj.imageUrl;
+      normalizedSpeciesId = speciesObj._id;
+    } else if (speciesDoc instanceof mongoose.Types.ObjectId) {
+      normalizedSpeciesId = speciesDoc;
+    }
+
+    const normalizedEntry: Record<string, unknown> = {
+      ...rawEntry,
+      speciesId: normalizedSpeciesId ?? rawEntry.speciesId,
+      species: speciesName ?? (rawEntry as unknown as { species?: string }).species,
+      imageUrl: speciesImageUrl ?? rawEntry.imageUrl,
+    };
+
+    const addedAtIso = link.addedAt instanceof Date ? link.addedAt.toISOString() : new Date(link.addedAt).toISOString();
+    const dedupeKey = `${(normalizedEntry as { _id?: mongoose.Types.ObjectId })._id?.toString() ?? ''}::${addedAtIso}`;
+    if (seen.has(dedupeKey)) {
+      return acc;
+    }
+    seen.add(dedupeKey);
 
     const addedByDoc = link.addedBy as { _id?: mongoose.Types.ObjectId } | mongoose.Types.ObjectId;
     const addedBy =
@@ -39,13 +70,37 @@ const serializeCatalogLinks = (
         : addedByDoc?._id ?? fallbackUserId;
 
     acc.push({
-      entry: serializedEntry,
+      entry: normalizedEntry as unknown as ICatalogEntry,
       linkedAt: link.addedAt,
       addedBy,
     });
 
     return acc;
   }, []);
+};
+
+const resolveImageUrl = (url: unknown, req: Request): string | undefined => {
+  if (!url) return undefined;
+  const urlString = String(url);
+  if (!urlString) return undefined;
+
+  if (/^https?:\/\//i.test(urlString)) {
+    return urlString;
+  }
+
+  const baseUrl = process.env.MEDIA_BASE_URL?.trim()
+    || `${req.protocol}://${req.get('host')}`;
+
+  try {
+    return new URL(urlString, baseUrl).toString();
+  } catch (error) {
+    logger.warn('Failed to resolve image URL, returning original value', {
+      url: urlString,
+      baseUrl,
+      error,
+    });
+    return urlString;
+  }
 };
 
 export class CatalogController {
@@ -133,7 +188,13 @@ export class CatalogController {
       let entries: CatalogEntryLinkResponse[] = [];
       if (isOwner || share?.role) {
         const links = await catalogEntryLinkModel.listEntriesWithDetails(catalog._id);
-        entries = serializeCatalogLinks(links, user._id);
+        entries = serializeCatalogLinks(links, user._id).map(entry => ({
+          ...entry,
+          entry: {
+            ...entry.entry,
+            imageUrl: resolveImageUrl((entry.entry as unknown as { imageUrl?: unknown }).imageUrl, req),
+          } as unknown as ICatalogEntry,
+        }));
       }
 
       res.status(200).json({
@@ -295,7 +356,13 @@ export class CatalogController {
       await catalogEntryLinkModel.linkEntry(catalog._id, entry._id, user._id);
 
       const links = await catalogEntryLinkModel.listEntriesWithDetails(catalog._id);
-      const entries = serializeCatalogLinks(links, user._id);
+      const entries = serializeCatalogLinks(links, user._id).map(entry => ({
+        ...entry,
+        entry: {
+          ...entry.entry,
+          imageUrl: resolveImageUrl((entry.entry as unknown as { imageUrl?: unknown }).imageUrl, req),
+        } as unknown as ICatalogEntry,
+      }));
 
       res.status(200).json({
         message: 'Entry linked to catalog successfully',
@@ -343,7 +410,13 @@ export class CatalogController {
       await catalogEntryLinkModel.unlinkEntry(catalog._id, entryObjectId);
 
       const links = await catalogEntryLinkModel.listEntriesWithDetails(catalog._id);
-      const entries = serializeCatalogLinks(links, user._id);
+      const entries = serializeCatalogLinks(links, user._id).map(entry => ({
+        ...entry,
+        entry: {
+          ...entry.entry,
+          imageUrl: resolveImageUrl((entry.entry as unknown as { imageUrl?: unknown }).imageUrl, req),
+        } as unknown as ICatalogEntry,
+      }));
 
       res.status(200).json({
         message: 'Entry unlinked from catalog successfully',
