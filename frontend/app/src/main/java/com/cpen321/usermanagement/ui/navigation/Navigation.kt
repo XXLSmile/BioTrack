@@ -41,6 +41,7 @@ import com.cpen321.usermanagement.ui.screens.ProfileScreen
 import com.cpen321.usermanagement.ui.screens.ProfileScreenActions
 import com.cpen321.usermanagement.ui.viewmodels.AuthViewModel
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
+import com.cpen321.usermanagement.ui.viewmodels.FriendViewModel
 import com.cpen321.usermanagement.ui.viewmodels.MainViewModel
 import com.cpen321.usermanagement.ui.viewmodels.NavigationViewModel
 import com.cpen321.usermanagement.ui.viewmodels.ProfileViewModel
@@ -78,6 +79,7 @@ fun AppNavigation(
     val authViewModel: AuthViewModel = hiltViewModel()
     val profileViewModel: ProfileViewModel = hiltViewModel()
     val mainViewModel: MainViewModel = hiltViewModel()
+    val friendViewModel: FriendViewModel = hiltViewModel()
 
     val bottomNavItems = remember {
         listOf(
@@ -97,7 +99,8 @@ fun AppNavigation(
             navController,
             navigationStateManager,
             authViewModel,
-            mainViewModel
+            mainViewModel,
+            friendViewModel
         )
     }
 
@@ -128,7 +131,8 @@ fun AppNavigation(
             navController = navController,
             authViewModel = authViewModel,
             profileViewModel = profileViewModel,
-        mainViewModel = mainViewModel,
+            mainViewModel = mainViewModel,
+            friendViewModel = friendViewModel,
             navigationStateManager = navigationStateManager,
             modifier = Modifier.padding(innerPadding)
         )
@@ -140,10 +144,12 @@ private fun handleNavigationEvent(
     navController: NavHostController,
     navigationStateManager: NavigationStateManager,
     authViewModel: AuthViewModel,
-    mainViewModel: MainViewModel
+    mainViewModel: MainViewModel,
+    friendViewModel: FriendViewModel
 ) {
     when (navigationEvent) {
         is NavigationEvent.NavigateToAuth -> {
+            friendViewModel.clearSearchState()
             navController.navigate(NavRoutes.AUTH) {
                 popUpTo(0) { inclusive = true }
             }
@@ -151,6 +157,7 @@ private fun handleNavigationEvent(
         }
 
         is NavigationEvent.NavigateToAuthWithMessage -> {
+            friendViewModel.clearSearchState()
             authViewModel.setSuccessMessage(navigationEvent.message)
             navController.navigate(NavRoutes.AUTH) {
                 popUpTo(0) { inclusive = true }
@@ -206,6 +213,7 @@ private fun AppNavHost(
     authViewModel: AuthViewModel,
     profileViewModel: ProfileViewModel,
     mainViewModel: MainViewModel,
+    friendViewModel: FriendViewModel,
     navigationStateManager: NavigationStateManager,
     modifier: Modifier = Modifier
 ) {
@@ -240,7 +248,7 @@ private fun AppNavHost(
         }
 
         composable(NavRoutes.FRIENDS) {
-            FriendsScreen()
+            FriendsScreen(viewModel = friendViewModel)
         }
 
         composable(NavRoutes.PROFILE) {

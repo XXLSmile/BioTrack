@@ -149,6 +149,16 @@ class FriendViewModel @Inject constructor(
         _uiState.update { it.copy(errorMessage = null, successMessage = null) }
     }
 
+    fun clearSearchState() {
+        _uiState.update {
+            it.copy(
+                searchQuery = "",
+                searchResults = emptyList(),
+                isSearching = false
+            )
+        }
+    }
+
     private fun refreshFriends() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingFriends = true) }
