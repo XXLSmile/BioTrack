@@ -6,8 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,18 +18,24 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -46,9 +52,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.cpen321.usermanagement.data.model.CatalogShareEntry
 import com.cpen321.usermanagement.ui.navigation.NavRoutes
+import com.cpen321.usermanagement.ui.viewmodels.CatalogShareViewModel
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
+
+
 
 
 @Composable
@@ -58,14 +69,28 @@ fun CatalogListScreen(
     showNavigationIcon: Boolean = true
 ) {
     val catalogs by viewModel.catalogs.collectAsState()
+    val shareViewModel: CatalogShareViewModel = hiltViewModel()
+    val shareUiState by shareViewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
     var showDialog by remember { mutableStateOf(false) }
     var newCatalogName by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         viewModel.loadCatalogs()
+        shareViewModel.loadPendingInvitations()
+        shareViewModel.loadSharedWithMe()
+    }
+
+    LaunchedEffect(shareUiState.successMessage, shareUiState.errorMessage) {
+        val message = shareUiState.successMessage ?: shareUiState.errorMessage
+        if (message != null) {
+            snackbarHostState.showSnackbar(message)
+            shareViewModel.clearMessages()
+        }
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("My Catalogs") },
@@ -111,9 +136,31 @@ fun CatalogListScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            if (shareUiState.pendingInvitations.isNotEmpty()) {
+                CatalogInvitationsSection(
+                    invitations = shareUiState.pendingInvitations,
+                    isProcessing = shareUiState.isProcessing,
+                    onRespond = { shareId, action -> shareViewModel.respondToInvitation(shareId, action) }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            if (shareUiState.sharedCatalogs.isNotEmpty()) {
+                SharedCatalogsSection(
+                    shares = shareUiState.sharedCatalogs,
+                    onOpenCatalog = { catalogId ->
+                        val route = NavRoutes.CATALOG_DETAIL.replace("{catalogId}", catalogId)
+                        navController.navigate(route)
+                    }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
             if (catalogs.isEmpty()) {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .weight(1f, fill = true)
+                        .fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -128,7 +175,9 @@ fun CatalogListScreen(
                     contentPadding = PaddingValues(bottom = 80.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .weight(1f, fill = true)
+                        .fillMaxWidth()
                 ) {
                     items(catalogs) { catalog ->
                         CatalogCard(
@@ -176,6 +225,116 @@ fun CatalogListScreen(
                 )
             }
         )
+    }
+}
+
+@Composable
+private fun CatalogInvitationsSection(
+    invitations: List<CatalogShareEntry>,
+    isProcessing: Boolean,
+    onRespond: (String, String) -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Catalog invitations",
+                style = MaterialTheme.typography.titleMedium
+            )
+            invitations.forEach { invitation ->
+                val catalogName = invitation.catalog?.name?.takeIf { it.isNotBlank() }
+                    ?: "Catalog"
+                val inviterName = invitation.invitedBy?.name?.takeIf { it.isNotBlank() }
+                    ?: invitation.invitedBy?.username?.takeIf { it.isNotBlank() }
+                    ?: "Unknown"
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(catalogName, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = "Invited by $inviterName",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = { onRespond(invitation._id, "accept") },
+                            enabled = !isProcessing,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Accept")
+                        }
+                        OutlinedButton(
+                            onClick = { onRespond(invitation._id, "decline") },
+                            enabled = !isProcessing,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Text("Decline")
+                        }
+                    }
+                }
+                HorizontalDivider()
+            }
+        }
+    }
+}
+
+@Composable
+private fun SharedCatalogsSection(
+    shares: List<CatalogShareEntry>,
+    onOpenCatalog: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "Catalogs shared with you",
+            style = MaterialTheme.typography.titleMedium
+        )
+        shares.forEach { share ->
+            val catalogId = share.catalog?._id ?: return@forEach
+            val catalogName = share.catalog?.name?.takeIf { it.isNotBlank() } ?: "Catalog"
+            val roleLabel = share.role.replaceFirstChar { it.uppercase() }
+
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { onOpenCatalog(catalogId) }
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(catalogName, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = "Role: $roleLabel",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    share.invitedBy?.let { inviter ->
+                        val inviterName = inviter.name?.takeIf { it.isNotBlank() }
+                            ?: inviter.username?.takeIf { it.isNotBlank() }
+                        inviterName?.let {
+                            Text(
+                                text = "Shared by $it",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

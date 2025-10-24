@@ -53,6 +53,7 @@ import com.cpen321.usermanagement.ui.components.EntryDetailDialog
 import com.cpen321.usermanagement.ui.components.ConfirmEntryActionDialog
 import com.cpen321.usermanagement.ui.components.toCatalogEntry
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
+import com.cpen321.usermanagement.ui.viewmodels.CatalogShareViewModel
 import com.cpen321.usermanagement.ui.navigation.NavRoutes
 import com.cpen321.usermanagement.ui.viewmodels.MainViewModel
 import com.cpen321.usermanagement.ui.viewmodels.ProfileViewModel
@@ -66,6 +67,8 @@ fun MainScreen(
 ) {
     val mainUiState by mainViewModel.uiState.collectAsState()
     val profileUiState by profileViewModel.uiState.collectAsState()
+    val catalogShareViewModel: CatalogShareViewModel = hiltViewModel()
+    val shareUiState by catalogShareViewModel.uiState.collectAsState()
     val snackBarHostState: SnackbarHostState = remember { SnackbarHostState() }
 
     val navigateToRoute = remember(navController) {
@@ -84,6 +87,7 @@ fun MainScreen(
         if (profileUiState.user == null) {
             profileViewModel.loadProfile()
         }
+        catalogShareViewModel.loadSharedWithMe()
     }
 
     LaunchedEffect(Unit) {
@@ -108,6 +112,11 @@ fun MainScreen(
     var isDialogProcessing by remember { mutableStateOf(false) }
     var detailErrorMessage by remember { mutableStateOf<String?>(null) }
     var pendingEntryAction by remember { mutableStateOf<EntryAction?>(null) }
+    val additionalCatalogOptions = remember(shareUiState.sharedCatalogs) {
+        shareUiState.sharedCatalogs
+            .filter { it.status == "accepted" && it.role == "editor" && it.catalog?._id != null }
+            .map { CatalogOption(it.catalog!!._id, it.catalog.name ?: "Catalog") }
+    }
     var selectedEntry by remember { mutableStateOf<RemoteCatalogEntry?>(null) }
 
     LaunchedEffect(selectedEntry) {
@@ -199,7 +208,8 @@ fun MainScreen(
                     if (!isDialogProcessing) {
                         showAddDialog = false
                     }
-                }
+                },
+                additionalCatalogs = additionalCatalogOptions
             )
         }
 

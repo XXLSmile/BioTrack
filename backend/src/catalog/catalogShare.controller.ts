@@ -199,6 +199,26 @@ export class CatalogShareController {
     }
   }
 
+
+  async listPendingInvitations(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const user = req.user!;
+      const invitations = await catalogShareModel.listPendingInvitations(user._id);
+
+      res.status(200).json({
+        message: 'Pending catalog invitations fetched successfully',
+        data: { shares: invitations },
+      });
+    } catch (error) {
+      logger.error('Failed to fetch pending catalog invitations:', error);
+      next(error);
+    }
+  }
+
   async listSharedWithMe(
     req: Request,
     res: Response,

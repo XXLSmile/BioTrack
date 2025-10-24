@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
 import com.cpen321.usermanagement.data.remote.api.RetrofitClient
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
+import com.cpen321.usermanagement.ui.viewmodels.CatalogShareViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -43,6 +44,18 @@ fun CameraScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val catalogShareViewModel: CatalogShareViewModel = hiltViewModel()
+    val shareUiState by catalogShareViewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        catalogShareViewModel.loadSharedWithMe()
+    }
+
+    val additionalCatalogOptions = remember(shareUiState.sharedCatalogs) {
+        shareUiState.sharedCatalogs
+            .filter { it.status == "accepted" && it.role == "editor" && it.catalog?._id != null }
+            .map { CatalogOption(it.catalog!!._id, it.catalog.name ?: "Catalog") }
+    }
 
     var imageUri by remember { mutableStateOf<Uri?>(null) }
     var resultText by remember { mutableStateOf<String?>(null) }
