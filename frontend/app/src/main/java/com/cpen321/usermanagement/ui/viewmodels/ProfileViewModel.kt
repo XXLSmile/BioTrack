@@ -53,7 +53,7 @@ class ProfileViewModel @Inject constructor(
                     isLoadingProfile = false,
                     user = user
                 )
-                loadStats()
+                refreshStats()
             } else {
                 val error = profileResult.exceptionOrNull()
                 _uiState.value = _uiState.value.copy(
@@ -64,7 +64,7 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    private fun loadStats() {
+    fun refreshStats() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoadingStats = true)
 
@@ -116,7 +116,7 @@ class ProfileViewModel @Inject constructor(
                     successMessage = "Profile updated successfully!",
                     usernameResult = null
                 )
-                loadStats()
+                refreshStats()
                 onSuccess()
             } else {
                 val error = result.exceptionOrNull()

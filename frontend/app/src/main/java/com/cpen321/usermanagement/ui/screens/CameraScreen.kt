@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
 import com.cpen321.usermanagement.data.remote.api.RetrofitClient
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
+import com.cpen321.usermanagement.ui.viewmodels.ProfileViewModel
 import com.cpen321.usermanagement.ui.viewmodels.CatalogShareViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -44,6 +45,7 @@ fun CameraScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val profileViewModel: ProfileViewModel = hiltViewModel()
     val catalogShareViewModel: CatalogShareViewModel = hiltViewModel()
     val shareUiState by catalogShareViewModel.uiState.collectAsState()
 
@@ -193,6 +195,7 @@ fun CameraScreen(
                         recognitionResult = null
                         imageUri = null
                         viewModel.loadCatalogs()
+                        profileViewModel.refreshStats()
                     }
                     isSaving = false
                 }
@@ -202,7 +205,8 @@ fun CameraScreen(
                     showCatalogDialog = false
                     recognitionResult = null
                 }
-            }
+            },
+            additionalCatalogs = additionalCatalogOptions
         )
     }
 }
@@ -267,10 +271,10 @@ private suspend fun saveRecognitionToCatalog(
                     it.commonName ?: it.scientificName
                 }
                 val message = speciesName?.let { "✅ Saved $it to catalog." }
-                    ?: (body?.message?.takeIf { it.isNotBlank() } ?: "✅ Saved entry to catalog.")
+                    ?: (body?.message?.takeIf { it.isNotBlank() } ?: "✅ Saved observation to catalog.")
                 true to message
             } else {
-                false to (body?.message ?: "Failed to save entry.")
+                false to (body?.message ?: "Failed to save observation.")
             }
         } else {
             val errorMessage = response.errorBody()?.string()?.takeIf { it.isNotBlank() }

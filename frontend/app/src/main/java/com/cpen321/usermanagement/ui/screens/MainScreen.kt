@@ -196,11 +196,12 @@ fun MainScreen(
                         if (success) {
                             showAddDialog = false
                             mainViewModel.loadRecentObservations()
+                            profileViewModel.refreshStats()
                             coroutineScope.launch {
-                                snackBarHostState.showSnackbar("Entry added to catalog")
+                                snackBarHostState.showSnackbar("Observation added to catalog")
                             }
                         } else {
-                            detailErrorMessage = error ?: "Failed to add entry to catalog"
+                            detailErrorMessage = error ?: "Failed to add observation to catalog"
                         }
                     }
                 },
@@ -253,11 +254,12 @@ fun MainScreen(
                             showAddDialog = false
                             selectedEntry = null
                             mainViewModel.loadRecentObservations()
+                            profileViewModel.refreshStats()
                             coroutineScope.launch {
-                                snackBarHostState.showSnackbar("Entry deleted")
+                                snackBarHostState.showSnackbar("Observation deleted")
                             }
                         } else {
-                            detailErrorMessage = error ?: "Failed to delete entry"
+                            detailErrorMessage = error ?: "Failed to delete observation"
                         }
                     }
                 },

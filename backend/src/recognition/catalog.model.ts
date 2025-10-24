@@ -4,6 +4,7 @@ import path from 'path';
 
 import { catalogEntryLinkModel } from '../catalog/catalogEntryLink.model';
 import logger from '../logger.util';
+import { userModel } from '../user/user.model';
 
 // Catalog entry interface (represents a user's saved wildlife sighting)
 export interface ICatalogEntry extends Document {
@@ -171,6 +172,7 @@ export class CatalogRepository {
       }
 
       await entry.deleteOne();
+      await userModel.recomputeObservationCount(ownerId);
       return 'deleted';
     } catch (error) {
       logger.error('Failed to delete catalog entry', {

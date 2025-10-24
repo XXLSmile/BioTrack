@@ -17,7 +17,7 @@ class RecognitionRepository @Inject constructor(
             val entries = response.body()?.data?.entries ?: emptyList()
             entries.map { it.toDomain() }
         } else {
-            throw Exception(response.errorBody()?.string() ?: "Failed to load recent entries")
+            throw Exception(response.errorBody()?.string() ?: "Failed to load recent observations")
         }
     }
 
@@ -27,7 +27,7 @@ class RecognitionRepository @Inject constructor(
             val entries = response.body()?.data?.entries ?: emptyList()
             entries.map { it.toDomain() }
         } else {
-            throw Exception(response.errorBody()?.string() ?: "Failed to load catalog entries")
+            throw Exception(response.errorBody()?.string() ?: "Failed to load observations")
         }
     }
 
@@ -36,7 +36,7 @@ class RecognitionRepository @Inject constructor(
         if (response.isSuccessful) {
             Unit
         } else {
-            throw Exception(response.errorBody()?.string() ?: "Failed to delete catalog entry")
+            throw Exception(response.errorBody()?.string() ?: "Failed to delete observation")
         }
     }
 }

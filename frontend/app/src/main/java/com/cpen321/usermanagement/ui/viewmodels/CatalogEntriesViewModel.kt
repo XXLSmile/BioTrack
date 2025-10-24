@@ -48,7 +48,7 @@ class CatalogEntriesViewModel @Inject constructor(
                         it.copy(
                             isLoading = false,
                             errorMessage = error.localizedMessage
-                                ?: "Failed to load catalog entries"
+                                ?: "Failed to load observations"
                         )
                     }
                 }
