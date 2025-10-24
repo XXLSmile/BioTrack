@@ -8,25 +8,37 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
 
+
+data class CatalogOption(
+
+    val id: String,
+    val name: String
+)
 @Composable
 fun AddToCatalogDialog(
     viewModel: CatalogViewModel,
     isSaving: Boolean,
     onSave: (catalogId: String) -> Unit,
     onDismiss: () -> Unit,
-    excludeCatalogId: String? = null
+    excludeCatalogId: String? = null,
+    additionalCatalogs: List<CatalogOption> = emptyList()
 ) {
     val catalogs by viewModel.catalogs.collectAsState()
-    val filteredCatalogs = remember(catalogs, excludeCatalogId) {
-        catalogs.filter { it._id != excludeCatalogId }
+    val combinedCatalogs = remember(catalogs, additionalCatalogs, excludeCatalogId) {
+        val base = catalogs.map { CatalogOption(it._id, it.name) }
+            .filter { it.id != excludeCatalogId }
+        val extras = additionalCatalogs.filter { option ->
+            option.id != excludeCatalogId && base.none { it.id == option.id }
+        }
+        (base + extras).distinctBy { it.id }
     }
     var selectedCatalogId by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(filteredCatalogs) {
-        if (selectedCatalogId == null && filteredCatalogs.isNotEmpty()) {
-            selectedCatalogId = filteredCatalogs.first()._id
-        } else if (selectedCatalogId != null && filteredCatalogs.none { it._id == selectedCatalogId }) {
-            selectedCatalogId = filteredCatalogs.firstOrNull()?._id
+    LaunchedEffect(combinedCatalogs) {
+        if (selectedCatalogId == null && combinedCatalogs.isNotEmpty()) {
+            selectedCatalogId = combinedCatalogs.first().id
+        } else if (selectedCatalogId != null && combinedCatalogs.none { it.id == selectedCatalogId }) {
+            selectedCatalogId = combinedCatalogs.firstOrNull()?.id
         }
     }
 
@@ -68,17 +80,17 @@ fun AddToCatalogDialog(
         title = { Text("Save to Catalog") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (filteredCatalogs.isEmpty()) {
+                if (combinedCatalogs.isEmpty()) {
                     Text("No available catalogs. Create a new one first!")
                 } else {
-                    filteredCatalogs.forEach { catalog ->
+                    combinedCatalogs.forEach { catalog ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             RadioButton(
-                                selected = selectedCatalogId == catalog._id,
-                                onClick = { selectedCatalogId = catalog._id }
+                                selected = selectedCatalogId == catalog.id,
+                                onClick = { selectedCatalogId = catalog.id }
                             )
                             Text(catalog.name)
                         }

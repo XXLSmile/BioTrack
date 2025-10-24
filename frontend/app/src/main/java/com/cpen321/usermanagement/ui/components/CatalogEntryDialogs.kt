@@ -44,9 +44,9 @@ fun EntryDetailDialog(
     errorMessage: String?,
     canRemoveFromCatalog: Boolean,
     onDismiss: () -> Unit,
-    onAddToCatalog: () -> Unit,
+    onAddToCatalog: (() -> Unit)?,
     onRemoveFromCatalog: (() -> Unit)?,
-    onDeleteEntry: () -> Unit
+    onDeleteEntry: (() -> Unit)?
 ) {
     val item = entry.entry
     val speciesName = item.species ?: (item._id ?: "Unknown")
@@ -135,61 +135,73 @@ fun EntryDetailDialog(
 
                 HorizontalDivider()
 
-                var actionsExpanded by remember { mutableStateOf(false) }
-                LaunchedEffect(isProcessing) {
-                    if (isProcessing) {
-                        actionsExpanded = false
-                    }
+                val actions = remember(onAddToCatalog, onRemoveFromCatalog, onDeleteEntry) {
+                    listOfNotNull(
+                        onAddToCatalog?.let { "add" to it },
+                        if (canRemoveFromCatalog) onRemoveFromCatalog?.let { "remove" to it } else null,
+                        onDeleteEntry?.let { "delete" to it }
+                    )
                 }
 
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    TextButton(
-                        onClick = { actionsExpanded = true },
-                        enabled = !isProcessing
-                    ) {
-                        Text("More actions")
+                if (actions.isNotEmpty()) {
+                    var actionsExpanded by remember { mutableStateOf(false) }
+                    LaunchedEffect(isProcessing) {
+                        if (isProcessing) {
+                            actionsExpanded = false
+                        }
                     }
 
-                    DropdownMenu(
-                        expanded = actionsExpanded,
-                        onDismissRequest = { actionsExpanded = false }
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        DropdownMenuItem(
-                            text = { Text("Add to another catalog") },
-                            onClick = {
-                                actionsExpanded = false
-                                onAddToCatalog()
-                            },
+                        TextButton(
+                            onClick = { actionsExpanded = true },
                             enabled = !isProcessing
-                        )
-
-                        if (canRemoveFromCatalog && onRemoveFromCatalog != null) {
-                            DropdownMenuItem(
-                                text = { Text("Remove from this catalog") },
-                                onClick = {
-                                    actionsExpanded = false
-                                    onRemoveFromCatalog()
-                                },
-                                enabled = !isProcessing
-                            )
+                        ) {
+                            Text("More actions")
                         }
 
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    text = "Delete entry",
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            },
-                            onClick = {
-                                actionsExpanded = false
-                                onDeleteEntry()
-                            },
-                            enabled = !isProcessing
-                        )
+                        DropdownMenu(
+                            expanded = actionsExpanded,
+                            onDismissRequest = { actionsExpanded = false }
+                        ) {
+                            actions.forEach { (key, action) ->
+                                when (key) {
+                                    "add" -> DropdownMenuItem(
+                                        text = { Text("Add to another catalog") },
+                                        onClick = {
+                                            actionsExpanded = false
+                                            action()
+                                        },
+                                        enabled = !isProcessing
+                                    )
+
+                                    "remove" -> DropdownMenuItem(
+                                        text = { Text("Remove from this catalog") },
+                                        onClick = {
+                                            actionsExpanded = false
+                                            action()
+                                        },
+                                        enabled = !isProcessing
+                                    )
+
+                                    "delete" -> DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = "Delete entry",
+                                                color = MaterialTheme.colorScheme.error
+                                            )
+                                        },
+                                        onClick = {
+                                            actionsExpanded = false
+                                            action()
+                                        },
+                                        enabled = !isProcessing
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

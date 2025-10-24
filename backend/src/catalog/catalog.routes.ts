@@ -33,6 +33,11 @@ router.get(
   catalogShareController.listSharedWithMe.bind(catalogShareController)
 );
 
+router.get(
+  '/share/pending',
+  catalogShareController.listPendingInvitations.bind(catalogShareController)
+);
+
 router.patch(
   '/share/:shareId/respond',
   validateBody<RespondToInvitationRequest>(respondToInvitationSchema),

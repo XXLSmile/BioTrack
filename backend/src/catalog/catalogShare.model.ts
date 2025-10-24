@@ -105,6 +105,16 @@ export class CatalogShareModel {
       .populate('invitedBy', 'name username profilePicture');
   }
 
+
+  async listPendingInvitations(
+    inviteeId: mongoose.Types.ObjectId
+  ): Promise<ICatalogShare[]> {
+    return this.share
+      .find({ invitee: inviteeId, status: 'pending' })
+      .populate('catalog')
+      .populate('invitedBy', 'name username profilePicture');
+  }
+
   async listSharedWithUser(userId: mongoose.Types.ObjectId): Promise<ICatalogShare[]> {
     return this.share
       .find({ invitee: userId, status: 'accepted' })

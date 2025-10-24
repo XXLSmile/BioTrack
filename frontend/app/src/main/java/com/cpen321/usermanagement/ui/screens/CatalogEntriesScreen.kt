@@ -56,6 +56,7 @@ import com.cpen321.usermanagement.ui.components.EntryDetailDialog
 import com.cpen321.usermanagement.ui.components.toCatalogEntry
 import com.cpen321.usermanagement.ui.viewmodels.CatalogEntriesViewModel
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
+import com.cpen321.usermanagement.ui.viewmodels.CatalogShareViewModel
 import com.cpen321.usermanagement.data.model.CatalogEntry as RemoteCatalogEntry
 import kotlinx.coroutines.launch
 
@@ -66,6 +67,8 @@ fun CatalogEntriesScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val catalogViewModel: CatalogViewModel = hiltViewModel()
+    val catalogShareViewModel: CatalogShareViewModel = hiltViewModel()
+    val shareUiState by catalogShareViewModel.uiState.collectAsState()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -75,6 +78,15 @@ fun CatalogEntriesScreen(
     var isActionInProgress by remember { mutableStateOf(false) }
     var detailErrorMessage by remember { mutableStateOf<String?>(null) }
     var pendingAction by remember { mutableStateOf<EntryAction?>(null) }
+    val additionalCatalogOptions = remember(shareUiState.sharedCatalogs) {
+        shareUiState.sharedCatalogs
+            .filter { it.status == "accepted" && it.role == "editor" && it.catalog?._id != null }
+            .map { CatalogOption(it.catalog!!._id, it.catalog.name ?: "Catalog") }
+    }
+
+    LaunchedEffect(Unit) {
+        catalogShareViewModel.loadSharedWithMe()
+    }
 
     LaunchedEffect(selectedEntry) {
         detailErrorMessage = null
@@ -252,7 +264,8 @@ fun CatalogEntriesScreen(
                 if (!isActionInProgress) {
                     showAddDialog = false
                 }
-            }
+            },
+            additionalCatalogs = additionalCatalogOptions
         )
     }
 
