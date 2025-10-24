@@ -12,6 +12,7 @@ import logger from '../logger.util';
 import { RecognitionImageResponse } from './recognition.types';
 import { catalogModel } from '../catalog/catalog.model';
 import { catalogEntryLinkModel } from '../catalog/catalogEntryLink.model';
+import { catalogShareModel } from '../catalog/catalogShare.model';
 import { buildCatalogEntriesResponse } from '../catalog/catalog.helpers';
 import { emitCatalogEntriesUpdated } from '../socket/socket.manager';
 
@@ -129,7 +130,13 @@ export class RecognitionController {
           });
         }
 
-        if (!catalog.owner.equals(user._id)) {
+        const isOwner = catalog.owner.equals(user._id);
+        const share = isOwner
+          ? null
+          : await catalogShareModel.getUserAccess(catalog._id, user._id);
+        const hasEditPermission = isOwner || (share?.role === 'editor');
+
+        if (!hasEditPermission) {
           return res.status(403).json({
             message: 'You do not have permission to modify this catalog',
           });
@@ -219,6 +226,18 @@ export class RecognitionController {
             catalogEntry._id,
             user._id
           );
+
+          try {
+            const links = await catalogEntryLinkModel.listEntriesWithDetails(catalogToLink._id);
+            const entries = buildCatalogEntriesResponse(links, user._id);
+            emitCatalogEntriesUpdated(catalogToLink._id, entries, user._id);
+          } catch (broadcastError) {
+            logger.warn('Failed to broadcast catalog update after recognition save', {
+              catalogId: catalogToLink._id.toString(),
+              entryId: catalogEntry._id.toString(),
+              error: broadcastError,
+            });
+          }
         }
 
         linkedCatalogId = catalogToLink._id;

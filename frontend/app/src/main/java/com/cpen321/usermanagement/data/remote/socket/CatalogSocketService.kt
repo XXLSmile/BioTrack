@@ -81,7 +81,9 @@ class CatalogSocketService @Inject constructor() {
                 val ack = Ack { args ->
                     val response = args.firstOrNull()
                     val ok = when (response) {
+                        null -> true
                         is JSONObject -> response.optBoolean("ok", false)
+                        is Map<*, *> -> ((response as Map<*, *>)["ok"] as? Boolean) == true
                         is Boolean -> response
                         else -> false
                     }
@@ -98,6 +100,7 @@ class CatalogSocketService @Inject constructor() {
                     } else {
                         val message = when (response) {
                             is JSONObject -> response.optString("error", "Failed to join catalog")
+                            is Map<*, *> -> ((response as Map<*, *>)["error"] as? String) ?: "Failed to join catalog"
                             is String -> response
                             else -> "Failed to join catalog"
                         }
