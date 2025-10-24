@@ -189,7 +189,7 @@ fun EntryDetailDialog(
                                     "delete" -> DropdownMenuItem(
                                         text = {
                                             Text(
-                                                text = "Delete entry",
+                                                text = "Delete observation",
                                                 color = MaterialTheme.colorScheme.error
                                             )
                                         },
@@ -217,13 +217,13 @@ fun ConfirmEntryActionDialog(
 ) {
     val (title, description, confirmText) = when (action) {
         is EntryAction.Remove -> Triple(
-            "Remove entry",
-            "Remove this entry from the current catalog? The observation will remain saved.",
+            "Remove observation",
+            "Remove this observation from the current catalog? The observation will remain saved.",
             "Remove"
         )
         is EntryAction.Delete -> Triple(
-            "Delete entry",
-            "Delete this entry permanently? The observation will be removed from all catalogs.",
+            "Delete observation",
+            "Delete this observation permanently? The observation will be removed from all catalogs.",
             "Delete"
         )
     }

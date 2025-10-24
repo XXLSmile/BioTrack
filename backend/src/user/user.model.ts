@@ -1,7 +1,6 @@
 import mongoose, { Schema } from 'mongoose';
 import { z } from 'zod';
 
-
 import {
   createUserSchema,
   GoogleUserInfo,
@@ -9,6 +8,7 @@ import {
   updateProfileSchema,
 } from './user.types';
 import logger from '../logger.util';
+import { CatalogModel } from '../recognition/catalog.model';
 
 const userSchema = new Schema<IUser>(
   {
@@ -268,6 +268,18 @@ export class UserModel {
     } catch (error) {
       logger.error('Error incrementing observation count:', error);
       throw new Error('Failed to update observation count');
+    }
+  }
+
+  async recomputeObservationCount(userId: mongoose.Types.ObjectId): Promise<void> {
+    try {
+      const count = await CatalogModel.countDocuments({ userId });
+      await this.user.findByIdAndUpdate(userId, {
+        observationCount: count,
+      });
+    } catch (error) {
+      logger.error('Error recomputing observation count:', error);
+      throw new Error('Failed to recompute observation count');
     }
   }
 

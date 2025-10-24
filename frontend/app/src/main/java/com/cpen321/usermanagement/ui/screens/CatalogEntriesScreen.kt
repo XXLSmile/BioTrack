@@ -57,6 +57,7 @@ import com.cpen321.usermanagement.ui.components.toCatalogEntry
 import com.cpen321.usermanagement.ui.viewmodels.CatalogEntriesViewModel
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
 import com.cpen321.usermanagement.ui.viewmodels.CatalogShareViewModel
+import com.cpen321.usermanagement.ui.viewmodels.ProfileViewModel
 import com.cpen321.usermanagement.data.model.CatalogEntry as RemoteCatalogEntry
 import kotlinx.coroutines.launch
 
@@ -68,6 +69,7 @@ fun CatalogEntriesScreen(
     val uiState by viewModel.uiState.collectAsState()
     val catalogViewModel: CatalogViewModel = hiltViewModel()
     val catalogShareViewModel: CatalogShareViewModel = hiltViewModel()
+    val profileViewModel: ProfileViewModel = hiltViewModel()
     val shareUiState by catalogShareViewModel.uiState.collectAsState()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -100,7 +102,7 @@ fun CatalogEntriesScreen(
 
     val openImage: (String?) -> Unit = { imageUrl ->
         if (imageUrl.isNullOrBlank()) {
-            Toast.makeText(context, "No image available for this entry", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "No image available for this observation", Toast.LENGTH_SHORT).show()
         } else {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(imageUrl))
             try {
@@ -114,7 +116,7 @@ fun CatalogEntriesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("All Catalog Entries") },
+                title = { Text("All Observations") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
@@ -161,7 +163,7 @@ fun CatalogEntriesScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = uiState.errorMessage ?: "Failed to load catalog entries",
+                        text = uiState.errorMessage ?: "Failed to load observations",
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -253,10 +255,10 @@ fun CatalogEntriesScreen(
                         showAddDialog = false
                         viewModel.refresh()
                         coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Entry added to catalog")
+                            snackbarHostState.showSnackbar("Observation added to catalog")
                         }
                     } else {
-                        detailErrorMessage = error ?: "Failed to add entry to catalog"
+                        detailErrorMessage = error ?: "Failed to add observation to catalog"
                     }
                 }
             },
@@ -302,11 +304,12 @@ fun CatalogEntriesScreen(
                         selectedEntry = null
                         showAddDialog = false
                         viewModel.refresh()
+                        profileViewModel.refreshStats()
                         coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Entry deleted")
+                            snackbarHostState.showSnackbar("Observation deleted")
                         }
                     } else {
-                        detailErrorMessage = error ?: "Failed to delete entry"
+                        detailErrorMessage = error ?: "Failed to delete observation"
                     }
                 }
             },

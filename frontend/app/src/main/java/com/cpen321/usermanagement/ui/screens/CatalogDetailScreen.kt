@@ -215,10 +215,10 @@ fun CatalogDetailScreen(
                     if (success) {
                         showAddDialog = false
                         coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Entry added to catalog")
+                            snackbarHostState.showSnackbar("Observation added to catalog")
                         }
                     } else {
-                        detailErrorMessage = error ?: "Failed to add entry to catalog"
+                        detailErrorMessage = error ?: "Failed to add observation to catalog"
                     }
                 }
             },
@@ -276,10 +276,10 @@ fun CatalogDetailScreen(
                                 selectedEntry = null
                                 showAddDialog = false
                                 coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("Entry removed from catalog")
+                                    snackbarHostState.showSnackbar("Observation removed from catalog")
                                 }
                             } else {
-                                detailErrorMessage = error ?: "Failed to remove entry"
+                                detailErrorMessage = error ?: "Failed to remove observation"
                             }
                         }
                     }
@@ -292,11 +292,12 @@ fun CatalogDetailScreen(
                             if (success) {
                                 selectedEntry = null
                                 showAddDialog = false
+                                profileViewModel.refreshStats()
                                 coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("Entry deleted")
+                                    snackbarHostState.showSnackbar("Observation deleted")
                                 }
                             } else {
-                                detailErrorMessage = error ?: "Failed to delete entry"
+                                detailErrorMessage = error ?: "Failed to delete observation"
                             }
                         }
                     }

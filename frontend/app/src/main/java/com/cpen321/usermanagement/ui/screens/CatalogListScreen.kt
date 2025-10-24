@@ -366,7 +366,7 @@ private fun ManageAllEntriesCard(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = "All Catalog Entries",
+                    text = "All Observations",
                     style = MaterialTheme.typography.titleMedium
                 )
                 Text(
