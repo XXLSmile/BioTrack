@@ -20,6 +20,16 @@ class RecognitionRepository @Inject constructor(
             throw Exception(response.errorBody()?.string() ?: "Failed to load recent entries")
         }
     }
+
+    suspend fun fetchAllCatalogEntries(): Result<List<RecentObservation>> = runCatching {
+        val response = recognitionApi.getCatalogEntries()
+        if (response.isSuccessful) {
+            val entries = response.body()?.data?.entries ?: emptyList()
+            entries.map { it.toDomain() }
+        } else {
+            throw Exception(response.errorBody()?.string() ?: "Failed to load catalog entries")
+        }
+    }
 }
 
 private fun RecentEntryDto.toDomain(): RecentObservation {
