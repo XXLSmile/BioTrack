@@ -30,6 +30,15 @@ class RecognitionRepository @Inject constructor(
             throw Exception(response.errorBody()?.string() ?: "Failed to load catalog entries")
         }
     }
+
+    suspend fun deleteEntry(entryId: String): Result<Unit> = runCatching {
+        val response = recognitionApi.deleteEntry(entryId)
+        if (response.isSuccessful) {
+            Unit
+        } else {
+            throw Exception(response.errorBody()?.string() ?: "Failed to delete catalog entry")
+        }
+    }
 }
 
 private fun RecentEntryDto.toDomain(): RecentObservation {

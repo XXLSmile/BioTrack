@@ -6,6 +6,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,12 +29,19 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -42,7 +50,14 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.cpen321.usermanagement.ui.components.ObservationListItem
+import com.cpen321.usermanagement.ui.components.ConfirmEntryActionDialog
+import com.cpen321.usermanagement.ui.components.EntryAction
+import com.cpen321.usermanagement.ui.components.EntryDetailDialog
+import com.cpen321.usermanagement.ui.components.toCatalogEntry
 import com.cpen321.usermanagement.ui.viewmodels.CatalogEntriesViewModel
+import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
+import com.cpen321.usermanagement.data.model.CatalogEntry as RemoteCatalogEntry
+import kotlinx.coroutines.launch
 
 @Composable
 fun CatalogEntriesScreen(
@@ -50,7 +65,39 @@ fun CatalogEntriesScreen(
     viewModel: CatalogEntriesViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val catalogViewModel: CatalogViewModel = hiltViewModel()
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+
+    var selectedEntry by remember { mutableStateOf<RemoteCatalogEntry?>(null) }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var isActionInProgress by remember { mutableStateOf(false) }
+    var detailErrorMessage by remember { mutableStateOf<String?>(null) }
+    var pendingAction by remember { mutableStateOf<EntryAction?>(null) }
+
+    LaunchedEffect(selectedEntry) {
+        detailErrorMessage = null
+    }
+
+    LaunchedEffect(showAddDialog) {
+        if (showAddDialog) {
+            catalogViewModel.loadCatalogs()
+        }
+    }
+
+    val openImage: (String?) -> Unit = { imageUrl ->
+        if (imageUrl.isNullOrBlank()) {
+            Toast.makeText(context, "No image available for this entry", Toast.LENGTH_SHORT).show()
+        } else {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(imageUrl))
+            try {
+                context.startActivity(intent)
+            } catch (error: ActivityNotFoundException) {
+                Toast.makeText(context, "No app available to open this image", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -77,7 +124,8 @@ fun CatalogEntriesScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         when {
             uiState.isLoading && uiState.entries.isEmpty() -> {
@@ -159,24 +207,13 @@ fun CatalogEntriesScreen(
                     itemsIndexed(uiState.entries) { index, entry ->
                         ObservationListItem(
                             observation = entry,
-                            onClick = {
-                                val imageUrl = entry.imageUrl
-                                if (imageUrl.isNullOrBlank()) {
-                                    Toast.makeText(context, "No image available for this entry", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(imageUrl))
-                                    try {
-                                        context.startActivity(intent)
-                                    } catch (error: ActivityNotFoundException) {
-                                        Toast.makeText(context, "No app available to open this image", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            },
+                            onClick = { selectedEntry = entry.toCatalogEntry() },
                             trailingContent = {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
                                     contentDescription = "Open image",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.clickable { openImage(entry.imageUrl) }
                                 )
                             }
                         )
@@ -188,5 +225,83 @@ fun CatalogEntriesScreen(
                 }
             }
         }
+    }
+
+    if (showAddDialog && selectedEntry != null) {
+        AddToCatalogDialog(
+            viewModel = catalogViewModel,
+            isSaving = isActionInProgress,
+            onSave = { catalogId ->
+                val entryId = selectedEntry?.entry?._id ?: return@AddToCatalogDialog
+                isActionInProgress = true
+                detailErrorMessage = null
+                catalogViewModel.addEntryToCatalog(catalogId, entryId, null) { success, error ->
+                    isActionInProgress = false
+                    if (success) {
+                        showAddDialog = false
+                        viewModel.refresh()
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Entry added to catalog")
+                        }
+                    } else {
+                        detailErrorMessage = error ?: "Failed to add entry to catalog"
+                    }
+                }
+            },
+            onDismiss = {
+                if (!isActionInProgress) {
+                    showAddDialog = false
+                }
+            }
+        )
+    }
+
+    selectedEntry?.let { entry ->
+        EntryDetailDialog(
+            entry = entry,
+            isProcessing = isActionInProgress,
+            errorMessage = detailErrorMessage,
+            canRemoveFromCatalog = false,
+            onDismiss = {
+                if (!isActionInProgress) {
+                    selectedEntry = null
+                    showAddDialog = false
+                }
+            },
+            onAddToCatalog = { showAddDialog = true },
+            onRemoveFromCatalog = null,
+            onDeleteEntry = { pendingAction = EntryAction.Delete(entry) }
+        )
+    }
+
+    val action = pendingAction
+    if (action is EntryAction.Delete && !isActionInProgress) {
+        ConfirmEntryActionDialog(
+            action = action,
+            onConfirm = {
+                val entryId = action.entry.entry._id
+                isActionInProgress = true
+                detailErrorMessage = null
+                catalogViewModel.deleteEntry(entryId, null) { success, error ->
+                    isActionInProgress = false
+                    pendingAction = null
+                    if (success) {
+                        selectedEntry = null
+                        showAddDialog = false
+                        viewModel.refresh()
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Entry deleted")
+                        }
+                    } else {
+                        detailErrorMessage = error ?: "Failed to delete entry"
+                    }
+                }
+            },
+            onDismiss = {
+                if (!isActionInProgress) {
+                    pendingAction = null
+                }
+            }
+        )
     }
 }

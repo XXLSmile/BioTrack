@@ -1,4 +1,9 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import fs from 'fs';
+import path from 'path';
+
+import { catalogEntryLinkModel } from '../catalog/catalogEntryLink.model';
+import logger from '../logger.util';
 
 // Catalog entry interface (represents a user's saved wildlife sighting)
 export interface ICatalogEntry extends Document {
@@ -130,6 +135,50 @@ export class CatalogRepository {
   async countUniqueSpeciesByUserId(userId: string): Promise<number> {
     const unique = await CatalogModel.distinct('speciesId', { userId });
     return unique.length;
+  }
+
+  async deleteById(
+    entryId: string,
+    userId: string
+  ): Promise<'deleted' | 'not_found' | 'forbidden'> {
+    if (!mongoose.Types.ObjectId.isValid(entryId) || !mongoose.Types.ObjectId.isValid(userId)) {
+      return 'not_found';
+    }
+
+    const entry = await CatalogModel.findById(entryId);
+    if (!entry) {
+      return 'not_found';
+    }
+
+    const ownerId = entry.userId instanceof mongoose.Types.ObjectId
+      ? entry.userId
+      : new mongoose.Types.ObjectId(entry.userId);
+
+    if (!ownerId.equals(new mongoose.Types.ObjectId(userId))) {
+      return 'forbidden';
+    }
+
+    try {
+      await catalogEntryLinkModel.removeEntryFromAllCatalogs(entry._id);
+
+      if (entry.imageUrl) {
+        const uploadsDir = path.join(__dirname, '../../uploads/images');
+        const filename = path.basename(entry.imageUrl);
+        const filepath = path.join(uploadsDir, filename);
+        if (fs.existsSync(filepath)) {
+          fs.unlinkSync(filepath);
+        }
+      }
+
+      await entry.deleteOne();
+      return 'deleted';
+    } catch (error) {
+      logger.error('Failed to delete catalog entry', {
+        entryId,
+        error,
+      });
+      throw error;
+    }
   }
 }
 

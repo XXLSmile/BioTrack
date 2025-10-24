@@ -3,7 +3,9 @@ package com.cpen321.usermanagement.data.remote.api
 import com.cpen321.usermanagement.data.remote.dto.ApiResponse
 import com.cpen321.usermanagement.data.remote.dto.RecentEntriesResponse
 import retrofit2.Response
+import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface RecognitionApi {
@@ -14,4 +16,9 @@ interface RecognitionApi {
 
     @GET("recognition/catalog")
     suspend fun getCatalogEntries(): Response<ApiResponse<RecentEntriesResponse>>
+
+    @DELETE("recognition/entry/{entryId}")
+    suspend fun deleteEntry(
+        @Path("entryId") entryId: String
+    ): Response<ApiResponse<Unit>>
 }

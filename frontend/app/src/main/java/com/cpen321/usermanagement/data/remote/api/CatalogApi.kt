@@ -26,6 +26,12 @@ interface CatalogApi {
         @Path("entryId") entryId: String
     ): Response<CatalogResponse>
 
+    @DELETE("catalogs/{catalogId}/entries/{entryId}")
+    suspend fun unlinkEntry(
+        @Path("catalogId") catalogId: String,
+        @Path("entryId") entryId: String
+    ): Response<CatalogResponse>
+
     @DELETE("catalogs/{catalogId}")
     suspend fun deleteCatalog(@Path("catalogId") catalogId: String): Response<Unit>
 

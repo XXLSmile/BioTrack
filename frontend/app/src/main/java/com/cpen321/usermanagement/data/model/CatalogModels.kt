@@ -38,5 +38,13 @@ data class Entry(
     val _id: String,
     val species: String?,
     val confidence: Double?,
-    val imageUrl: String?
+    val imageUrl: String?,
+    val userId: String? = null,
+    val speciesId: String? = null,
+    val imageMimeType: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val notes: String? = null,
+    val createdAt: String? = null,
+    val updatedAt: String? = null
 )

@@ -354,6 +354,44 @@ export class RecognitionController {
       next(error);
     }
   }
+
+  async deleteEntry(
+    req: Request<{ entryId: string }>,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const user = req.user!;
+      const { entryId } = req.params;
+
+      if (!entryId) {
+        return res.status(400).json({
+          message: 'Entry ID is required',
+        });
+      }
+
+      const result = await catalogRepository.deleteById(entryId, user._id.toString());
+
+      if (result === 'not_found') {
+        return res.status(404).json({
+          message: 'Catalog entry not found',
+        });
+      }
+
+      if (result === 'forbidden') {
+        return res.status(403).json({
+          message: 'You do not have permission to delete this entry',
+        });
+      }
+
+      return res.status(200).json({
+        message: 'Catalog entry deleted successfully',
+      });
+    } catch (error) {
+      logger.error('Error deleting catalog entry:', error);
+      next(error);
+    }
+  }
 }
 
 export const recognitionController = new RecognitionController();

@@ -22,9 +22,14 @@ class CatalogRepository @Inject constructor(
         return response.body()?.data?.catalog
     }
 
-    suspend fun linkEntryToCatalog(catalogId: String, entryId: String): Boolean {
+    suspend fun linkEntryToCatalog(catalogId: String, entryId: String): CatalogData? {
         val response = api.linkEntry(catalogId, entryId)
-        return response.isSuccessful
+        return response.body()?.data
+    }
+
+    suspend fun unlinkEntryFromCatalog(catalogId: String, entryId: String): CatalogData? {
+        val response = api.unlinkEntry(catalogId, entryId)
+        return response.body()?.data
     }
 
     suspend fun getCatalogById(catalogId: String): com.cpen321.usermanagement.data.model.CatalogData? {
