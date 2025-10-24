@@ -11,4 +11,7 @@ interface RecognitionApi {
     suspend fun getRecentEntries(
         @Query("limit") limit: Int = 10
     ): Response<ApiResponse<RecentEntriesResponse>>
+
+    @GET("recognition/catalog")
+    suspend fun getCatalogEntries(): Response<ApiResponse<RecentEntriesResponse>>
 }
