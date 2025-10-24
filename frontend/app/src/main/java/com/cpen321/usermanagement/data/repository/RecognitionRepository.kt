@@ -2,6 +2,7 @@ package com.cpen321.usermanagement.data.repository
 
 import com.cpen321.usermanagement.data.model.RecentObservation
 import com.cpen321.usermanagement.data.remote.api.RecognitionApi
+import com.cpen321.usermanagement.data.remote.api.RetrofitClient
 import com.cpen321.usermanagement.data.remote.dto.RecentEntryDto
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,6 +24,8 @@ class RecognitionRepository @Inject constructor(
 
 private fun RecentEntryDto.toDomain(): RecentObservation {
     val species = this.speciesId
+    val resolvedImage = RetrofitClient.resolveImageUrl(imageUrl)
+        ?: RetrofitClient.resolveImageUrl(species?.imageUrl)
     val commonName = species?.commonName
     val scientificName = species?.scientificName
     val displayTitle = commonName ?: scientificName ?: "Unknown species"
@@ -42,7 +45,7 @@ private fun RecentEntryDto.toDomain(): RecentObservation {
         title = displayTitle,
         subtitle = subtitle,
         location = location,
-        imageUrl = species?.imageUrl ?: imageUrl,
+        imageUrl = resolvedImage,
         notes = notes,
         confidence = confidence,
         createdAtIso = createdAt

@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
     private const val BASE_URL = BuildConfig.API_BASE_URL
+    private const val IMAGE_BASE_URL = BuildConfig.IMAGE_BASE_URL
     private const val COLOR_API_BASE_URL = "http://colormind.io/"
 
     private var authToken: String? = null
@@ -63,6 +64,15 @@ object RetrofitClient {
 
     val wildlifeApi: WildlifeApi by lazy {
         retrofit.create(WildlifeApi::class.java)
+    }
+
+    fun resolveImageUrl(path: String?): String? {
+        if (path.isNullOrBlank()) return null
+        return if (path.startsWith("http", ignoreCase = true)) {
+            path
+        } else {
+            IMAGE_BASE_URL.trimEnd('/') + "/" + path.trimStart('/')
+        }
     }
 
 }
