@@ -53,7 +53,9 @@ const serializeCatalogLinks = (
       ...rawEntry,
       speciesId: normalizedSpeciesId ?? rawEntry.speciesId,
       species: speciesName ?? (rawEntry as unknown as { species?: string }).species,
-      imageUrl: speciesImageUrl ?? rawEntry.imageUrl,
+      // imageUrl: speciesImageUrl ?? rawEntry.imageUrl,
+      imageUrl: rawEntry.imageUrl ?? speciesImageUrl,
+
     };
 
     const addedAtIso = link.addedAt instanceof Date ? link.addedAt.toISOString() : new Date(link.addedAt).toISOString();
