@@ -26,22 +26,26 @@ export class RecognitionController {
     next: NextFunction
   ) {
     try {
-      // Check if file was uploaded
-      if (!req.file) {
+      const body = req.body as Record<string, string | undefined>;
+      const latitude = body.latitude;
+      const longitude = body.longitude;
+      const imageUrl = body.imageUrl ?? body.image_url;
+
+      if (!req.file && !imageUrl) {
         return res.status(400).json({
-          message: 'No image file provided. Please upload an image.',
+          message: 'Provide an image file or an imageUrl to perform recognition.',
         });
       }
 
-      const { latitude, longitude } = req.body;
-
-      // Recognize species using iNaturalist API
       logger.info('Processing image recognition request');
-      const recognitionResult = await recognitionService.recognizeFromImage(
-        req.file.buffer,
-        latitude ? parseFloat(latitude) : undefined,
-        longitude ? parseFloat(longitude) : undefined
-      );
+
+      const recognitionResult = imageUrl
+        ? await recognitionService.recognizeFromUrl(imageUrl)
+        : await recognitionService.recognizeFromImage(
+            req.file!.buffer,
+            latitude ? parseFloat(latitude) : undefined,
+            longitude ? parseFloat(longitude) : undefined
+          );
 
       return res.status(200).json({
         message: 'Species recognized successfully',
