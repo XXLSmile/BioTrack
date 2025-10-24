@@ -41,6 +41,7 @@ import com.cpen321.usermanagement.ui.screens.ManageProfileScreen
 import com.cpen321.usermanagement.ui.screens.ProfileScreen
 import com.cpen321.usermanagement.ui.screens.ProfileScreenActions
 import com.cpen321.usermanagement.ui.viewmodels.AuthViewModel
+import com.cpen321.usermanagement.ui.viewmodels.CatalogEntriesViewModel
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
 import com.cpen321.usermanagement.ui.viewmodels.FriendViewModel
 import com.cpen321.usermanagement.ui.viewmodels.MainViewModel
@@ -246,7 +247,8 @@ private fun AppNavHost(
         }
 
         composable(NavRoutes.CATALOG_ENTRIES) {
-            CatalogEntriesScreen(navController = navController)
+            val viewModel: CatalogEntriesViewModel = hiltViewModel()
+            CatalogEntriesScreen(navController = navController, viewModel = viewModel)
         }
 
         composable(NavRoutes.IDENTIFY) {
