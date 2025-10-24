@@ -1,5 +1,6 @@
 import axios from 'axios';
 import FormData from 'form-data';
+import crypto from 'crypto';
 import logger from '../logger.util';
 import {
   INaturalistResponse,
@@ -10,6 +11,8 @@ import { speciesRepository } from './species.model';
 export class RecognitionService {
   private apiBaseUrl = 'https://api.inaturalist.org/v1';
   private userAgent = 'BioTrack/1.0';
+  private zylaApiUrl = process.env.ZYLA_API_URL ?? 'https://zylalabs.com/api/6628/animal+image+detection+api/9728/animal+recognition';
+  private zylaApiToken = process.env.ZYLA_API_KEY ?? '10848|57uHDVRiBVLHqWIkZvIQStLfpiEctQWUBsFfjNQi';
 
   /**
    * Recognize species from an image using iNaturalist API
@@ -21,12 +24,6 @@ export class RecognitionService {
   ): Promise<RecognitionResult> {
     try {
       logger.info('Starting species recognition via iNaturalist API');
-
-      // DEVELOPMENT MODE: Use mock data for testing
-      if (process.env.NODE_ENV === 'development' && process.env.USE_MOCK_IDENTIFICATION === 'true') {
-        logger.info('Using mock recognition for development');
-        return this.getMockRecognitionResult();
-      }
 
       // Create form data for the API request
       const formData = new FormData();
@@ -115,55 +112,79 @@ export class RecognitionService {
     }
   }
 
-  /**
-   * Mock recognition result for development/testing
-   */
-  private getMockRecognitionResult(): RecognitionResult {
-    const mockSpecies = [
-      {
-        id: 12345,
-        scientificName: 'Corvus brachyrhynchos',
-        commonName: 'American Crow',
-        rank: 'species',
-        taxonomy: 'Aves',
-        wikipediaUrl: 'https://en.wikipedia.org/wiki/American_crow',
-        imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c6/American_Crow.jpg/256px-American_Crow.jpg',
-      },
-      {
-        id: 12346,
-        scientificName: 'Turdus migratorius',
-        commonName: 'American Robin',
-        rank: 'species',
-        taxonomy: 'Aves',
-        wikipediaUrl: 'https://en.wikipedia.org/wiki/American_robin',
-        imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/Turdus-migratorius-002.jpg/256px-Turdus-migratorius-002.jpg',
-      },
-      {
-        id: 12347,
-        scientificName: 'Cardinalis cardinalis',
-        commonName: 'Northern Cardinal',
-        rank: 'species',
-        taxonomy: 'Aves',
-        wikipediaUrl: 'https://en.wikipedia.org/wiki/Northern_cardinal',
-        imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Cardinalis_cardinalis_-Illinois-8.jpg/256px-Cardinalis_cardinalis_-Illinois-8.jpg',
+  async recognizeFromUrl(imageUrl: string): Promise<RecognitionResult> {
+    try {
+      logger.info('Starting species recognition via Zyla API');
+
+      const response = await axios.post(
+        this.zylaApiUrl,
+        { image_url: imageUrl },
+        {
+          headers: {
+            Authorization: `Bearer ${this.zylaApiToken}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 30000,
+        }
+      );
+
+      const outputs: Array<{ label: string; score?: number }> = response.data?.output ?? [];
+
+      if (!response.data?.success || outputs.length === 0) {
+        throw new Error('No species recognized from image');
       }
-    ];
 
-    // Randomly select a species for variety
-    const selectedSpecies = mockSpecies[Math.floor(Math.random() * mockSpecies.length)];
+      const top = outputs[0];
+      const label = top.label || 'Unknown species';
+      const normalizedLabel = label.toLowerCase();
 
-    return {
-      species: selectedSpecies,
-      confidence: 0.85 + Math.random() * 0.1, // 0.85-0.95 confidence
-      alternatives: mockSpecies
-        .filter(s => s.id !== selectedSpecies.id)
-        .slice(0, 3)
-        .map(species => ({
-          scientificName: species.scientificName,
-          commonName: species.commonName,
-          confidence: 0.3 + Math.random() * 0.4, // 0.3-0.7 confidence
+      const syntheticId = this.getStableId(normalizedLabel);
+
+      await speciesRepository.findOrCreate({
+        inaturalistId: syntheticId,
+        scientificName: label,
+        commonName: label,
+        rank: 'species',
+        taxonomy: 'Unknown',
+        wikipediaUrl: undefined,
+        imageUrl,
+      });
+
+      const recognitionResult: RecognitionResult = {
+        species: {
+          id: syntheticId,
+          scientificName: label,
+          commonName: label,
+          rank: 'species',
+          taxonomy: 'Unknown',
+          wikipediaUrl: undefined,
+          imageUrl,
+        },
+        confidence: top.score ?? 0,
+        alternatives: outputs.slice(1, 4).map(candidate => ({
+          scientificName: candidate.label,
+          commonName: candidate.label,
+          confidence: candidate.score ?? 0,
         })),
-    };
+      };
+
+      return recognitionResult;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Zyla API error:', {
+          status: error.response?.status,
+          message: error.message,
+        });
+      }
+
+      logger.error('Error recognizing species:', error instanceof Error ? error.message : String(error));
+      throw new Error('Failed to recognize species from image');
+    }
+  }
+
+  private getStableId(label: string): number {
+    const hash = crypto.createHash('sha256').update(label).digest('hex');
+    return parseInt(hash.slice(0, 8), 16);
   }
 }
 
