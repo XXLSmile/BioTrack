@@ -13,14 +13,20 @@ fun AddToCatalogDialog(
     viewModel: CatalogViewModel,
     isSaving: Boolean,
     onSave: (catalogId: String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    excludeCatalogId: String? = null
 ) {
     val catalogs by viewModel.catalogs.collectAsState()
+    val filteredCatalogs = remember(catalogs, excludeCatalogId) {
+        catalogs.filter { it._id != excludeCatalogId }
+    }
     var selectedCatalogId by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(catalogs) {
-        if (selectedCatalogId == null && catalogs.isNotEmpty()) {
-            selectedCatalogId = catalogs.first()._id
+    LaunchedEffect(filteredCatalogs) {
+        if (selectedCatalogId == null && filteredCatalogs.isNotEmpty()) {
+            selectedCatalogId = filteredCatalogs.first()._id
+        } else if (selectedCatalogId != null && filteredCatalogs.none { it._id == selectedCatalogId }) {
+            selectedCatalogId = filteredCatalogs.firstOrNull()?._id
         }
     }
 
@@ -62,10 +68,10 @@ fun AddToCatalogDialog(
         title = { Text("Save to Catalog") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (catalogs.isEmpty()) {
-                    Text("No catalogs yet. Create one first!")
+                if (filteredCatalogs.isEmpty()) {
+                    Text("No available catalogs. Create a new one first!")
                 } else {
-                    catalogs.forEach { catalog ->
+                    filteredCatalogs.forEach { catalog ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()

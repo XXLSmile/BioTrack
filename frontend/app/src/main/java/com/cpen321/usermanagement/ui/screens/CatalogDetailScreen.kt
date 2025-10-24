@@ -2,7 +2,6 @@
 
 package com.cpen321.usermanagement.ui.screens
 
-import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -17,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -24,9 +24,12 @@ import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
 import com.cpen321.usermanagement.data.model.CatalogEntry as RemoteCatalogEntry
-import java.text.SimpleDateFormat
-import java.util.*
-import com.cpen321.usermanagement.BuildConfig
+import com.cpen321.usermanagement.ui.components.ConfirmEntryActionDialog
+import com.cpen321.usermanagement.ui.components.EntryAction
+import com.cpen321.usermanagement.ui.components.EntryDetailDialog
+import com.cpen321.usermanagement.ui.components.formatIsoToPrettyDate
+import com.cpen321.usermanagement.ui.components.resolveImageUrl
+import kotlinx.coroutines.launch
 
 @Composable
 fun CatalogDetailScreen(
@@ -42,6 +45,24 @@ fun CatalogDetailScreen(
     val catalogDetailState by viewModel.catalogDetail.collectAsState()
     val catalog = catalogDetailState?.catalog
     val entries = catalogDetailState?.entries ?: emptyList()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+
+    var selectedEntry by remember { mutableStateOf<RemoteCatalogEntry?>(null) }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var isActionInProgress by remember { mutableStateOf(false) }
+    var detailErrorMessage by remember { mutableStateOf<String?>(null) }
+    var pendingAction by remember { mutableStateOf<EntryAction?>(null) }
+
+    LaunchedEffect(selectedEntry) {
+        detailErrorMessage = null
+    }
+
+    LaunchedEffect(showAddDialog) {
+        if (showAddDialog) {
+            viewModel.loadCatalogs()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -57,7 +78,8 @@ fun CatalogDetailScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         when {
             catalog == null -> {
@@ -98,16 +120,132 @@ fun CatalogDetailScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(entries) { entry -> // entry: RemoteCatalogEntry
-                        EntryCard(entry = entry)
+                        EntryCard(entry = entry, onClick = { selectedEntry = entry })
                     }
                 }
             }
         }
     }
+
+    val currentCatalogId = catalog?._id
+
+    if (showAddDialog && selectedEntry != null) {
+        AddToCatalogDialog(
+            viewModel = viewModel,
+            isSaving = isActionInProgress,
+            onSave = { targetCatalogId ->
+                val entryId = selectedEntry?.entry?._id ?: return@AddToCatalogDialog
+                isActionInProgress = true
+                detailErrorMessage = null
+                viewModel.addEntryToCatalog(targetCatalogId, entryId, currentCatalogId) { success, error ->
+                    isActionInProgress = false
+                    if (success) {
+                        showAddDialog = false
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Entry added to catalog")
+                        }
+                    } else {
+                        detailErrorMessage = error ?: "Failed to add entry to catalog"
+                    }
+                }
+            },
+            onDismiss = {
+                if (!isActionInProgress) {
+                    showAddDialog = false
+                }
+            },
+            excludeCatalogId = currentCatalogId
+        )
+    }
+
+    selectedEntry?.let { entry ->
+        val canRemoveFromCatalog = currentCatalogId != null
+        EntryDetailDialog(
+            entry = entry,
+            isProcessing = isActionInProgress,
+            errorMessage = detailErrorMessage,
+            canRemoveFromCatalog = canRemoveFromCatalog,
+            onDismiss = {
+                if (!isActionInProgress) {
+                    selectedEntry = null
+                    showAddDialog = false
+                }
+            },
+            onAddToCatalog = {
+                showAddDialog = true
+            },
+            onRemoveFromCatalog = if (canRemoveFromCatalog) {
+                { pendingAction = EntryAction.Remove(entry) }
+            } else null,
+            onDeleteEntry = {
+                pendingAction = EntryAction.Delete(entry)
+            }
+        )
+    }
+
+    val action = pendingAction
+    if (action != null && !isActionInProgress) {
+        ConfirmEntryActionDialog(
+            action = action,
+            onConfirm = {
+                val entryId = action.entry.entry._id
+                when (action) {
+                    is EntryAction.Remove -> {
+                        val catalogId = currentCatalogId
+                        if (catalogId == null) {
+                            detailErrorMessage = "Catalog unavailable"
+                            pendingAction = null
+                            return@ConfirmEntryActionDialog
+                        }
+                        isActionInProgress = true
+                        detailErrorMessage = null
+                        viewModel.removeEntryFromCatalog(catalogId, entryId) { success, error ->
+                            isActionInProgress = false
+                            pendingAction = null
+                            if (success) {
+                                selectedEntry = null
+                                showAddDialog = false
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("Entry removed from catalog")
+                                }
+                            } else {
+                                detailErrorMessage = error ?: "Failed to remove entry"
+                            }
+                        }
+                    }
+                    is EntryAction.Delete -> {
+                        isActionInProgress = true
+                        detailErrorMessage = null
+                        viewModel.deleteEntry(entryId, currentCatalogId) { success, error ->
+                            isActionInProgress = false
+                            pendingAction = null
+                            if (success) {
+                                selectedEntry = null
+                                showAddDialog = false
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("Entry deleted")
+                                }
+                            } else {
+                                detailErrorMessage = error ?: "Failed to delete entry"
+                            }
+                        }
+                    }
+                }
+            },
+            onDismiss = {
+                if (!isActionInProgress) {
+                    pendingAction = null
+                }
+            }
+        )
+    }
 }
 
 @Composable
-private fun EntryCard(entry: RemoteCatalogEntry) {
+private fun EntryCard(
+    entry: RemoteCatalogEntry,
+    onClick: (RemoteCatalogEntry) -> Unit
+) {
     // RemoteCatalogEntry has shape: { entry: Entry, linkedAt: String?, addedBy: String? }
     val item = entry.entry
     val speciesName = item.species ?: (item._id ?: "Unknown")
@@ -117,9 +255,7 @@ private fun EntryCard(entry: RemoteCatalogEntry) {
 
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        onClick = {
-            // TODO: Navigate to a detailed animal info screen later
-        }
+        onClick = { onClick(entry) }
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -161,37 +297,3 @@ private fun EntryCard(entry: RemoteCatalogEntry) {
     }
 }
 
-private fun formatIsoToPrettyDate(iso: String): String {
-    return try {
-        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
-        val date = sdf.parse(iso)
-        val out = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
-        out.format(date!!)
-    } catch (e: Exception) {
-        iso.take(10)
-    }
-}
-
-private fun resolveImageUrl(rawUrl: String?): String? {
-    if (rawUrl.isNullOrBlank()) return null
-
-    val baseUrl = BuildConfig.IMAGE_BASE_URL.trimEnd('/')
-
-    return try {
-        val uri = Uri.parse(rawUrl)
-        val host = uri.host?.lowercase(Locale.ROOT)
-        when {
-            uri.scheme.isNullOrBlank() -> {
-                "$baseUrl/${rawUrl.trimStart('/')}"
-            }
-            host == "localhost" || host == "127.0.0.1" -> {
-                val path = uri.path ?: ""
-                val fullPath = if (path.startsWith("/")) path else "/$path"
-                "$baseUrl$fullPath"
-            }
-            else -> rawUrl
-        }
-    } catch (e: Exception) {
-        "$baseUrl/${rawUrl.trimStart('/')}"
-    }
-}

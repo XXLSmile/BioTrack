@@ -51,4 +51,10 @@ router.get(
   recognitionController.getImageFromDatabase
 );
 
+router.delete(
+  '/entry/:entryId',
+  authenticateToken,
+  recognitionController.deleteEntry
+);
+
 export default router;

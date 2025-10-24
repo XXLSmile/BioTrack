@@ -77,6 +77,17 @@ export class CatalogEntryLinkModel {
     }
   }
 
+  async removeEntryFromAllCatalogs(
+    entryId: mongoose.Types.ObjectId
+  ): Promise<void> {
+    try {
+      await this.link.deleteMany({ entry: entryId });
+    } catch (error) {
+      logger.error('Failed to remove entry from catalogs:', error);
+      throw new Error('Failed to remove entry from catalogs');
+    }
+  }
+
   async isEntryLinked(
     catalogId: mongoose.Types.ObjectId,
     entryId: mongoose.Types.ObjectId

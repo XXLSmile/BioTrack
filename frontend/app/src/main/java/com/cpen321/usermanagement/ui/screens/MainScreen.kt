@@ -32,7 +32,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -41,11 +44,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.cpen321.usermanagement.data.model.CatalogEntry as RemoteCatalogEntry
 import com.cpen321.usermanagement.data.model.RecentObservation
 import com.cpen321.usermanagement.ui.components.ObservationListItem
+import com.cpen321.usermanagement.ui.components.EntryAction
+import com.cpen321.usermanagement.ui.components.EntryDetailDialog
+import com.cpen321.usermanagement.ui.components.ConfirmEntryActionDialog
+import com.cpen321.usermanagement.ui.components.toCatalogEntry
+import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
 import com.cpen321.usermanagement.ui.navigation.NavRoutes
 import com.cpen321.usermanagement.ui.viewmodels.MainViewModel
 import com.cpen321.usermanagement.ui.viewmodels.ProfileViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun MainScreen(
@@ -89,6 +100,25 @@ fun MainScreen(
 
     val user = profileUiState.user
     val stats = profileUiState.stats
+    val catalogViewModel: CatalogViewModel = hiltViewModel()
+    val coroutineScope = rememberCoroutineScope()
+
+    var showEntryDialog by remember { mutableStateOf(false) }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var isDialogProcessing by remember { mutableStateOf(false) }
+    var detailErrorMessage by remember { mutableStateOf<String?>(null) }
+    var pendingEntryAction by remember { mutableStateOf<EntryAction?>(null) }
+    var selectedEntry by remember { mutableStateOf<RemoteCatalogEntry?>(null) }
+
+    LaunchedEffect(selectedEntry) {
+        detailErrorMessage = null
+    }
+
+    LaunchedEffect(showAddDialog) {
+        if (showAddDialog) {
+            catalogViewModel.loadCatalogs()
+        }
+    }
 
     LaunchedEffect(user?._id) {
         if (user != null) {
@@ -134,9 +164,99 @@ fun MainScreen(
                     isLoading = mainUiState.isLoadingRecent,
                     errorMessage = mainUiState.recentError,
                     onRetry = { mainViewModel.loadRecentObservations() },
-                    onViewAll = { navigateToRoute(NavRoutes.CATALOG_ENTRIES) }
+                    onViewAll = { navigateToRoute(NavRoutes.CATALOG_ENTRIES) },
+                    onSelectObservation = { observation ->
+                        selectedEntry = observation.toCatalogEntry()
+                        detailErrorMessage = null
+                        showEntryDialog = true
+                    }
                 )
             }
+        }
+
+        if (showAddDialog && selectedEntry != null) {
+            AddToCatalogDialog(
+                viewModel = catalogViewModel,
+                isSaving = isDialogProcessing,
+                onSave = { catalogId ->
+                    val entryId = selectedEntry?.entry?._id ?: return@AddToCatalogDialog
+                    isDialogProcessing = true
+                    detailErrorMessage = null
+                    catalogViewModel.addEntryToCatalog(catalogId, entryId, null) { success, error ->
+                        isDialogProcessing = false
+                        if (success) {
+                            showAddDialog = false
+                            mainViewModel.loadRecentObservations()
+                            coroutineScope.launch {
+                                snackBarHostState.showSnackbar("Entry added to catalog")
+                            }
+                        } else {
+                            detailErrorMessage = error ?: "Failed to add entry to catalog"
+                        }
+                    }
+                },
+                onDismiss = {
+                    if (!isDialogProcessing) {
+                        showAddDialog = false
+                    }
+                }
+            )
+        }
+
+        if (showEntryDialog && selectedEntry != null) {
+            EntryDetailDialog(
+                entry = selectedEntry!!,
+                isProcessing = isDialogProcessing,
+                errorMessage = detailErrorMessage,
+                canRemoveFromCatalog = false,
+                onDismiss = {
+                    if (!isDialogProcessing) {
+                        showEntryDialog = false
+                        showAddDialog = false
+                        selectedEntry = null
+                        detailErrorMessage = null
+                    }
+                },
+                onAddToCatalog = {
+                    showAddDialog = true
+                },
+                onRemoveFromCatalog = null,
+                onDeleteEntry = {
+                    pendingEntryAction = EntryAction.Delete(selectedEntry!!)
+                }
+            )
+        }
+
+        val pendingAction = pendingEntryAction
+        if (pendingAction is EntryAction.Delete && !isDialogProcessing) {
+            ConfirmEntryActionDialog(
+                action = pendingAction,
+                onConfirm = {
+                    val entryId = pendingAction.entry.entry._id
+                    isDialogProcessing = true
+                    detailErrorMessage = null
+                    catalogViewModel.deleteEntry(entryId, null) { success, error ->
+                        isDialogProcessing = false
+                        pendingEntryAction = null
+                        if (success) {
+                            showEntryDialog = false
+                            showAddDialog = false
+                            selectedEntry = null
+                            mainViewModel.loadRecentObservations()
+                            coroutineScope.launch {
+                                snackBarHostState.showSnackbar("Entry deleted")
+                            }
+                        } else {
+                            detailErrorMessage = error ?: "Failed to delete entry"
+                        }
+                    }
+                },
+                onDismiss = {
+                    if (!isDialogProcessing) {
+                        pendingEntryAction = null
+                    }
+                }
+            )
         }
     }
 }
@@ -321,7 +441,8 @@ private fun RecentObservationsSection(
     isLoading: Boolean,
     errorMessage: String?,
     onRetry: () -> Unit,
-    onViewAll: () -> Unit
+    onViewAll: () -> Unit,
+    onSelectObservation: (RecentObservation) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -390,7 +511,10 @@ private fun RecentObservationsSection(
                     }
                     else -> {
                         observations.forEachIndexed { index, observation ->
-                            ObservationListItem(observation)
+                            ObservationListItem(
+                                observation = observation,
+                                onClick = { onSelectObservation(observation) }
+                            )
                             if (index != observations.lastIndex) {
                                 HorizontalDivider()
                             }
