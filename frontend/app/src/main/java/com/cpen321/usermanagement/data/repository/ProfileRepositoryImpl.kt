@@ -9,6 +9,7 @@ import com.cpen321.usermanagement.data.remote.dto.UpdateProfileRequest
 import com.cpen321.usermanagement.data.remote.dto.User
 import com.cpen321.usermanagement.data.remote.dto.UserStatsData
 import com.cpen321.usermanagement.data.remote.dto.UsernameAvailabilityResponse
+import com.cpen321.usermanagement.data.remote.socket.CatalogSocketService
 import com.cpen321.usermanagement.utils.JsonUtils.parseErrorMessage
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -20,7 +21,8 @@ import retrofit2.HttpException
 @Singleton
 class ProfileRepositoryImpl @Inject constructor(
     private val userInterface: UserInterface,
-    private val tokenManager: TokenManager
+    private val tokenManager: TokenManager,
+    private val catalogSocketService: CatalogSocketService
 ) : ProfileRepository {
 
     companion object {
@@ -41,6 +43,7 @@ class ProfileRepositoryImpl @Inject constructor(
                 Log.e(TAG, "Failed to get profile: $errorMessage")
                 tokenManager.clearToken()
                 RetrofitClient.setAuthToken(null)
+                catalogSocketService.disconnect()
                 Result.failure(Exception(errorMessage))
             }
         } catch (e: SocketTimeoutException) {

@@ -1,10 +1,12 @@
-import  dotenv from 'dotenv';
+import dotenv from 'dotenv';
 import express from 'express';
+import http from 'http';
+import path from 'path';
 
 import { connectDB } from './database';
 import { errorHandler, notFoundHandler } from './errorHandler.middleware';
 import router from './routes';
-import path from 'path';
+import { initializeSocketServer } from './socket/socket.manager';
 
 dotenv.config();
 
@@ -18,7 +20,11 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('*', notFoundHandler);
 app.use(errorHandler);
 
+const server = http.createServer(app);
+initializeSocketServer(server);
+
 connectDB();
-app.listen(PORT, () => {
+
+server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });

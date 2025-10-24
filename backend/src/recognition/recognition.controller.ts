@@ -12,6 +12,8 @@ import logger from '../logger.util';
 import { RecognitionImageResponse } from './recognition.types';
 import { catalogModel } from '../catalog/catalog.model';
 import { catalogEntryLinkModel } from '../catalog/catalogEntryLink.model';
+import { buildCatalogEntriesResponse } from '../catalog/catalog.helpers';
+import { emitCatalogEntriesUpdated } from '../socket/socket.manager';
 
 export class RecognitionController {
   /**
@@ -370,6 +372,15 @@ export class RecognitionController {
         });
       }
 
+      if (!mongoose.Types.ObjectId.isValid(entryId)) {
+        return res.status(400).json({
+          message: 'Invalid entry ID',
+        });
+      }
+
+      const entryObjectId = new mongoose.Types.ObjectId(entryId);
+      const affectedCatalogIds = await catalogEntryLinkModel.listCatalogIdsForEntry(entryObjectId);
+
       const result = await catalogRepository.deleteById(entryId, user._id.toString());
 
       if (result === 'not_found') {
@@ -382,6 +393,22 @@ export class RecognitionController {
         return res.status(403).json({
           message: 'You do not have permission to delete this entry',
         });
+      }
+
+      if (result === 'deleted' && affectedCatalogIds.length > 0) {
+        for (const catalogId of affectedCatalogIds) {
+          try {
+            const links = await catalogEntryLinkModel.listEntriesWithDetails(catalogId);
+            const entries = buildCatalogEntriesResponse(links, user._id);
+            emitCatalogEntriesUpdated(catalogId, entries, user._id);
+          } catch (emitError) {
+            logger.warn('Failed to broadcast catalog update after entry deletion', {
+              entryId,
+              catalogId: catalogId.toString(),
+              error: emitError,
+            });
+          }
+        }
       }
 
       return res.status(200).json({

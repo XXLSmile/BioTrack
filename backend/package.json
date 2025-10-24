@@ -1,4 +1,4 @@
- {
+{
   "name": "backend",
   "version": "1.0.0",
   "main": "dist/index.js",
@@ -13,6 +13,7 @@
   "license": "ISC",
   "description": "TypeScript backend project",
   "dependencies": {
+    "@types/socket.io": "^3.0.1",
     "axios": "^1.6.0",
     "dotenv": "^17.2.1",
     "express": "^4.18.0",
@@ -21,6 +22,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.18.0",
     "multer": "^2.0.2",
+    "socket.io": "^4.8.1",
     "zod": "^4.1.1"
   },
   "devDependencies": {

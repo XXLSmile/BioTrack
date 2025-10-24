@@ -107,6 +107,15 @@ export class CatalogEntryLinkModel {
       })
       .populate('addedBy', 'name username profilePicture');
   }
+
+  async listCatalogIdsForEntry(
+    entryId: mongoose.Types.ObjectId
+  ): Promise<mongoose.Types.ObjectId[]> {
+    const catalogIds = await this.link.distinct('catalog', { entry: entryId });
+    return catalogIds
+      .map(id => (typeof id === 'string' ? new mongoose.Types.ObjectId(id) : id))
+      .filter((catalogId): catalogId is mongoose.Types.ObjectId => catalogId instanceof mongoose.Types.ObjectId);
+  }
 }
 
 export const catalogEntryLinkModel = new CatalogEntryLinkModel();
