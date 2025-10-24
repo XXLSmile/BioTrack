@@ -31,6 +31,7 @@ import com.cpen321.usermanagement.R
 import com.cpen321.usermanagement.ui.screens.AuthScreen
 import com.cpen321.usermanagement.ui.screens.CameraScreen
 import com.cpen321.usermanagement.ui.screens.CatalogDetailScreen
+import com.cpen321.usermanagement.ui.screens.CatalogEntriesScreen
 import com.cpen321.usermanagement.ui.screens.CatalogListScreen
 import com.cpen321.usermanagement.ui.screens.FriendsScreen
 import com.cpen321.usermanagement.ui.screens.IdentifyScreen
@@ -55,6 +56,7 @@ object NavRoutes {
     const val IDENTIFY = "identify"
     const val FRIENDS = "friends"
     const val PROFILE = "profile"
+    const val CATALOG_ENTRIES = "catalog_entries"
 
     const val MANAGE_PROFILE = "manage_profile"
     const val CAMERA = "camera"
@@ -241,6 +243,10 @@ private fun AppNavHost(
         composable(NavRoutes.CATALOGS) {
             val catalogViewModel: CatalogViewModel = hiltViewModel()
             CatalogListScreen(viewModel = catalogViewModel, navController = navController, showNavigationIcon = false)
+        }
+
+        composable(NavRoutes.CATALOG_ENTRIES) {
+            CatalogEntriesScreen(navController = navController)
         }
 
         composable(NavRoutes.IDENTIFY) {
