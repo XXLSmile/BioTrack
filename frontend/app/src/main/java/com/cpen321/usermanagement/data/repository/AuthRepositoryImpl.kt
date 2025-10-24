@@ -15,6 +15,7 @@ import com.cpen321.usermanagement.data.remote.api.UserInterface
 import com.cpen321.usermanagement.data.remote.dto.AuthData
 import com.cpen321.usermanagement.data.remote.dto.GoogleLoginRequest
 import com.cpen321.usermanagement.data.remote.dto.User
+import com.cpen321.usermanagement.data.remote.socket.CatalogSocketService
 import com.cpen321.usermanagement.utils.JsonUtils
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -29,7 +30,8 @@ class AuthRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val authInterface: AuthInterface,
     private val userInterface: UserInterface,
-    private val tokenManager: TokenManager
+    private val tokenManager: TokenManager,
+    private val catalogSocketService: CatalogSocketService
 ) : AuthRepository {
 
     companion object {
@@ -93,6 +95,7 @@ class AuthRepositoryImpl @Inject constructor(
                 val authData = response.body()!!.data!!
                 tokenManager.saveToken(authData.token)
                 RetrofitClient.setAuthToken(authData.token)
+                catalogSocketService.updateAuthToken(authData.token)
                 Result.success(authData)
             } else {
                 val errorBodyString = response.errorBody()?.string()
@@ -126,6 +129,7 @@ class AuthRepositoryImpl @Inject constructor(
                 val authData = response.body()!!.data!!
                 tokenManager.saveToken(authData.token)
                 RetrofitClient.setAuthToken(authData.token)
+                catalogSocketService.updateAuthToken(authData.token)
                 Result.success(authData)
             } else {
                 val errorBodyString = response.errorBody()?.string()
@@ -154,6 +158,7 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun clearToken(): Result<Unit> {
         tokenManager.clearToken()
         RetrofitClient.setAuthToken(null)
+        catalogSocketService.disconnect()
         return Result.success(Unit)
     }
 
@@ -197,6 +202,7 @@ class AuthRepositoryImpl @Inject constructor(
         if (isLoggedIn) {
             val token = getStoredToken()
             token?.let { RetrofitClient.setAuthToken(it) }
+            token?.let { catalogSocketService.updateAuthToken(it) }
             // Verify token is still valid by trying to get user profile
             return getCurrentUser() != null
         }
@@ -209,6 +215,7 @@ class AuthRepositoryImpl @Inject constructor(
             if (response.isSuccessful) {
                 tokenManager.clearToken()
                 RetrofitClient.setAuthToken(null)
+                catalogSocketService.disconnect()
                 Result.success(Unit)
             } else {
                 val errorBodyString = response.errorBody()?.string()
