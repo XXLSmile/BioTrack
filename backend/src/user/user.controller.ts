@@ -383,4 +383,15 @@ export class UserController {
       next(error);
     }
   }
+
+  async updateFcmToken(req: Request, res: Response) {
+  const user = req.user!;
+  const { token } = req.body;
+
+  await userModel.update(user._id, { fcmToken: token });
+
+  res.status(200).json({ message: "Token updated" });
+}
+
+
 }

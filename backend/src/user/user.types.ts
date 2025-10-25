@@ -21,6 +21,7 @@ export interface IUser extends Document {
   friendCount: number;
   createdAt: Date;
   updatedAt: Date;
+  fcmToken?: string | null;       // Firebase Cloud Messaging token for push notifications
 }
 
 // Zod schemas

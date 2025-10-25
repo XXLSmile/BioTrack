@@ -24,6 +24,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.tasks.await
 
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
@@ -96,6 +98,8 @@ class AuthRepositoryImpl @Inject constructor(
                 tokenManager.saveToken(authData.token)
                 RetrofitClient.setAuthToken(authData.token)
                 catalogSocketService.updateAuthToken(authData.token)
+                // Send FCM token
+                sendFcmTokenToServer()
                 Result.success(authData)
             } else {
                 val errorBodyString = response.errorBody()?.string()
@@ -130,7 +134,10 @@ class AuthRepositoryImpl @Inject constructor(
                 tokenManager.saveToken(authData.token)
                 RetrofitClient.setAuthToken(authData.token)
                 catalogSocketService.updateAuthToken(authData.token)
+                // Send FCM token
+                sendFcmTokenToServer()
                 Result.success(authData)
+
             } else {
                 val errorBodyString = response.errorBody()?.string()
                 val errorMessage = JsonUtils.parseErrorMessage(
@@ -152,6 +159,22 @@ class AuthRepositoryImpl @Inject constructor(
         } catch (e: retrofit2.HttpException) {
             Log.e(TAG, "HTTP error during Google sign up: ${e.code()}", e)
             Result.failure(e)
+        }
+    }
+
+    override suspend fun sendFcmTokenToServer() {
+        try {
+            val fcmToken = FirebaseMessaging.getInstance().token.await()
+            Log.d(TAG, "Sending FCM token: $fcmToken")
+
+            val response = RetrofitClient.userInterface.updateFcmToken(mapOf("token" to fcmToken))
+            if (response.isSuccessful) {
+                Log.d(TAG, "FCM token sent successfully")
+            } else {
+                Log.e(TAG, "Failed to send FCM token: ${response.errorBody()?.string()}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sending FCM token", e)
         }
     }
 
