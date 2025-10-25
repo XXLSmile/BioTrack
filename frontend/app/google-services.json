@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "600451774581",
+    "project_id": "biotrack-df1d8",
+    "storage_bucket": "biotrack-df1d8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:600451774581:android:68c2ce92f2d542918fe03c",
+        "android_client_info": {
+          "package_name": "com.cpen321.usermanagement"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDRFUFFo8AYKFMHJct1FYPhgmFocU31eeI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
