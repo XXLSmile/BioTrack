@@ -19,7 +19,9 @@ import jakarta.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MyFirebaseMessagingService : FirebaseMessagingService() {
     @Inject lateinit var authRepository: AuthRepositoryImpl
 
