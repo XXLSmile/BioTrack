@@ -49,6 +49,7 @@ export const updateProfileSchema = z.object({
   region: z.string().max(100).optional(),
   isPublicProfile: z.boolean().optional(),
   favoriteSpecies: z.array(z.string()).optional(),
+  fcmToken: z.string().nullable().optional(),
 });
 
 // Request types
