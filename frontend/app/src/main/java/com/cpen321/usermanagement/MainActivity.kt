@@ -16,14 +16,33 @@ import com.cpen321.usermanagement.ui.theme.ProvideSpacing
 import com.cpen321.usermanagement.ui.theme.UserManagementTheme
 import dagger.hilt.android.AndroidEntryPoint
 
+import com.cpen321.usermanagement.data.remote.api.RetrofitClient
+
+import kotlinx.coroutines.launch
+import androidx.lifecycle.lifecycleScope
+import com.cpen321.usermanagement.data.repository.AuthRepositoryImpl
+import javax.inject.Inject
+
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @Inject lateinit var authRepository: AuthRepositoryImpl
     override fun onCreate(savedInstanceState: Bundle?) {
+
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         setContent {
             UserManagementTheme {
                 UserManagementApp()
+            }
+        }
+
+        // Send FCM token if user is already logged in
+        lifecycleScope.launch {
+            if (authRepository.doesTokenExist()) {
+                RetrofitClient.setAuthToken(authRepository.getStoredToken())
+                authRepository.sendFcmTokenToServer()
             }
         }
     }
@@ -50,3 +69,4 @@ fun UserManagementApp() {
         }
     }
 }
+

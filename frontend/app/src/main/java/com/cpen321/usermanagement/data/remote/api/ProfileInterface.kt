@@ -48,4 +48,9 @@ interface UserInterface {
     suspend fun searchUsers(
         @Query("query") query: String
     ): Response<ApiResponse<SearchUsersResponse>>
+
+    @POST("user/update-fcm-token")
+    suspend fun updateFcmToken(@Body body: Map<String, String>): Response<ApiResponse<Unit>>
+
+
 }

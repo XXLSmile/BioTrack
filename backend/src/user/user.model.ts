@@ -84,6 +84,8 @@ const userSchema = new Schema<IUser>(
       default: 0,
       min: 0,
     },
+    //firebase tokens for push notifications
+    fcmToken: { type: String, default: null },
   },
   {
     timestamps: true,

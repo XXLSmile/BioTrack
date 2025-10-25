@@ -9,6 +9,7 @@ import {
 } from './friend.types';
 import { userModel } from '../user/user.model';
 import logger from '../logger.util';
+import { messaging } from "../firebase";
 
 export class FriendController {
   async listFriends(req: Request, res: Response, next: NextFunction) {
@@ -100,6 +101,25 @@ export class FriendController {
       }
 
       const request = await friendshipModel.createRequest(user._id, targetId);
+      // Send FCM notification to target user if they have an FCM token
+      if (targetUser.fcmToken) {
+        try {
+          await messaging.send({
+            token: targetUser.fcmToken,
+            notification: {
+              title: "New Friend Request 🎉",
+              body: `${user.name || user.username} sent you a friend request!`,
+            },
+            data: {
+              type: "FRIEND_REQUEST_RECEIVED",
+              requesterId: user._id.toString(),
+            },
+          });
+          logger.info(`Sent friend request notification to ${targetUser.username}`);
+        } catch (err) {
+          logger.warn(`Failed to send FCM notification to ${targetUser.username}:`, err);
+        }
+      }
 
       res.status(201).json({
         message: 'Friend request sent successfully',
@@ -110,6 +130,8 @@ export class FriendController {
       next(error);
     }
   }
+
+
 
   async respondToRequest(
     req: Request<{ requestId: string }, unknown, RespondFriendRequest>,
@@ -160,6 +182,28 @@ export class FriendController {
         const addresseeId = request.addressee as mongoose.Types.ObjectId;
         await userModel.incrementFriendCount(requesterId);
         await userModel.incrementFriendCount(addresseeId);
+
+        const requesterUser = await userModel.findById(requesterId);
+        const addresseeUser = await userModel.findById(addresseeId);
+        // Send FCM notification to requester if they have an FCM token
+        if (requesterUser?.fcmToken) {
+          try {
+            await messaging.send({
+              token: requesterUser.fcmToken,
+              notification: {
+                title: "Friend Request Accepted ✅",
+                body: `${addresseeUser?.name || addresseeUser?.username} accepted your friend request!`,
+              },
+              data: {
+                type: "FRIEND_REQUEST_ACCEPTED",
+                friendId: addresseeId.toString(),
+              },
+            });
+            logger.info(`Sent acceptance notification to ${requesterUser.username}`);
+          } catch (err) {
+            logger.warn(`Failed to send FCM acceptance notification:`, err);
+          }
+        }
       }
 
       res.status(200).json({

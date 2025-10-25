@@ -34,6 +34,8 @@ router.get('/:userId', userController.getUserById);
 
 router.post('/favorite-species', userController.addFavoriteSpecies);
 
+router.post('/update-fcm-token', userController.updateFcmToken);
+
 router.delete('/favorite-species', userController.removeFavoriteSpecies);
 
 export default router;
