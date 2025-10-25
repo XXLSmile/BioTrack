@@ -9,6 +9,10 @@ build/
 # Environment variables
 ../.env
 
+# Ignore Firebase admin credentials
+biotrack-df1d8-firebase-adminsdk-fbsvc-54ca31b746.json
+
+
 # Logs
 logs
 *.log
