@@ -16,6 +16,8 @@ export interface ICatalogEntry extends Document {
   imageMimeType?: string; // Store the image type (e.g., 'image/jpeg')
   latitude?: number;
   longitude?: number;
+  city?: string;
+  province?: string;
   confidence: number;
   notes?: string;
   imageHash: string;
@@ -55,6 +57,14 @@ const catalogSchema = new Schema<ICatalogEntry>(
     longitude: {
       type: Number,
     },
+    city: {
+      type: String,
+      trim: true,
+    },
+    province: {
+      type: String,
+      trim: true,
+    },
     confidence: {
       type: Number,
       required: true,
@@ -93,6 +103,8 @@ export class CatalogRepository {
     imageMimeType?: string;
     latitude?: number;
     longitude?: number;
+    city?: string;
+    province?: string;
     confidence: number;
     notes?: string;
     imageHash: string;

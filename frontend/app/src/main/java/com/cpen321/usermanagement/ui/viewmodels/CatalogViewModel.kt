@@ -130,7 +130,7 @@ class CatalogViewModel @Inject constructor(
                 when {
                     currentCatalogId == null -> Unit
                     currentCatalogId == targetCatalogId && updatedCatalog != null -> applyCatalogData(updatedCatalog)
-                    currentCatalogId != null -> loadCatalogDetail(currentCatalogId)
+                    else -> currentCatalogId?.let { loadCatalogDetail(it) }
                 }
                 onComplete(true, null)
             } catch (e: Exception) {
