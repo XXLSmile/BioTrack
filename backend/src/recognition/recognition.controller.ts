@@ -15,6 +15,25 @@ import { catalogEntryLinkModel } from '../catalog/catalogEntryLink.model';
 import { catalogShareModel } from '../catalog/catalogShare.model';
 import { buildCatalogEntriesResponse } from '../catalog/catalog.helpers';
 import { emitCatalogEntriesUpdated } from '../socket/socket.manager';
+import { geocodingService } from '../location/geocoding.service';
+
+const parseCoordinate = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return undefined;
+    }
+
+    const parsed = Number.parseFloat(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  return undefined;
+};
 
 export class RecognitionController {
   /**
@@ -27,10 +46,11 @@ export class RecognitionController {
     next: NextFunction
   ) {
     try {
-      const body = req.body as Record<string, string | undefined>;
-      const latitude = body.latitude;
-      const longitude = body.longitude;
-      const imageUrl = body.imageUrl ?? body.image_url;
+      const body = req.body as Record<string, unknown>;
+      const latitude = parseCoordinate(body.latitude);
+      const longitude = parseCoordinate(body.longitude);
+      const rawImageUrl = body.imageUrl ?? body.image_url;
+      const imageUrl = typeof rawImageUrl === 'string' && rawImageUrl.trim().length > 0 ? rawImageUrl : undefined;
 
       if (!req.file && !imageUrl) {
         return res.status(400).json({
@@ -44,8 +64,8 @@ export class RecognitionController {
         ? await recognitionService.recognizeFromUrl(imageUrl)
         : await recognitionService.recognizeFromImage(
             req.file!.buffer,
-            latitude ? parseFloat(latitude) : undefined,
-            longitude ? parseFloat(longitude) : undefined
+            latitude,
+            longitude
           );
 
       return res.status(200).json({
@@ -96,13 +116,16 @@ export class RecognitionController {
       }
 
       const user = req.user!;
-      const { latitude, longitude, notes, catalogId } = req.body;
+      const { latitude: rawLatitude, longitude: rawLongitude, notes, catalogId } = req.body;
+
+      const latitude = parseCoordinate(rawLatitude);
+      const longitude = parseCoordinate(rawLongitude);
 
       // Recognize species
       const recognitionResult = await recognitionService.recognizeFromImage(
         req.file.buffer,
-        latitude ? parseFloat(latitude) : undefined,
-        longitude ? parseFloat(longitude) : undefined
+        latitude,
+        longitude
       );
 
       // Get species from database
@@ -156,6 +179,10 @@ export class RecognitionController {
 
       let isNewEntry = false;
 
+      const locationInfo = latitude !== undefined && longitude !== undefined
+        ? await geocodingService.reverseGeocode(latitude, longitude)
+        : undefined;
+
       if (!catalogEntry) {
         // Save image to disk (for backwards compatibility and quick access)
         const IMAGES_DIR = path.join(__dirname, '../../uploads/images');
@@ -179,8 +206,10 @@ export class RecognitionController {
             imageUrl,
             imageData: req.file.buffer, // Save the actual image data to DB
             imageMimeType: req.file.mimetype, // Save the image MIME type
-            latitude: latitude ? parseFloat(latitude) : undefined,
-            longitude: longitude ? parseFloat(longitude) : undefined,
+            latitude,
+            longitude,
+            city: locationInfo?.city,
+            province: locationInfo?.province,
             confidence: recognitionResult.confidence,
             notes,
             imageHash,
@@ -245,6 +274,24 @@ export class RecognitionController {
         }
 
         linkedCatalogId = catalogToLink._id;
+      }
+
+      if (catalogEntry && locationInfo) {
+        let shouldSave = false;
+
+        if (!catalogEntry.city && locationInfo.city) {
+          catalogEntry.city = locationInfo.city;
+          shouldSave = true;
+        }
+
+        if (!catalogEntry.province && locationInfo.province) {
+          catalogEntry.province = locationInfo.province;
+          shouldSave = true;
+        }
+
+        if (shouldSave) {
+          await catalogEntry.save();
+        }
       }
 
       if (isNewEntry) {
