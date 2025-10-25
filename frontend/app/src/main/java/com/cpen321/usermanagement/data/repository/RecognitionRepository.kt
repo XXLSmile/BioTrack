@@ -54,19 +54,19 @@ private fun RecentEntryDto.toDomain(): RecentObservation {
         else -> ""
     }
 
-    val location = when {
-        latitude != null && longitude != null -> "Lat ${"%.2f".format(latitude)}, Lng ${"%.2f".format(longitude)}"
-        else -> "Location unavailable"
-    }
-
     return RecentObservation(
         id = _id,
         title = displayTitle,
         subtitle = subtitle,
-        location = location,
+        city = city?.takeIf { it.isNotBlank() },
+        province = province?.takeIf { it.isNotBlank() },
         imageUrl = resolvedImage,
         notes = notes,
         confidence = confidence,
+        latitude = latitude,
+        longitude = longitude,
+        speciesCommonName = commonName,
+        speciesScientificName = scientificName,
         createdAtIso = createdAt
     )
 }

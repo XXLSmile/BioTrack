@@ -1,5 +1,6 @@
 package com.cpen321.usermanagement.ui.navigation
 
+import android.net.Uri
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CameraAlt
@@ -40,12 +41,15 @@ import com.cpen321.usermanagement.ui.screens.MainScreen
 import com.cpen321.usermanagement.ui.screens.ManageProfileScreen
 import com.cpen321.usermanagement.ui.screens.ProfileScreen
 import com.cpen321.usermanagement.ui.screens.ProfileScreenActions
+import com.cpen321.usermanagement.ui.screens.PublicProfileScreen
+import com.cpen321.usermanagement.ui.screens.ObservationDetailScreen
 import com.cpen321.usermanagement.ui.viewmodels.AuthViewModel
 import com.cpen321.usermanagement.ui.viewmodels.CatalogEntriesViewModel
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
 import com.cpen321.usermanagement.ui.viewmodels.FriendViewModel
 import com.cpen321.usermanagement.ui.viewmodels.MainViewModel
 import com.cpen321.usermanagement.ui.viewmodels.NavigationViewModel
+import com.cpen321.usermanagement.ui.viewmodels.PublicProfileViewModel
 import com.cpen321.usermanagement.ui.viewmodels.ProfileViewModel
 
 object NavRoutes {
@@ -62,6 +66,11 @@ object NavRoutes {
     const val MANAGE_PROFILE = "manage_profile"
     const val CAMERA = "camera"
     const val CATALOG_DETAIL = "catalog_detail/{catalogId}"
+    const val OBSERVATION_DETAIL = "observation_detail/{entryId}"
+    const val PUBLIC_PROFILE = "public_profile/{username}"
+
+    fun observationDetail(entryId: String) = "observation_detail/$entryId"
+    fun publicProfile(username: String) = "public_profile/$username"
 }
 
 private data class BottomNavItem(
@@ -256,7 +265,14 @@ private fun AppNavHost(
         }
 
         composable(NavRoutes.FRIENDS) {
-            FriendsScreen(viewModel = friendViewModel)
+            FriendsScreen(
+                viewModel = friendViewModel,
+                onUserSelected = { user ->
+                    user.username?.let { username ->
+                        navController.navigate(NavRoutes.publicProfile(Uri.encode(username)))
+                    }
+                }
+            )
         }
 
         composable(NavRoutes.PROFILE) {
@@ -288,6 +304,26 @@ private fun AppNavHost(
             val catalogId = backStackEntry.arguments?.getString("catalogId") ?: return@composable
             val catalogViewModel: CatalogViewModel = hiltViewModel()
             CatalogDetailScreen(catalogId = catalogId, viewModel = catalogViewModel, navController = navController)
+        }
+
+        composable(NavRoutes.OBSERVATION_DETAIL) { backStackEntry ->
+            val entryId = backStackEntry.arguments?.getString("entryId") ?: return@composable
+            ObservationDetailScreen(
+                observationId = entryId,
+                mainViewModel = mainViewModel,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(NavRoutes.PUBLIC_PROFILE) { backStackEntry ->
+            val usernameParam = backStackEntry.arguments?.getString("username") ?: return@composable
+            val username = Uri.decode(usernameParam)
+            val publicProfileViewModel: PublicProfileViewModel = hiltViewModel()
+            PublicProfileScreen(
+                username = username,
+                viewModel = publicProfileViewModel,
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }

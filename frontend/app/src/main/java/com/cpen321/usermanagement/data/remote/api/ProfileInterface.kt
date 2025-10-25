@@ -7,11 +7,13 @@ import com.cpen321.usermanagement.data.remote.dto.SearchUsersResponse
 import com.cpen321.usermanagement.data.remote.dto.UpdateProfileRequest
 import com.cpen321.usermanagement.data.remote.dto.UserStatsData
 import com.cpen321.usermanagement.data.remote.dto.UsernameAvailabilityResponse
+import com.cpen321.usermanagement.data.remote.dto.PublicProfileData
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface UserInterface {
@@ -48,4 +50,9 @@ interface UserInterface {
     suspend fun searchUsers(
         @Query("query") query: String
     ): Response<ApiResponse<SearchUsersResponse>>
+
+    @GET("user/username/{username}")
+    suspend fun getUserByUsername(
+        @Path("username") username: String
+    ): Response<ApiResponse<PublicProfileData>>
 }

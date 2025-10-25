@@ -192,10 +192,12 @@ class CatalogSocketService @Inject constructor() {
 
         socket.on("catalog:entries-updated") { args ->
             parseEntriesPayload(args)?.let { payload ->
+                val catalogId = payload.catalogId ?: return@let
+                val entries = payload.entries ?: return@let
                 _events.tryEmit(
                     CatalogSocketEvent.EntriesUpdated(
-                        catalogId = payload.catalogId,
-                        entries = payload.entries,
+                        catalogId = catalogId,
+                        entries = entries,
                         updatedAt = payload.updatedAt
                     )
                 )
@@ -204,10 +206,12 @@ class CatalogSocketService @Inject constructor() {
 
         socket.on("catalog:metadata-updated") { args ->
             parseCatalogPayload(args)?.let { payload ->
+                val catalogId = payload.catalogId ?: return@let
+                val catalog = payload.catalog ?: return@let
                 _events.tryEmit(
                     CatalogSocketEvent.MetadataUpdated(
-                        catalogId = payload.catalogId,
-                        catalog = payload.catalog,
+                        catalogId = catalogId,
+                        catalog = catalog,
                         updatedAt = payload.updatedAt
                     )
                 )
@@ -216,14 +220,15 @@ class CatalogSocketService @Inject constructor() {
 
         socket.on("catalog:deleted") { args ->
             parseDeletionPayload(args)?.let { payload ->
+                val catalogId = payload.catalogId ?: return@let
                 scope.launch {
                     mutex.withLock {
-                        joinedCatalogs.remove(payload.catalogId)
+                        joinedCatalogs.remove(catalogId)
                     }
                 }
                 _events.tryEmit(
                     CatalogSocketEvent.CatalogDeleted(
-                        catalogId = payload.catalogId,
+                        catalogId = catalogId,
                         timestamp = payload.timestamp
                     )
                 )
@@ -249,7 +254,7 @@ class CatalogSocketService @Inject constructor() {
         val json = args?.firstOrNull() ?: return null
         return runCatching {
             val payload = gson.fromJson(json.toString(), EntriesPayload::class.java)
-            if (payload.catalogId.isNullOrBlank() || payload.entries == null) {
+            if (payload.catalogId.isNullOrBlank() || payload.entries.isNullOrEmpty()) {
                 null
             } else {
                 payload
@@ -282,21 +287,21 @@ class CatalogSocketService @Inject constructor() {
     }
 
     private data class EntriesPayload(
-        val catalogId: String,
-        val entries: List<CatalogEntry>,
+        val catalogId: String?,
+        val entries: List<CatalogEntry>?,
         val triggeredBy: String?,
         val updatedAt: String?
     )
 
     private data class CatalogPayload(
-        val catalogId: String,
-        val catalog: Catalog,
+        val catalogId: String?,
+        val catalog: Catalog?,
         val triggeredBy: String?,
         val updatedAt: String?
     )
 
     private data class DeletionPayload(
-        val catalogId: String,
+        val catalogId: String?,
         val triggeredBy: String?,
         val timestamp: String?
     )

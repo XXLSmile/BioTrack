@@ -26,7 +26,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -66,7 +66,10 @@ import com.cpen321.usermanagement.ui.viewmodels.FriendUiTab
 import com.cpen321.usermanagement.ui.viewmodels.FriendViewModel
 
 @Composable
-fun FriendsScreen(viewModel: FriendViewModel = hiltViewModel()) {
+fun FriendsScreen(
+    viewModel: FriendViewModel = hiltViewModel(),
+    onUserSelected: (PublicUserSummary) -> Unit = {}
+) {
     val uiState by viewModel.uiState.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -94,7 +97,8 @@ fun FriendsScreen(viewModel: FriendViewModel = hiltViewModel()) {
         onDeclineRequest = viewModel::declineFriendRequest,
         onRemoveFriend = viewModel::removeFriend,
         onCancelRequest = viewModel::cancelFriendRequest,
-        onClearMessage = viewModel::clearMessages
+        onClearMessage = viewModel::clearMessages,
+        onUserSelected = onUserSelected
     )
 }
 
@@ -111,6 +115,7 @@ private fun FriendsScreenContent(
     onRemoveFriend: (String) -> Unit,
     onCancelRequest: (String) -> Unit,
     onClearMessage: () -> Unit,
+    onUserSelected: (PublicUserSummary) -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -153,7 +158,8 @@ private fun FriendsScreenContent(
                     friends = uiState.friends,
                     isLoading = uiState.isLoadingFriends,
                     onRemoveFriend = onRemoveFriend,
-                    emptyMessage = "No friends yet\nSearch above to connect with other users"
+                    emptyMessage = "No friends yet\nSearch above to connect with other users",
+                    onUserSelected = onUserSelected
                 )
                 FriendUiTab.REQUESTS -> FriendRequestSection(
                     requests = uiState.incomingRequests,
@@ -164,7 +170,8 @@ private fun FriendsScreenContent(
                     primaryActionText = "Accept",
                     secondaryActionText = "Decline",
                     primaryActionEnabled = true,
-                    userResolver = { it.requester }
+                    userResolver = { it.requester },
+                    onUserSelected = onUserSelected
                 )
                 FriendUiTab.SENT -> FriendRequestSection(
                     requests = uiState.sentRequests,
@@ -175,7 +182,8 @@ private fun FriendsScreenContent(
                     primaryActionText = "Pending",
                     secondaryActionText = "Cancel",
                     primaryActionEnabled = false,
-                    userResolver = { it.addressee }
+                    userResolver = { it.addressee },
+                    onUserSelected = onUserSelected
                 )
             }
 
@@ -197,7 +205,7 @@ private fun FriendsScreenContent(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Medium
                         )
-                        Divider(
+                        HorizontalDivider(
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
                             thickness = 1.dp
                         )
@@ -209,7 +217,8 @@ private fun FriendsScreenContent(
                                 SearchResultRow(
                                     user = user,
                                     onSendRequest = onSendRequest,
-                                    isActionEnabled = uiState.canSendRequest(user._id)
+                                    isActionEnabled = uiState.canSendRequest(user._id),
+                                    onUserSelected = onUserSelected
                                 )
                             }
                         }
@@ -312,7 +321,8 @@ private fun FriendListSection(
     friends: List<FriendSummary>,
     isLoading: Boolean,
     onRemoveFriend: (String) -> Unit,
-    emptyMessage: String
+    emptyMessage: String,
+    onUserSelected: (PublicUserSummary) -> Unit
 ) {
     FriendCardWrapper {
         when {
@@ -322,7 +332,7 @@ private fun FriendListSection(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(friends) { friend ->
-                    FriendRow(friend, onRemoveFriend)
+                    FriendRow(friend, onRemoveFriend, onUserSelected)
                 }
             }
         }
@@ -339,7 +349,8 @@ private fun FriendRequestSection(
     primaryActionText: String,
     secondaryActionText: String,
     primaryActionEnabled: Boolean = true,
-    userResolver: (FriendRequestSummary) -> PublicUserSummary?
+    userResolver: (FriendRequestSummary) -> PublicUserSummary?,
+    onUserSelected: (PublicUserSummary) -> Unit
 ) {
     FriendCardWrapper {
         when {
@@ -354,7 +365,8 @@ private fun FriendRequestSection(
                         secondaryActionText = secondaryActionText,
                         onPrimaryAction = { onAccept(request._id) },
                         onSecondaryAction = { onDecline(request._id) },
-                        primaryActionEnabled = primaryActionEnabled
+                        primaryActionEnabled = primaryActionEnabled,
+                        onUserSelected = onUserSelected
                     )
                 }
             }
@@ -419,7 +431,11 @@ private fun EmptyState(message: String) {
 }
 
 @Composable
-private fun FriendRow(friend: FriendSummary, onRemoveFriend: (String) -> Unit) {
+private fun FriendRow(
+    friend: FriendSummary,
+    onRemoveFriend: (String) -> Unit,
+    onUserSelected: (PublicUserSummary) -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -427,7 +443,8 @@ private fun FriendRow(friend: FriendSummary, onRemoveFriend: (String) -> Unit) {
     ) {
         UserSummary(
             user = friend.user,
-            subtitle = "Friends since ${friend.since}"
+            subtitle = "Friends since ${friend.since}",
+            onClick = friend.user.username?.let { { onUserSelected(friend.user) } }
         )
         IconButton(onClick = { onRemoveFriend(friend.friendshipId) }) {
             Icon(
@@ -447,7 +464,8 @@ private fun FriendRequestRow(
     secondaryActionText: String,
     onPrimaryAction: () -> Unit,
     onSecondaryAction: () -> Unit,
-    primaryActionEnabled: Boolean
+    primaryActionEnabled: Boolean,
+    onUserSelected: (PublicUserSummary) -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -456,7 +474,8 @@ private fun FriendRequestRow(
         if (user != null) {
             UserSummary(
                 user = user,
-                subtitle = request.status.replaceFirstChar { it.uppercase() }
+                subtitle = request.status.replaceFirstChar { it.uppercase() },
+                onClick = user.username?.let { { onUserSelected(user) } }
             )
         }
         Row(
@@ -484,14 +503,22 @@ private fun FriendRequestRow(
 private fun SearchResultRow(
     user: PublicUserSummary,
     onSendRequest: (String) -> Unit,
-    isActionEnabled: Boolean
+    isActionEnabled: Boolean,
+    onUserSelected: (PublicUserSummary) -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = !user.username.isNullOrBlank()) {
+                user.username?.let { onUserSelected(user) }
+            },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        UserSummary(user = user)
+        UserSummary(
+            user = user,
+            onClick = user.username?.let { { onUserSelected(user) } }
+        )
         IconButton(
             onClick = { onSendRequest(user._id) },
             enabled = isActionEnabled,
@@ -520,9 +547,14 @@ private fun SearchResultRow(
 @Composable
 private fun UserSummary(
     user: PublicUserSummary,
-    subtitle: String? = null
+    subtitle: String? = null,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
 ) {
+    val rowModifier = onClick?.let { modifier.clickable(onClick = it) } ?: modifier
+
     Row(
+        modifier = rowModifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {

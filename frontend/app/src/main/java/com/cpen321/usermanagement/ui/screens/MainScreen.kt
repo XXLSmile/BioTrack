@@ -175,9 +175,13 @@ fun MainScreen(
                     onRetry = { mainViewModel.loadRecentObservations() },
                     onViewAll = { navigateToRoute(NavRoutes.CATALOG_ENTRIES) },
                     onSelectObservation = { observation ->
-                        selectedEntry = observation.toCatalogEntry()
-                        detailErrorMessage = null
-                        showEntryDialog = true
+                        if (observation.hasCoordinates) {
+                            navController.navigate(NavRoutes.observationDetail(observation.id))
+                        } else {
+                            selectedEntry = observation.toCatalogEntry()
+                            detailErrorMessage = null
+                            showEntryDialog = true
+                        }
                     }
                 )
             }
