@@ -278,8 +278,8 @@ fun RecentObservation.toCatalogEntry(): RemoteCatalogEntry {
         userId = null,
         speciesId = null,
         imageMimeType = null,
-        latitude = null,
-        longitude = null,
+        latitude = latitude,
+        longitude = longitude,
         notes = notes,
         createdAt = createdAtIso,
         updatedAt = createdAtIso

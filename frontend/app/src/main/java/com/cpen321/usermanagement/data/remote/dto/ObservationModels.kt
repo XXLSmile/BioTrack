@@ -23,6 +23,8 @@ data class RecentEntryDto(
     val notes: String?,
     val latitude: Double?,
     val longitude: Double?,
+    val city: String?,
+    val province: String?,
     val createdAt: String?,
     val updatedAt: String?
 )

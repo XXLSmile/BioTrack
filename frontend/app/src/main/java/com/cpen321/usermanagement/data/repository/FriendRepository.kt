@@ -4,11 +4,16 @@ import com.cpen321.usermanagement.data.remote.api.FriendApi
 import com.cpen321.usermanagement.data.remote.api.UserInterface
 import com.cpen321.usermanagement.data.remote.dto.FriendListResponse
 import com.cpen321.usermanagement.data.remote.dto.FriendRequestsResponse
+import com.cpen321.usermanagement.data.remote.dto.PublicUserProfile
 import com.cpen321.usermanagement.data.remote.dto.SearchUsersResponse
 import com.cpen321.usermanagement.data.remote.dto.SendFriendRequestBody
 import com.cpen321.usermanagement.data.remote.dto.UpdateFriendRequestBody
+import com.cpen321.usermanagement.utils.JsonUtils.parseErrorMessage
 import javax.inject.Inject
 import javax.inject.Singleton
+
+class PrivateProfileException(message: String) : Exception(message)
+class UserNotFoundException(message: String) : Exception(message)
 
 @Singleton
 class FriendRepository @Inject constructor(
@@ -60,6 +65,24 @@ class FriendRepository @Inject constructor(
             response.body()?.data ?: SearchUsersResponse(emptyList(), 0)
         } else {
             throw Exception(response.errorBody()?.string() ?: "Failed to search users")
+        }
+    }
+
+    suspend fun fetchPublicProfile(username: String): Result<PublicUserProfile> = runCatching {
+        val response = userInterface.getUserByUsername(username)
+        val body = response.body()
+
+        if (response.isSuccessful && body?.data?.user != null) {
+            body.data.user
+        } else {
+            val errorBodyString = response.errorBody()?.string()
+            val fallbackMessage = body?.message ?: "Failed to load profile"
+            val message = parseErrorMessage(errorBodyString, fallbackMessage)
+            when (response.code()) {
+              403 -> throw PrivateProfileException(message)
+              404 -> throw UserNotFoundException(message)
+              else -> throw Exception(message)
+            }
         }
     }
 }

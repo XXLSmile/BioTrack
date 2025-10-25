@@ -92,9 +92,9 @@ fun ObservationListItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (observation.location.isNotBlank()) {
+            if (observation.displayLocation.isNotBlank()) {
                 Text(
-                    text = observation.location,
+                    text = observation.displayLocation,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
