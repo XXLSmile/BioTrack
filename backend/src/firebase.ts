@@ -2,7 +2,8 @@ import admin from 'firebase-admin';
 import fs from 'fs';
 import path from 'path';
 
-import logger from './logger.util';
+// Resolve the absolute path to your service account file
+const serviceAccountPath = path.resolve(__dirname, "../firebase-adminsdk.json");
 
 const resolveServiceAccount = () => {
   const fromEnv = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
