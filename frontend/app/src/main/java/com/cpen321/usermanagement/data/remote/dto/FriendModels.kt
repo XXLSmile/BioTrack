@@ -34,6 +34,30 @@ data class FriendRequestsResponse(
     val count: Int
 )
 
+data class FriendRecommendationUser(
+    val _id: String,
+    val name: String?,
+    val username: String?,
+    val profilePicture: String?,
+    val location: String?,
+    val region: String?,
+    val favoriteSpecies: List<String>?
+)
+
+data class FriendRecommendationDto(
+    val user: FriendRecommendationUser?,
+    val mutualFriends: List<PublicUserSummary>?,
+    val sharedSpecies: List<String>?,
+    val locationMatch: Boolean?,
+    val distanceKm: Double?,
+    val score: Int?
+)
+
+data class FriendRecommendationsResponse(
+    val recommendations: List<FriendRecommendationDto>,
+    val count: Int
+)
+
 data class SendFriendRequestBody(
     val targetUserId: String
 )

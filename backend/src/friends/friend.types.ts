@@ -24,3 +24,23 @@ export const respondFriendRequestSchema = z.object({
 
 export type RespondFriendRequest = z.infer<typeof respondFriendRequestSchema>;
 
+export interface FriendRecommendation {
+  user: {
+    _id: mongoose.Types.ObjectId;
+    name?: string | null;
+    username?: string | null;
+    profilePicture?: string | null;
+    location?: string | null;
+    region?: string | null;
+    favoriteSpecies?: string[];
+  };
+  mutualFriends: Array<{
+    _id: mongoose.Types.ObjectId;
+    name?: string | null;
+    username?: string | null;
+  }>;
+  sharedSpecies: string[];
+  locationMatch: boolean;
+  distanceKm?: number;
+  score: number;
+}

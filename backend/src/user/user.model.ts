@@ -237,6 +237,23 @@ export class UserModel {
     }
   }
 
+  async findMany(
+    filter: mongoose.FilterQuery<IUser>,
+    projection?: mongoose.ProjectionType<IUser>,
+    options?: { limit?: number }
+  ): Promise<IUser[]> {
+    try {
+      let query = this.user.find(filter, projection);
+      if (options?.limit !== undefined) {
+        query = query.limit(options.limit);
+      }
+      return await query;
+    } catch (error) {
+      logger.error('Error finding users:', error);
+      throw new Error('Failed to find users');
+    }
+  }
+
   async searchByName(
     query: string,
     limit: number = 10,

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.cpen321.usermanagement.data.remote.dto.FriendRequestSummary
 import com.cpen321.usermanagement.data.remote.dto.FriendSummary
 import com.cpen321.usermanagement.data.remote.dto.PublicUserSummary
+import com.cpen321.usermanagement.data.repository.FriendRecommendation
 import com.cpen321.usermanagement.data.repository.FriendRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -25,11 +26,13 @@ data class FriendUiState(
     val incomingRequests: List<FriendRequestSummary> = emptyList(),
     val sentRequests: List<FriendRequestSummary> = emptyList(),
     val searchResults: List<PublicUserSummary> = emptyList(),
+    val recommendations: List<FriendRecommendation> = emptyList(),
     val searchQuery: String = "",
     val isSearching: Boolean = false,
     val isLoadingFriends: Boolean = false,
     val isLoadingRequests: Boolean = false,
     val isLoadingSentRequests: Boolean = false,
+    val isLoadingRecommendations: Boolean = false,
     val selectedTab: FriendUiTab = FriendUiTab.FRIENDS,
     val errorMessage: String? = null,
     val successMessage: String? = null
@@ -54,6 +57,7 @@ class FriendViewModel @Inject constructor(
         refreshFriends()
         refreshIncomingRequests()
         refreshSentRequests()
+        loadRecommendations()
     }
 
     fun updateSearchQuery(query: String) {
@@ -101,6 +105,7 @@ class FriendViewModel @Inject constructor(
                 .onSuccess {
                     refreshIncomingRequests()
                     refreshSentRequests()
+                    loadRecommendations()
                     _uiState.update { it.copy(successMessage = "Friend request sent") }
                 }
                 .onFailure { error ->
@@ -113,18 +118,21 @@ class FriendViewModel @Inject constructor(
         respondToRequest(requestId, "accept") {
             refreshFriends()
             refreshIncomingRequests()
+            loadRecommendations()
         }
     }
 
     fun declineFriendRequest(requestId: String) {
         respondToRequest(requestId, "decline") {
             refreshIncomingRequests()
+            loadRecommendations()
         }
     }
 
     fun cancelFriendRequest(requestId: String) {
         respondToRequest(requestId, "decline") {
             refreshSentRequests()
+            loadRecommendations()
         }
     }
 
@@ -133,6 +141,7 @@ class FriendViewModel @Inject constructor(
             friendRepository.removeFriend(friendshipId)
                 .onSuccess {
                     refreshFriends()
+                    loadRecommendations()
                     _uiState.update { it.copy(successMessage = "Friend removed") }
                 }
                 .onFailure { error ->
@@ -218,6 +227,29 @@ class FriendViewModel @Inject constructor(
                         it.copy(
                             isLoadingSentRequests = false,
                             errorMessage = error.localizedMessage ?: "Failed to load sent requests"
+                        )
+                    }
+                }
+        }
+    }
+
+    fun loadRecommendations(limit: Int = 10) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingRecommendations = true) }
+            friendRepository.fetchFriendRecommendations(limit)
+                .onSuccess { recommendations ->
+                    _uiState.update {
+                        it.copy(
+                            recommendations = recommendations,
+                            isLoadingRecommendations = false
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(
+                            isLoadingRecommendations = false,
+                            errorMessage = error.localizedMessage ?: "Failed to load friend suggestions"
                         )
                     }
                 }

@@ -61,6 +61,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.cpen321.usermanagement.data.remote.dto.FriendSummary
 import com.cpen321.usermanagement.data.remote.dto.FriendRequestSummary
 import com.cpen321.usermanagement.data.remote.dto.PublicUserSummary
+import com.cpen321.usermanagement.data.repository.FriendRecommendation
+import java.util.Locale
 import com.cpen321.usermanagement.ui.viewmodels.FriendUiState
 import com.cpen321.usermanagement.ui.viewmodels.FriendUiTab
 import com.cpen321.usermanagement.ui.viewmodels.FriendViewModel
@@ -98,6 +100,7 @@ fun FriendsScreen(
         onRemoveFriend = viewModel::removeFriend,
         onCancelRequest = viewModel::cancelFriendRequest,
         onClearMessage = viewModel::clearMessages,
+        onRefreshRecommendations = { viewModel.loadRecommendations() },
         onUserSelected = onUserSelected
     )
 }
@@ -115,6 +118,7 @@ private fun FriendsScreenContent(
     onRemoveFriend: (String) -> Unit,
     onCancelRequest: (String) -> Unit,
     onClearMessage: () -> Unit,
+    onRefreshRecommendations: () -> Unit,
     onUserSelected: (PublicUserSummary) -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -225,6 +229,14 @@ private fun FriendsScreenContent(
                     }
                 }
             }
+
+            RecommendationSection(
+                recommendations = uiState.recommendations,
+                isLoading = uiState.isLoadingRecommendations,
+                onSendRequest = onSendRequest,
+                onUserSelected = onUserSelected,
+                onRefresh = onRefreshRecommendations
+            )
         }
     }
 }
@@ -451,6 +463,126 @@ private fun FriendRow(
                 imageVector = Icons.Rounded.Delete,
                 contentDescription = "Remove friend",
                 tint = MaterialTheme.colorScheme.error
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecommendationSection(
+    recommendations: List<FriendRecommendation>,
+    isLoading: Boolean,
+    onSendRequest: (String) -> Unit,
+    onUserSelected: (PublicUserSummary) -> Unit,
+    onRefresh: () -> Unit
+) {
+    if (!isLoading && recommendations.isEmpty()) {
+        return
+    }
+
+    FriendCardWrapper {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Suggested friends",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium
+            )
+            TextButton(onClick = onRefresh) {
+                Text("Refresh")
+            }
+        }
+
+        when {
+            isLoading -> {
+                LoadingPlaceholder()
+            }
+
+            recommendations.isEmpty() -> {
+                Text(
+                    text = "No suggestions yet. Try refreshing later!",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            else -> {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    recommendations.forEachIndexed { index, recommendation ->
+                        RecommendationRow(
+                            recommendation = recommendation,
+                            isActionEnabled = true,
+                            onSendRequest = onSendRequest,
+                            onUserSelected = onUserSelected
+                        )
+                        if (index != recommendations.lastIndex) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecommendationRow(
+    recommendation: FriendRecommendation,
+    isActionEnabled: Boolean,
+    onSendRequest: (String) -> Unit,
+    onUserSelected: (PublicUserSummary) -> Unit
+) {
+    val summary = PublicUserSummary(
+        _id = recommendation.userId,
+        name = recommendation.name,
+        username = recommendation.username,
+        profilePicture = recommendation.profilePicture
+    )
+
+    val distanceText = recommendation.distanceKm?.let { distance ->
+        when {
+            distance < 0.1 -> "Less than 0.1 km away"
+            else -> String.format(Locale.getDefault(), "%.1f km away", distance)
+        }
+    }
+
+    val subtitle = distanceText ?: if (recommendation.locationMatch) "Nearby" else null
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        UserSummary(
+            user = summary,
+            subtitle = subtitle?.takeIf { it.isNotBlank() },
+            onClick = summary.username?.let { { onUserSelected(summary) } }
+        )
+        IconButton(
+            onClick = { onSendRequest(recommendation.userId) },
+            enabled = isActionEnabled,
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(
+                    if (isActionEnabled)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                )
+        ) {
+            Icon(
+                imageVector = Icons.Default.PersonAdd,
+                contentDescription = "Send friend request",
+                tint = if (isActionEnabled)
+                    MaterialTheme.colorScheme.onPrimary
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

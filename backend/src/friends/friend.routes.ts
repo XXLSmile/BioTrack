@@ -13,6 +13,11 @@ router.use(authenticateToken);
 
 router.get('/', friendController.listFriends.bind(friendController));
 
+router.get(
+  '/recommendations',
+  friendController.getRecommendations.bind(friendController)
+);
+
 router.get('/requests', friendController.listRequests.bind(friendController));
 
 router.post(
@@ -30,4 +35,3 @@ router.patch(
 router.delete('/:friendshipId', friendController.removeFriend.bind(friendController));
 
 export default router;
-
