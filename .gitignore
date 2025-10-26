@@ -58,3 +58,5 @@ DerivedData/
 
 # System files
 Thumbs.db
+
+backend/firebase-adminsdk.json
