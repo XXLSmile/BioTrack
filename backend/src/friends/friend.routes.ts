@@ -28,6 +28,9 @@ router.patch(
 );
 
 router.delete('/:friendshipId', friendController.removeFriend.bind(friendController));
+router.delete(
+  '/requests/:requestId',
+  friendController.cancelRequest.bind(friendController)
+);
 
 export default router;
-

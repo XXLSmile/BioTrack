@@ -38,4 +38,9 @@ interface FriendApi {
     suspend fun removeFriend(
         @Path("friendshipId") friendshipId: String
     ): Response<ApiResponse<Void>>
+
+    @DELETE("friends/requests/{requestId}")
+    suspend fun cancelFriendRequest(
+        @Path("requestId") requestId: String
+    ): Response<ApiResponse<Void>>
 }

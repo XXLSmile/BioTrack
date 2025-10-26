@@ -123,8 +123,17 @@ class FriendViewModel @Inject constructor(
     }
 
     fun cancelFriendRequest(requestId: String) {
-        respondToRequest(requestId, "decline") {
-            refreshSentRequests()
+        viewModelScope.launch {
+            friendRepository.cancelFriendRequest(requestId)
+                .onSuccess {
+                    refreshSentRequests()
+                    _uiState.update { it.copy(successMessage = "Friend request cancelled") }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(errorMessage = error.localizedMessage ?: "Failed to cancel request")
+                    }
+                }
         }
     }
 

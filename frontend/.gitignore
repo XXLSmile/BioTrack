@@ -101,3 +101,6 @@ lint/tmp/
 ehthumbs.db
 Thumbs.db
 .env
+
+**/google-services.json
+**/GoogleService-Info.plist

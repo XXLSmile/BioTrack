@@ -17,16 +17,45 @@ export class FriendController {
       const user = req.user!;
       const friendships = await friendshipModel.getFriendsForUser(user._id);
 
-      const friends = friendships.map(friendship => {
-        const isRequester = friendship.requester._id.equals(user._id);
-        const friendUser = isRequester ? friendship.addressee : friendship.requester;
+      const friends = friendships
+        .map(friendship => {
+          const friendshipId = friendship._id as mongoose.Types.ObjectId;
+          const requester = friendship.requester as
+            | mongoose.Types.ObjectId
+            | (mongoose.Document & { _id: mongoose.Types.ObjectId })
+            | null;
+          const addressee = friendship.addressee as
+            | mongoose.Types.ObjectId
+            | (mongoose.Document & { _id: mongoose.Types.ObjectId })
+            | null;
 
-        return {
-          friendshipId: friendship._id,
-          user: friendUser,
-          since: friendship.respondedAt ?? friendship.createdAt,
-        };
-      });
+          if (!requester || !addressee) {
+            logger.warn('Encountered friendship with missing user reference', {
+              friendshipId: friendshipId.toString(),
+            });
+            return null;
+          }
+
+          if (
+            requester instanceof mongoose.Types.ObjectId ||
+            addressee instanceof mongoose.Types.ObjectId
+          ) {
+            logger.warn('Friendship missing populated user data', {
+              friendshipId: friendshipId.toString(),
+            });
+            return null;
+          }
+
+          const isRequester = requester._id.equals(user._id);
+          const friendUser = isRequester ? addressee : requester;
+
+          return {
+            friendshipId,
+            user: friendUser,
+            since: friendship.respondedAt ?? friendship.createdAt,
+          };
+        })
+        .filter((friend): friend is NonNullable<typeof friend> => friend !== null);
 
       res.status(200).json({
         message: 'Friends fetched successfully',
@@ -206,12 +235,59 @@ export class FriendController {
         }
       }
 
+      if (newStatus === 'declined') {
+        await friendshipModel.deleteFriendship(requestObjectIdForUpdate);
+      }
+
       res.status(200).json({
         message: `Friend request ${action}ed successfully`,
-        data: { request: updated },
+        data: {
+          request: newStatus === 'declined' ? null : updated,
+        },
       });
     } catch (error) {
       logger.error('Failed to respond to friend request:', error);
+      next(error);
+    }
+  }
+
+  async cancelRequest(
+    req: Request<{ requestId: string }>,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const user = req.user!;
+      const { requestId } = req.params;
+      const requestObjectId = new mongoose.Types.ObjectId(requestId);
+
+      const request = await friendshipModel.findById(requestObjectId);
+
+      if (!request) {
+        return res.status(404).json({
+          message: 'Friend request not found',
+        });
+      }
+
+      if (!request.requester.equals(user._id)) {
+        return res.status(403).json({
+          message: 'You can only cancel requests you sent',
+        });
+      }
+
+      if (request.status !== 'pending') {
+        return res.status(400).json({
+          message: 'Only pending requests can be cancelled',
+        });
+      }
+
+      await friendshipModel.deleteFriendship(requestObjectId);
+
+      res.status(200).json({
+        message: 'Friend request cancelled successfully',
+      });
+    } catch (error) {
+      logger.error('Failed to cancel friend request:', error);
       next(error);
     }
   }

@@ -128,6 +128,31 @@ export class FriendshipModel {
       throw new Error('Failed to delete friendship');
     }
   }
+
+  async deleteAllForUser(userId: mongoose.Types.ObjectId): Promise<mongoose.Types.ObjectId[]> {
+    try {
+      const friendships = await this.friendship.find({
+        $or: [{ requester: userId }, { addressee: userId }],
+      });
+
+      const acceptedFriendIds = friendships
+        .filter((friendship) => friendship.status === 'accepted')
+        .map((friendship) =>
+          friendship.requester.equals(userId)
+            ? (friendship.addressee as mongoose.Types.ObjectId)
+            : (friendship.requester as mongoose.Types.ObjectId)
+        );
+
+      await this.friendship.deleteMany({
+        $or: [{ requester: userId }, { addressee: userId }],
+      });
+
+      return acceptedFriendIds;
+    } catch (error) {
+      logger.error('Failed to delete friendships for user:', error);
+      throw new Error('Failed to delete friendships for user');
+    }
+  }
 }
 
 export const friendshipModel = new FriendshipModel();

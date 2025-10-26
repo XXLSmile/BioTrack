@@ -52,6 +52,13 @@ class FriendRepository @Inject constructor(
         }
     }
 
+    suspend fun cancelFriendRequest(requestId: String): Result<Unit> = runCatching {
+        val response = friendApi.cancelFriendRequest(requestId)
+        if (!response.isSuccessful) {
+            throw Exception(response.errorBody()?.string() ?: "Failed to cancel friend request")
+        }
+    }
+
     suspend fun removeFriend(friendshipId: String): Result<Unit> = runCatching {
         val response = friendApi.removeFriend(friendshipId)
         if (!response.isSuccessful) {

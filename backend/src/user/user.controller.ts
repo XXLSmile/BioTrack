@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import { GetProfileResponse, UpdateProfileRequest } from '../user/user.types';
 import logger from '../logger.util';
 import { userModel } from '../user/user.model';
+import { friendshipModel } from '../friends/friend.model';
 
 export class UserController {
   getProfile(req: Request, res: Response<GetProfileResponse>) {
@@ -71,6 +72,14 @@ export class UserController {
     try {
       const user = req.user!;
 
+      const userId = user._id as mongoose.Types.ObjectId;
+
+      const connectedFriendIds = await friendshipModel.deleteAllForUser(userId);
+      await Promise.all(
+        Array.from(new Set(connectedFriendIds.map((id) => id.toString()))).map((friendId) =>
+          userModel.decrementFriendCount(new mongoose.Types.ObjectId(friendId))
+        )
+      );
 
       await userModel.delete(user._id);
 
