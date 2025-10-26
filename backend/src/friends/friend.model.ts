@@ -99,6 +99,30 @@ export class FriendshipModel {
       .populate('addressee', 'name username profilePicture');
   }
 
+  async getAcceptedFriendshipsForUsers(
+    userIds: mongoose.Types.ObjectId[]
+  ): Promise<IFriendship[]> {
+    if (userIds.length === 0) {
+      return [];
+    }
+
+    return this.friendship.find({
+      status: 'accepted',
+      $or: [
+        { requester: { $in: userIds } },
+        { addressee: { $in: userIds } },
+      ],
+    });
+  }
+
+  async getRelationshipsForUser(
+    userId: mongoose.Types.ObjectId
+  ): Promise<IFriendship[]> {
+    return this.friendship.find({
+      $or: [{ requester: userId }, { addressee: userId }],
+    });
+  }
+
   async findById(id: mongoose.Types.ObjectId): Promise<IFriendship | null> {
     return this.friendship.findById(id);
   }

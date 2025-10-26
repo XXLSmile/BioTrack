@@ -10,7 +10,7 @@ build/
 ../.env
 
 # Ignore Firebase admin credentials
-biotrack-df1d8-firebase-adminsdk-fbsvc-06cd79a9d7.json
+firebase-adminsdk.json
 
 
 # Logs

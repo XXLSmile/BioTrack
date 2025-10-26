@@ -4,12 +4,42 @@ import { friendshipModel } from './friend.model';
 import {
   CreateFriendRequest,
   createFriendRequestSchema,
+  FriendRecommendation,
   RespondFriendRequest,
   respondFriendRequestSchema,
 } from './friend.types';
 import { userModel } from '../user/user.model';
 import logger from '../logger.util';
 import { messaging } from "../firebase";
+import { IUser } from '../user/user.types';
+import { geocodingService } from '../location/geocoding.service';
+
+type Coordinates = {
+  latitude: number;
+  longitude: number;
+};
+
+const toRadians = (value: number) => (value * Math.PI) / 180;
+
+const haversineDistanceKm = (a: Coordinates, b: Coordinates): number => {
+  const R = 6371; // Earth radius in km
+  const dLat = toRadians(b.latitude - a.latitude);
+  const dLon = toRadians(b.longitude - a.longitude);
+  const lat1 = toRadians(a.latitude);
+  const lat2 = toRadians(b.latitude);
+
+  const sinLat = Math.sin(dLat / 2);
+  const sinLon = Math.sin(dLon / 2);
+
+  const h =
+    sinLat * sinLat +
+    Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon;
+
+  const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  return R * c;
+};
+
+const LOCATION_DISTANCE_THRESHOLD_KM = 30;
 
 export class FriendController {
   async listFriends(req: Request, res: Response, next: NextFunction) {
@@ -63,6 +93,391 @@ export class FriendController {
       });
     } catch (error) {
       logger.error('Failed to list friends:', error);
+      next(error);
+    }
+  }
+
+  async getRecommendations(req: Request, res: Response, next: NextFunction) {
+    try {
+      const user = req.user!;
+      const limit = req.query.limit ? Math.min(Math.max(parseInt(req.query.limit as string, 10) || 10, 1), 50) : 10;
+
+      const currentUser = await userModel.findById(user._id);
+      if (!currentUser) {
+        return res.status(404).json({
+          message: 'User profile not found',
+        });
+      }
+
+      const userIdStr = user._id.toString();
+      const friends = await friendshipModel.getFriendsForUser(user._id);
+
+      const friendIds = new Set<string>();
+      const friendDetails = new Map<string, { _id: mongoose.Types.ObjectId; name?: string | null; username?: string | null }>();
+
+      for (const friendship of friends) {
+        const isRequester = (friendship.requester as mongoose.Types.ObjectId).equals(user._id);
+        const friendDoc = (isRequester ? friendship.addressee : friendship.requester) as unknown as IUser;
+        if (!friendDoc?._id) {
+          continue;
+        }
+
+        const friendIdStr = friendDoc._id.toString();
+        friendIds.add(friendIdStr);
+        friendDetails.set(friendIdStr, {
+          _id: friendDoc._id,
+          name: friendDoc.name ?? null,
+          username: friendDoc.username ?? null,
+        });
+      }
+
+      const relationships = await friendshipModel.getRelationshipsForUser(user._id);
+      const excludedIds = new Set<string>([userIdStr]);
+
+      for (const relationship of relationships) {
+        const requesterId = (relationship.requester as mongoose.Types.ObjectId).toString();
+        const addresseeId = (relationship.addressee as mongoose.Types.ObjectId).toString();
+        const otherId = requesterId === userIdStr ? addresseeId : requesterId;
+
+        excludedIds.add(otherId);
+      }
+
+      friendIds.forEach(id => excludedIds.add(id));
+
+      const toObjectIds = (ids: Iterable<string>) =>
+        Array.from(ids).map(id => new mongoose.Types.ObjectId(id));
+
+      type CandidateAggregate = {
+        mutualFriendIds: Set<string>;
+        sharedSpecies: Set<string>;
+        locationMatch: boolean;
+        distanceKm?: number;
+        doc?: IUser;
+      };
+
+      const coordinateCache = new Map<string, Coordinates | null>();
+      const buildAddressQuery = (doc: IUser): string | null => {
+        const parts = [doc.location, doc.region]
+          .map(value => (typeof value === 'string' ? value.trim() : ''))
+          .filter(value => value.length > 0);
+
+        if (parts.length === 0) {
+          return null;
+        }
+
+        return parts.join(', ');
+      };
+
+      const resolveCoordinatesForDoc = async (doc: IUser): Promise<Coordinates | undefined> => {
+        const query = buildAddressQuery(doc);
+        if (!query) {
+          return undefined;
+        }
+
+        const cacheKey = query.toLowerCase();
+        if (coordinateCache.has(cacheKey)) {
+          return coordinateCache.get(cacheKey) ?? undefined;
+        }
+
+        const result = await geocodingService.forwardGeocode(query);
+        if (result) {
+          const coords: Coordinates = {
+            latitude: result.latitude,
+            longitude: result.longitude,
+          };
+          coordinateCache.set(cacheKey, coords);
+          return coords;
+        }
+
+        coordinateCache.set(cacheKey, null);
+        return undefined;
+      };
+
+      const userCoordinates = await resolveCoordinatesForDoc(currentUser);
+
+      const candidateData = new Map<string, CandidateAggregate>();
+      const ensureCandidate = (candidateId: string): CandidateAggregate => {
+        let entry = candidateData.get(candidateId);
+        if (!entry) {
+          entry = {
+            mutualFriendIds: new Set<string>(),
+            sharedSpecies: new Set<string>(),
+            locationMatch: false,
+            doc: undefined,
+          };
+          candidateData.set(candidateId, entry);
+        }
+        return entry;
+      };
+
+      // Friend-of-friend recommendations
+      if (friendIds.size > 0) {
+        const friendObjectIds = toObjectIds(friendIds);
+        const networkFriendships = await friendshipModel.getAcceptedFriendshipsForUsers(friendObjectIds);
+
+        for (const relation of networkFriendships) {
+          const requesterId = (relation.requester as mongoose.Types.ObjectId).toString();
+          const addresseeId = (relation.addressee as mongoose.Types.ObjectId).toString();
+
+          let mutualFriendId: string | null = null;
+          let candidateId: string | null = null;
+
+          if (friendIds.has(requesterId) && requesterId !== userIdStr) {
+            mutualFriendId = requesterId;
+            candidateId = addresseeId;
+          }
+
+          if (friendIds.has(addresseeId) && addresseeId !== userIdStr) {
+            mutualFriendId = addresseeId;
+            candidateId = requesterId;
+          }
+
+          if (!candidateId || candidateId === userIdStr) {
+            continue;
+          }
+
+          if (excludedIds.has(candidateId)) {
+            continue;
+          }
+
+          ensureCandidate(candidateId).mutualFriendIds.add(mutualFriendId!);
+        }
+      }
+
+      const userFavorites = Array.isArray(currentUser.favoriteSpecies)
+        ? currentUser.favoriteSpecies.filter(Boolean) as string[]
+        : [];
+
+      const excludedObjectIds = toObjectIds(excludedIds);
+
+      if (userFavorites.length > 0) {
+        const speciesMatches = await userModel.findMany(
+          {
+            _id: { $nin: excludedObjectIds },
+            isPublicProfile: true,
+            favoriteSpecies: { $in: userFavorites },
+          },
+          {
+            name: 1,
+            username: 1,
+            profilePicture: 1,
+            favoriteSpecies: 1,
+            location: 1,
+            region: 1,
+          },
+          { limit: limit * 5 }
+        );
+
+        for (const candidate of speciesMatches) {
+          const candidateId = candidate._id.toString();
+          if (excludedIds.has(candidateId)) {
+            continue;
+          }
+
+          const shared = (candidate.favoriteSpecies ?? []).filter(species =>
+            userFavorites.includes(species)
+          );
+
+          if (!shared.length) {
+            continue;
+          }
+
+          const entry = ensureCandidate(candidateId);
+          shared.forEach(species => entry.sharedSpecies.add(species));
+          entry.doc = candidate;
+        }
+      }
+
+      const escapeRegex = (value: string) =>
+        value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      const normalizedRegion = currentUser.region?.trim();
+      if (normalizedRegion) {
+        const regionRegex = new RegExp(`^${escapeRegex(normalizedRegion)}$`, 'i');
+        const regionMatches = await userModel.findMany(
+          {
+            _id: { $nin: excludedObjectIds },
+            isPublicProfile: true,
+            region: regionRegex,
+          },
+          {
+            name: 1,
+            username: 1,
+            profilePicture: 1,
+            favoriteSpecies: 1,
+            location: 1,
+            region: 1,
+          },
+          { limit: limit * 5 }
+        );
+
+        for (const candidate of regionMatches) {
+          const candidateId = candidate._id.toString();
+          if (excludedIds.has(candidateId)) {
+            continue;
+          }
+
+          const entry = ensureCandidate(candidateId);
+          entry.locationMatch = true;
+          if (!entry.doc) {
+            entry.doc = candidate;
+          }
+        }
+      }
+
+      // Fetch remaining candidate details
+      const missingDocIds = Array.from(candidateData.entries())
+        .filter(([, data]) => !data.doc)
+        .map(([candidateId]) => candidateId);
+
+      if (missingDocIds.length > 0) {
+        const missingDocs = await userModel.findMany(
+          {
+            _id: { $in: toObjectIds(missingDocIds) },
+            isPublicProfile: true,
+          },
+          {
+            name: 1,
+            username: 1,
+            profilePicture: 1,
+            favoriteSpecies: 1,
+            location: 1,
+            region: 1,
+          }
+        );
+
+        for (const candidate of missingDocs) {
+          const entry = candidateData.get(candidate._id.toString());
+          if (entry && !entry.doc) {
+            entry.doc = candidate;
+          }
+        }
+      }
+
+      const normalize = (value?: string | null) =>
+        value ? value.trim().toLowerCase() : undefined;
+
+      const normalizedUserRegion = normalize(currentUser.region);
+      const normalizedUserLocation = normalize(currentUser.location);
+
+      const recommendations: FriendRecommendation[] = [];
+
+      for (const [candidateId, data] of candidateData) {
+        const doc = data.doc;
+        if (!doc) {
+          continue;
+        }
+
+        if (!data.locationMatch) {
+          const regionMatch =
+            normalizedUserRegion &&
+            normalize(doc.region) === normalizedUserRegion;
+          const locationMatch =
+            !regionMatch &&
+            normalizedUserLocation &&
+            normalize(doc.location) === normalizedUserLocation;
+          data.locationMatch = Boolean(regionMatch || locationMatch);
+        }
+
+        const sharedSpecies = Array.from(data.sharedSpecies);
+        const mutualFriends = Array.from(data.mutualFriendIds)
+          .map(friendId => friendDetails.get(friendId))
+          .filter(Boolean)
+          .slice(0, 5)
+          .map(detail => ({
+            _id: detail!._id,
+            name: detail!.name ?? null,
+            username: detail!.username ?? null,
+          }));
+
+        let distanceKm: number | undefined;
+        if (userCoordinates) {
+          const candidateCoordinates = await resolveCoordinatesForDoc(doc);
+          if (candidateCoordinates) {
+            const distance = haversineDistanceKm(userCoordinates, candidateCoordinates);
+            if (Number.isFinite(distance)) {
+              const rounded = Math.round(distance * 10) / 10;
+              distanceKm = rounded;
+              const withinThreshold = rounded <= LOCATION_DISTANCE_THRESHOLD_KM;
+              data.locationMatch = withinThreshold;
+            }
+          }
+        }
+
+        data.distanceKm = distanceKm;
+
+        const score =
+          data.mutualFriendIds.size * 3 +
+          sharedSpecies.length * 2 +
+          (data.locationMatch ? 1 : 0);
+
+        if (score <= 0) {
+          continue;
+        }
+
+        const favoriteSpeciesSample = (doc.favoriteSpecies ?? []).slice(0, 5);
+
+        recommendations.push({
+          user: {
+            _id: doc._id,
+            name: doc.name ?? null,
+            username: doc.username ?? null,
+            profilePicture: doc.profilePicture ?? null,
+            location: doc.location ?? null,
+            region: doc.region ?? null,
+            favoriteSpecies: favoriteSpeciesSample,
+          },
+          mutualFriends,
+          sharedSpecies: sharedSpecies.slice(0, 5),
+          locationMatch: data.locationMatch,
+          distanceKm: data.distanceKm,
+          score,
+        });
+      }
+
+      recommendations.sort((a, b) => {
+        if (b.score !== a.score) {
+          return b.score - a.score;
+        }
+        if (b.mutualFriends.length !== a.mutualFriends.length) {
+          return b.mutualFriends.length - a.mutualFriends.length;
+        }
+        if (b.sharedSpecies.length !== a.sharedSpecies.length) {
+          return b.sharedSpecies.length - a.sharedSpecies.length;
+        }
+        return (a.user.username ?? '').localeCompare(b.user.username ?? '');
+      });
+
+      const limited = recommendations.slice(0, limit);
+
+      res.status(200).json({
+        message: 'Friend recommendations fetched successfully',
+        data: {
+          recommendations: limited.map(rec => ({
+            user: {
+              _id: rec.user._id.toString(),
+              name: rec.user.name ?? null,
+              username: rec.user.username ?? null,
+              profilePicture: rec.user.profilePicture ?? null,
+              location: rec.user.location ?? null,
+              region: rec.user.region ?? null,
+              favoriteSpecies: rec.user.favoriteSpecies ?? [],
+            },
+            mutualFriends: rec.mutualFriends.map(mutual => ({
+              _id: mutual._id.toString(),
+              name: mutual.name ?? null,
+              username: mutual.username ?? null,
+            })),
+            sharedSpecies: rec.sharedSpecies,
+            locationMatch: rec.locationMatch,
+            distanceKm: typeof rec.distanceKm === 'number' ? rec.distanceKm : null,
+            score: rec.score,
+          })),
+          count: limited.length,
+        },
+      });
+    } catch (error) {
+      logger.error('Failed to compute friend recommendations:', error);
       next(error);
     }
   }

@@ -2,6 +2,7 @@ package com.cpen321.usermanagement.data.remote.api
 
 import com.cpen321.usermanagement.data.remote.dto.ApiResponse
 import com.cpen321.usermanagement.data.remote.dto.FriendListResponse
+import com.cpen321.usermanagement.data.remote.dto.FriendRecommendationsResponse
 import com.cpen321.usermanagement.data.remote.dto.FriendRequestsResponse
 import com.cpen321.usermanagement.data.remote.dto.SendFriendRequestBody
 import com.cpen321.usermanagement.data.remote.dto.UpdateFriendRequestBody
@@ -22,6 +23,11 @@ interface FriendApi {
     suspend fun getFriendRequests(
         @Query("type") type: String? = null
     ): Response<ApiResponse<FriendRequestsResponse>>
+
+    @GET("friends/recommendations")
+    suspend fun getFriendRecommendations(
+        @Query("limit") limit: Int? = null
+    ): Response<ApiResponse<FriendRecommendationsResponse>>
 
     @POST("friends/requests")
     suspend fun sendFriendRequest(

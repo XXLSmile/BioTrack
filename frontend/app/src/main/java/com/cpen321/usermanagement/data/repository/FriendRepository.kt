@@ -5,6 +5,7 @@ import com.cpen321.usermanagement.data.remote.api.UserInterface
 import com.cpen321.usermanagement.data.remote.dto.FriendListResponse
 import com.cpen321.usermanagement.data.remote.dto.FriendRequestsResponse
 import com.cpen321.usermanagement.data.remote.dto.PublicUserProfile
+import com.cpen321.usermanagement.data.remote.dto.PublicUserSummary
 import com.cpen321.usermanagement.data.remote.dto.SearchUsersResponse
 import com.cpen321.usermanagement.data.remote.dto.SendFriendRequestBody
 import com.cpen321.usermanagement.data.remote.dto.UpdateFriendRequestBody
@@ -14,6 +15,21 @@ import javax.inject.Singleton
 
 class PrivateProfileException(message: String) : Exception(message)
 class UserNotFoundException(message: String) : Exception(message)
+
+data class FriendRecommendation(
+    val userId: String,
+    val name: String?,
+    val username: String?,
+    val profilePicture: String?,
+    val location: String?,
+    val region: String?,
+    val favoriteSpecies: List<String>,
+    val mutualFriends: List<PublicUserSummary>,
+    val sharedSpecies: List<String>,
+    val locationMatch: Boolean,
+    val distanceKm: Double?,
+    val score: Int
+)
 
 @Singleton
 class FriendRepository @Inject constructor(
@@ -72,6 +88,32 @@ class FriendRepository @Inject constructor(
             response.body()?.data ?: SearchUsersResponse(emptyList(), 0)
         } else {
             throw Exception(response.errorBody()?.string() ?: "Failed to search users")
+        }
+    }
+
+    suspend fun fetchFriendRecommendations(limit: Int? = null): Result<List<FriendRecommendation>> = runCatching {
+        val response = friendApi.getFriendRecommendations(limit)
+        if (response.isSuccessful) {
+            val recommendations = response.body()?.data?.recommendations ?: emptyList()
+            recommendations.mapNotNull { dto ->
+                val user = dto.user ?: return@mapNotNull null
+                FriendRecommendation(
+                    userId = user._id,
+                    name = user.name,
+                    username = user.username,
+                    profilePicture = user.profilePicture,
+                    location = user.location,
+                    region = user.region,
+                    favoriteSpecies = user.favoriteSpecies ?: emptyList(),
+                    mutualFriends = dto.mutualFriends ?: emptyList(),
+                    sharedSpecies = dto.sharedSpecies ?: emptyList(),
+                    locationMatch = dto.locationMatch ?: false,
+                    distanceKm = dto.distanceKm,
+                    score = dto.score ?: 0
+                )
+            }
+        } else {
+            throw Exception(response.errorBody()?.string() ?: "Failed to load friend recommendations")
         }
     }
 
