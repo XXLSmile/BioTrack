@@ -2,11 +2,35 @@
 
 ## 1. Change History
 
-| **Change Date**   | **Modified Sections** | **Rationale** |
-| ----------------- | --------------------- | ------------- |
-| _Nothing to show_ |
+|   **Change Date**   |    **Modified Sections**    |   **Rationale**   |
+|  -----------------  |  ---------------------      |  -------------    |
+|27/10/25             |4.1; Species Identification  |fetching from api  |
+|                     |Removed caching data logic   |is not too slow    |
+-------------------------------------------------------------------------
+|13/10/25             |Changed non-functional req   |old functional     |
+|                     |                             |req were not       |
+|                     |                             |specific enough    |
+-------------------------------------------------------------------------
+| 27/10/25            |3.1; Changed where share     |did this to align  |
+|                     |catalog was mentioned        |with the friends   |
+|                     |                             |use case           |
+-------------------------------------------------------------------------   
+| 27/10/25            |3.2; added colour coding and |did this to make it|
+|                     |changed ordering of some use |clear what use case|
+|                     |cases                        |is for what feature|
+|                     |                             |                   |
+|                     |                             |                   |
+|                     |                             |                   |
+|                     |                             |                   |
+|                     |                             |                   |
+|                     |                             |                   |
+|                     |                             |                   |
+|                     |                             |                   |
+|                     |                             |                   |
+|                     |                             |                   |
+|                     |                             |                   |
+|                     |                             |                   |
 
----
 
 ## 2. Project Description
 
@@ -22,13 +46,13 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 ### **3.1. List of Features**
 1. **Authentication**: To access the app, a user must sign in using the Google authentication service. New users should sign up before signing in. An authenticated user can sign out. Users can also remove their account.
-2. **Wildlife Recognition**: A user can scan and recognize wildlife using their devices camera. The app uses an external API to process the image and identify the wildlife species. When identified, the user can see basic information about the wildlife, like its name, habitat, rarity etc. The user can then catalog the species, or share the species directly with a friend(s).
+2. **Wildlife Recognition**: A user can scan and recognize wildlife using their devices camera. The app uses an external API to process the image and identify the wildlife species. When identified, the user can see basic information about the wildlife, like its name, habitat, rarity etc. The user can then catalog the species.
 3. **Catalog**: A user can create a catalog and save scanned wildlife to the catalog. Each entry contains information about the species and when and where the species was scanned. Users can make multiple catalogs as well as share catalogs with friends, where they can catalog entries in real time.
-4. **Manage Friends**: A user can add friends by searching for their username. A user can view their friends list, accept friend requests and remove friends. Based on species catalogged by a user, friend reccommendations will be suggested to the user based on catalog similarity to other users.
+4. **Manage Friends**: A user can add friends by searching for their username. A user can view their friends list, accept friend requests and remove friends. Based on species catalogged by a user, friend reccommendations will be suggested to the user based on catalog similarity to other users. Users can share scanned wildlife and catalogs with friends
 
 ### **3.2. Use Case Diagram**
 
-![use_case_diagram](images/Use-Case-Diagram-(CPEN)3.drawio.png)
+![use_case_diagram](images/Use-Case-Diagram-(CPEN).drawio.png)
 
 ### **3.3. Actors Description**
 1. **User**: The primary actor who interacts with the BioTrack app. Users can scan wildlife, view identifications, save observations to catalogs, manage their collections, and optionally share findings with friends or collaborators.
@@ -82,8 +106,8 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 - 2a. The user cancels without taking a photo.
     - 2a1. The system returns to the previous screen without saving anything.
                 
-- 3a. Device storage is full.
-    - 3a1. The system displays an error message and discards the photo.
+- 4a. Device storage is full.
+    - 4 a1. The system displays an error message and discards the photo.
 
 <a name="uc2"></a>
 
@@ -93,15 +117,14 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 **Primary actor(s)**: User 
 
-**Preconditions**: he user has a photo stored in device storage.
+**Preconditions**: The user has a photo stored in device storage.
 
 **Postconditions**: The identified wildlife and metadata are displayed to the user.
     
 **Main success scenario**:
 1. The user selects “Scan Picture.”
-2. The system sends the picture to the external recognition API.
-3. The API processes the picture and returns the wildlife identification with metadata.
-4. The system displays the species name, picture, and description (eg. species type, mammel, rarity, endarngered).
+2. The system sends the picture to the external recognition API and returns the identification.
+3. The system displays the species name, picture, and description (eg. species type, mammel, rarity, endarngered).
 
 **Failure scenario(s)**:
 - 1a. No internet connection.
@@ -136,8 +159,8 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 - 2a. User cancels before saving
     - 2a1. The system discards the scanned entry.
                 
-- 3a. Device storage or database write fails.
-    - 3a1. The system displays an error message and does not save the entry.
+- 2b. Device storage or database write fails.
+    - 2b1. The system displays an error message and does not save the entry.
 
 <a name="uc4"></a>
 
@@ -217,20 +240,140 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 ## 4. Designs Specification
 ### **4.1. Main Components**
 1. **Species Identification**
-    - **Purpose**: Receives an uploaded photo and returns the most likely species with confidence scores and metadata. It abstracts over multiple image recognition APIs and caches frequent results to reduce latency and cost.
+    - **Purpose**: Receives an uploaded photo and returns the most likely species with confidence scores and metadata. It abstracts over multiple image recognition APIs.
     - **Interfaces**: 
-        1. **[name]**
-            - **Purpose**:
+        1. **POST /api/recognition**
+            - **Purpose**: Accepts an image from the client and returns species predictions with confidence and metadata.
+            - **Parameters**: file image (The uploaded image file).
+            - **Returns**: 
+            {
+                "message": "Species recognized successfully",
+                "data": {
+                    "species": {
+                        "id": 12345,
+                        "scientificName": "Corvus brachyrhynchos",
+                        "commonName": "American Crow",
+                        "rank": "species",
+                        "taxonomy": "Aves",
+                        "wikipediaUrl": "https://en.wikipedia.org/wiki/American_crow",
+                        "imageUrl": "https://..."
+                    },
+                    "confidence": 0.91,
+                    "alternatives": [
+                    {
+                        "scientificName": "...",
+                        "commonName": "...",
+                        "confidence": 0.42
+                    }
+                    ]
+                }
+            }
+        2. **Recognition Result recognizeFromUrl(imageUrl: string)**
+            - **Purpose**: Internal server method that queries iNatuarlist and zylalabs and returns more confident result.
+            - **Parameters**: Image image
+            - **Returns**: 
+            {
+                "message": "Species recognized successfully",
+                "data": {
+                    "species": {
+                        "id": 12345,
+                        "scientificName": "Corvus brachyrhynchos",
+                        "commonName": "American Crow",
+                        "rank": "species",
+                        "taxonomy": "Aves",
+                        "wikipediaUrl": "https://en.wikipedia.org/wiki/American_crow",
+                        "imageUrl": "https://..."
+                    },
+                    "confidence": 0.91,
+                    "alternatives": [
+                    {
+                        "scientificName": "...",
+                        "commonName": "...",
+                        "confidence": 0.42
+                    }
+                    ]
+                }
+            }
+
 2. **Catalog**
     - **Purpose**: Creates and manages a user’s catalog of sightings, and maintains a list of unique species seen. Keeps domain logic server-side for consistency and offline-friendly syncing; cleaner than pushing all logic to the client.
     - **Interfaces**: 
-        1. **[name]**
-            - **Purpose**:
+        1. **POST /api/catalogs**
+            - **Purpose**: Adds a new species sighting to the user’s catalog.
+            - **Parameters**: _id, name, description, owner, createdAt, updatedAt, entries
+            - **Returns**: 
+            {
+                "message": "Entry linked to catalog successfully",
+                "data": {
+                    "catalog": {
+                        "_id": "...",
+                        "name": "Spring Birds",
+                        "description": "...",
+                        "owner": "...",
+                        "createdAt": "...",
+                        "updatedAt": "...",
+                        "entries": [
+                             {
+                            "entry": {
+                                "_id": "...",
+                                "userId": "...",
+                                "speciesId": {
+                                    "_id": "...",
+                                    "scientificName": "Corvus brachyrhynchos",
+                                    "commonName": "American Crow",
+                                     "...": "..."
+                                },
+                                "confidence": 0.91,
+                                "latitude": 49.28,
+                                "longitude": -123.12,
+                                "imageUrl": "/uploads/images/....jpg",
+                                "notes": "Perched on cedar tree",
+                                "createdAt": "...",
+                                "updatedAt": "..."
+                            },
+                            "linkedAt": "2024-05-01T19:30:00.000Z",
+                            "addedBy": "..."
+                        }
+                        ]
+                    }
+                }
+            }
+        2. **GET /api/catalogs/**
+            - **Purpose**: Lists all catalogs owned by the authenticated user.
+            - **Parameters**: Bearer JWT
+            - **Returns**: Array of catalogs with metadata and entry counts.
+
 3. **User**
     - **Purpose**: Handles user profiles, OAuth login, friends.
     - **Interfaces**:
-        1. **[name]**
-            - **Purpose**:
+        1. **POST /api/auth/signup**
+            - **Purpose**: Register a new user using a Google ID token and return JWT + profile.
+            - **Parameters**: idToken: string
+            - **Returns**:
+            {
+                "message": "User signed up successfully",
+                "data": { "token": "jwt-token", "user": { "_id": "...", "email": "...", "name": "..." } }
+            }
+        2. **POST /api/auth/signin**
+            - **Purpose**: Log in an existing user and return JWT + profile.
+            - **Parameters**: idToken: string
+            - **Returns**:
+            {
+                "message": "User signed up successfully",
+                "data": { "token": "jwt-token", "user": { "_id": "...", "email": "...", "name": "..." } }
+            }
+        3. **GET /api/user/profile**
+            - **Purpose**: Retrieve the authenticated user’s profile.
+            - **Parameters**: Authorization: Bearer <JWT>
+            - **Returns**: User profile object (name, email, stats).
+        4. **POST /api/user/profile**
+            - **Purpose**: Update user profile fields.
+            - **Parameters**: Authorization: Bearer <JWT>, Request Body: { name?, username?, location?, region?, isPublicProfile?, favoriteSpecies?[] }
+            - **Returns**: Updated profile object.
+        5. **DELETE /api/user/profile**
+            - **Purpose**: Permanently delete the user’s account.
+            - **Parameters**: Authorization: Bearer <JWT>
+            - **Returns**: { "message": "User deleted successfully" }
 
 
 
@@ -271,12 +414,22 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 ![dependencies_diagram](images/CPEN321M2-DependencyDiagramV2.drawio.png)
 
 ### **4.6. Use Case Sequence Diagram (5 Most Major Use Cases)**
-1. [**[WRITE_NAME_HERE]**](#uc1)\
-[SEQUENCE_DIAGRAM_HERE]
-2. ...
+1. [**Get Picture**](#uc1)\
+![sequence_diagram1](images/getPicture.png)
+2. [**Scan Picture**](#uc1)\
+![sequence_diagram2](images/scanPicture.png)
+3. [**Catalog Scanned Picture**](#uc1)\
+![sequence_diagram3](images/catalogScannedPicture.png)
+4. [**Add Friends**](#uc1)\
+![sequence_diagram4](images/addFriends.png)
+5. [**Share Scanned Picture**](#uc1)\
+![sequence_diagram5](images/shareScannedPicture.png)
 
 
 ### **4.7. Design and Ways to Test Non-Functional Requirements**
-1. [**[WRITE_NAME_HERE]**](#nfr1)
-    - **Validation**: ...
-2. ...
+1. [**Recognition Latency**](#nfr1)
+    - **Validation**: The backend uses asynchronous Express routes with non-blocking I/O to ensure fast responses. We can test the total response time between image upload and recognition result using Postman load tests
+2. [**UI/UX Accessibility**](#nfr1)
+    - **Validation**: The frontend uses semantic UI elements and and clear color contrast. We can perform user testing to ensure key tasks remain intuitive and consistent.
+3. [**Privacy & Data Protection**](#nfr1)
+    - **Validation**: JWT tokens secure user sessions, and Google OAuth 2.0 ensures authentication without storing raw passwords. The backend provides a dedicated /api/user/profile (DELETE) endpoint to permanently remove user data, complying with PIPEDA principles.
