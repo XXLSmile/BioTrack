@@ -134,6 +134,9 @@ export class UserController {
         badges: user.badges,
         friendCount: user.friendCount,
         createdAt: user.createdAt,
+        favoriteSpecies: Array.isArray(user.favoriteSpecies)
+          ? user.favoriteSpecies.filter(Boolean)
+          : [],
       };
 
       res.status(200).json({
@@ -179,6 +182,9 @@ export class UserController {
         badges: user.badges,
         friendCount: user.friendCount,
         createdAt: user.createdAt,
+        favoriteSpecies: Array.isArray(user.favoriteSpecies)
+          ? user.favoriteSpecies.filter(Boolean)
+          : [],
       };
 
       res.status(200).json({

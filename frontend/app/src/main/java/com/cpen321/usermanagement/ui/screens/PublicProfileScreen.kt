@@ -42,11 +42,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.cpen321.usermanagement.R
 import com.cpen321.usermanagement.data.remote.dto.PublicUserProfile
 import com.cpen321.usermanagement.ui.viewmodels.PublicProfileViewModel
 import java.time.OffsetDateTime
@@ -177,6 +179,7 @@ private fun PublicProfileContent(profile: PublicUserProfile) {
         ProfileHeader(profile = profile)
         ProfileStats(profile = profile)
         ProfileDetails(profile = profile)
+        FavoriteSpeciesCard(species = profile.favoriteSpecies.orEmpty())
         ProfileBadges(profile = profile)
     }
 }
@@ -242,22 +245,17 @@ private fun ProfileStats(profile: PublicUserProfile) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
             StatColumn(
                 icon = Icons.Outlined.Pets,
-                label = "Observations",
+                label = stringResource(R.string.profile_stat_observations),
                 value = profile.observationCount ?: 0
             )
             StatColumn(
-                icon = Icons.Outlined.Badge,
-                label = "Species",
-                value = profile.speciesDiscovered ?: 0
-            )
-            StatColumn(
                 icon = Icons.Outlined.Groups,
-                label = "Friends",
+                label = stringResource(R.string.profile_stat_friends),
                 value = profile.friendCount ?: 0
             )
         }
@@ -359,6 +357,42 @@ private fun DetailRow(
                 text = value,
                 style = MaterialTheme.typography.bodyMedium
             )
+        }
+    }
+}
+
+@Composable
+private fun FavoriteSpeciesCard(species: List<String>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.profile_favorites_heading),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium
+            )
+
+            if (species.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.profile_no_favorites),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                species.forEach { favorite ->
+                    Text(
+                        text = "• $favorite",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
         }
     }
 }

@@ -15,5 +15,6 @@ data class PublicUserProfile(
     val speciesDiscovered: Int?,
     val badges: List<String> = emptyList(),
     val friendCount: Int?,
-    val createdAt: String?
+    val createdAt: String?,
+    val favoriteSpecies: List<String>? = emptyList()
 )

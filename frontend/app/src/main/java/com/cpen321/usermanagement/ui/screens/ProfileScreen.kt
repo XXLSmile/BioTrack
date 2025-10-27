@@ -1,8 +1,10 @@
 package com.cpen321.usermanagement.ui.screens
 
 import Button
-import Icon
 import MenuButtonItem
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.Pets
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +25,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon as M3Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -43,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.cpen321.usermanagement.R
 import com.cpen321.usermanagement.data.remote.dto.User
 import com.cpen321.usermanagement.data.remote.dto.UserStatsData
@@ -318,7 +322,6 @@ private fun ProfileStatsCard(
             } else {
                 StatsRow(
                     observationCount = stats?.observationCount ?: user.observationCount,
-                    speciesDiscovered = stats?.speciesDiscovered ?: user.speciesDiscovered,
                     friendCount = stats?.friendCount ?: user.friendCount
                 )
 
@@ -338,33 +341,41 @@ private fun ProfileStatsCard(
 }
 
 @Composable
-private fun StatsRow(
-    observationCount: Int,
-    speciesDiscovered: Int,
-    friendCount: Int,
-    modifier: Modifier = Modifier
-) {
-    val spacing = LocalSpacing.current
-
+private fun StatsRow(observationCount: Int, friendCount: Int, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        StatItem(title = stringResource(R.string.profile_stat_observations), value = observationCount)
-        Spacer(modifier = Modifier.width(spacing.medium))
-        StatItem(title = stringResource(R.string.profile_stat_species), value = speciesDiscovered)
-        Spacer(modifier = Modifier.width(spacing.medium))
-        StatItem(title = stringResource(R.string.profile_stat_friends), value = friendCount)
+        StatItem(
+            icon = Icons.Outlined.Pets,
+            title = stringResource(R.string.profile_stat_observations),
+            value = observationCount
+        )
+        StatItem(
+            icon = Icons.Outlined.Groups,
+            title = stringResource(R.string.profile_stat_friends),
+            value = friendCount
+        )
     }
 }
 
 @Composable
-private fun StatItem(title: String, value: Int, modifier: Modifier = Modifier) {
+private fun StatItem(
+    icon: ImageVector,
+    title: String,
+    value: Int,
+    modifier: Modifier = Modifier
+) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
+        M3Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary
+        )
         Text(text = value.toString(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text(text = title, style = MaterialTheme.typography.bodyMedium)
     }
@@ -392,7 +403,10 @@ private fun FavoriteSpeciesCard(favoriteSpecies: List<String>, modifier: Modifie
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Column(modifier = Modifier.padding(spacing.large), verticalArrangement = Arrangement.spacedBy(spacing.small)) {
+        Column(
+            modifier = Modifier.padding(spacing.large),
+            verticalArrangement = Arrangement.spacedBy(spacing.small)
+        ) {
             Text(
                 text = stringResource(R.string.profile_favorites_heading),
                 style = MaterialTheme.typography.titleMedium,

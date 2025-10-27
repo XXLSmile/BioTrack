@@ -81,8 +81,10 @@ fun FriendsScreen(
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshAll()
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> viewModel.refreshAll()
+                Lifecycle.Event.ON_STOP -> viewModel.clearSearchState()
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
