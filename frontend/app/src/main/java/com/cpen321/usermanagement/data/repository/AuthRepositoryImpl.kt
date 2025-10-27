@@ -162,12 +162,25 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun sendFcmTokenToServer() {
+    override suspend fun sendFcmTokenToServer(fcmToken: String?) {
         try {
-            val fcmToken = FirebaseMessaging.getInstance().token.await()
-            Log.d(TAG, "Sending FCM token: $fcmToken")
+            val authToken = getStoredToken()
+            if (authToken.isNullOrBlank()) {
+                Log.d(TAG, "Skipping FCM token sync: user is not authenticated")
+                return
+            }
 
-            val response = RetrofitClient.userInterface.updateFcmToken(mapOf("token" to fcmToken))
+            RetrofitClient.setAuthToken(authToken)
+
+            val tokenToSend = fcmToken?.takeIf { it.isNotBlank() }
+                ?: FirebaseMessaging.getInstance().token.await()
+
+            if (tokenToSend.isBlank()) {
+                Log.w(TAG, "Skipping FCM token sync: token is blank")
+                return
+            }
+
+            val response = RetrofitClient.userInterface.updateFcmToken(mapOf("token" to tokenToSend))
             if (response.isSuccessful) {
                 Log.d(TAG, "FCM token sent successfully")
             } else {
@@ -233,7 +246,20 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     override suspend fun logout(): Result<Unit> {
+        val authToken = getStoredToken()
+        RetrofitClient.setAuthToken(authToken)
         return try {
+            if (!authToken.isNullOrBlank()) {
+                try {
+                    val clearResponse = RetrofitClient.userInterface.clearFcmToken()
+                    if (!clearResponse.isSuccessful) {
+                        Log.w(TAG, "Failed to clear FCM token on server during logout: ${clearResponse.errorBody()?.string()}")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error clearing FCM token during logout", e)
+                }
+            }
+
             val response = authInterface.logout()
             if (response.isSuccessful) {
                 tokenManager.clearToken()

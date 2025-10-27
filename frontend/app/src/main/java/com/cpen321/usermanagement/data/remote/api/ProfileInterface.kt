@@ -54,6 +54,9 @@ interface UserInterface {
     @POST("user/update-fcm-token")
     suspend fun updateFcmToken(@Body body: Map<String, String>): Response<ApiResponse<Unit>>
 
+    @DELETE("user/fcm-token")
+    suspend fun clearFcmToken(): Response<ApiResponse<Unit>>
+
 
 
     @GET("user/username/{username}")

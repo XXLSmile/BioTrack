@@ -35,7 +35,11 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
     private fun sendTokenToServer(token: String) {
         CoroutineScope(Dispatchers.IO).launch {
-            authRepository.sendFcmTokenToServer()
+            if (token.isBlank()) {
+                Log.w("FCM", "Skipping FCM token sync because provided token is blank")
+                return@launch
+            }
+            authRepository.sendFcmTokenToServer(token)
         }
     }
 

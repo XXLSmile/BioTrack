@@ -399,14 +399,36 @@ export class UserController {
     }
   }
 
-  async updateFcmToken(req: Request, res: Response) {
-  const user = req.user!;
-  const { token } = req.body;
+  async updateFcmToken(req: Request, res: Response, next: NextFunction) {
+    try {
+      const user = req.user!;
+      const { token } = req.body as { token?: unknown };
 
-  await userModel.update(user._id, { fcmToken: token });
+      if (typeof token !== 'string' || token.trim().length === 0) {
+        return res.status(400).json({
+          message: 'A valid FCM token is required',
+        });
+      }
 
-  res.status(200).json({ message: "Token updated" });
-}
+      await userModel.update(user._id, { fcmToken: token });
 
+      res.status(200).json({ message: 'Token updated' });
+    } catch (error) {
+      logger.error('Failed to update FCM token:', error);
+      next(error);
+    }
+  }
 
+  async clearFcmToken(req: Request, res: Response, next: NextFunction) {
+    try {
+      const user = req.user!;
+
+      await userModel.update(user._id, { fcmToken: null });
+
+      res.status(200).json({ message: 'Token cleared' });
+    } catch (error) {
+      logger.error('Failed to clear FCM token:', error);
+      next(error);
+    }
+  }
 }

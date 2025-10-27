@@ -10,7 +10,7 @@ interface AuthRepository {
     suspend fun googleSignIn(tokenId: String): Result<AuthData>
     suspend fun googleSignUp(tokenId: String): Result<AuthData>
 
-    suspend fun sendFcmTokenToServer()
+    suspend fun sendFcmTokenToServer(fcmToken: String? = null)
     suspend fun clearToken(): Result<Unit>
     suspend fun doesTokenExist(): Boolean
     suspend fun getStoredToken(): String?
