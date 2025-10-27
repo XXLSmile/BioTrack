@@ -46,7 +46,7 @@ fun SplashScreen(onTimeout: () -> Unit) {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "Bio-Track",
+                text = "BioTrack",
                 fontSize = 52.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
