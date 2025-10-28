@@ -41,6 +41,10 @@ class MainActivity : ComponentActivity() {
             ) {
                 requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1001)
             }
+            if(checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)
+            {
+                requestPermissions(arrayOf(android.Manifest.permission.CAMERA), 1001)
+            }
         }
 
 
