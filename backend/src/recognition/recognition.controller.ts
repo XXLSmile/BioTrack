@@ -13,7 +13,7 @@ import { RecognitionImageResponse } from './recognition.types';
 import { catalogModel } from '../catalog/catalog.model';
 import { catalogEntryLinkModel } from '../catalog/catalogEntryLink.model';
 import { catalogShareModel } from '../catalog/catalogShare.model';
-import { buildCatalogEntriesResponse } from '../catalog/catalog.helpers';
+import { buildCatalogEntriesResponse, resolveImageUrl } from '../catalog/catalog.helpers';
 import { emitCatalogEntriesUpdated } from '../socket/socket.manager';
 import { geocodingService } from '../location/geocoding.service';
 
@@ -33,6 +33,61 @@ const parseCoordinate = (value: unknown): number | undefined => {
   }
 
   return undefined;
+};
+
+const UPLOADS_ROOT = path.join(__dirname, '../../uploads');
+
+const ensureDirectoryExists = (directory: string): void => {
+  if (!fs.existsSync(directory)) {
+    fs.mkdirSync(directory, { recursive: true });
+  }
+};
+
+const saveUploadedFile = (
+  file: Express.Multer.File,
+  subDirectory: string
+): { fullPath: string; relativePath: string; filename: string } => {
+  const sanitizedSubDir = subDirectory.replace(/^\//, '');
+  const directory = path.join(UPLOADS_ROOT, sanitizedSubDir);
+  ensureDirectoryExists(directory);
+
+  const extension = path.extname(file.originalname || '').toLowerCase() || '.jpg';
+  const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extension}`;
+  const fullPath = path.join(directory, filename);
+  fs.writeFileSync(fullPath, file.buffer);
+
+  const relativePath = `/uploads/${sanitizedSubDir}/${filename}`;
+  return { fullPath, relativePath, filename };
+};
+
+const buildAccessibleImageUrl = (relativePath: string, req: Request): string => {
+  const normalized = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
+  const absoluteUrl = resolveImageUrl(normalized, {
+    protocol: req.protocol,
+    host: req.get('host') ?? undefined,
+  });
+
+  if (!absoluteUrl || !/^https?:\/\//i.test(absoluteUrl)) {
+    throw new Error(
+      'Unable to resolve public image URL. Ensure MEDIA_BASE_URL or host headers are configured.'
+    );
+  }
+
+  return absoluteUrl;
+};
+
+const deleteFileIfExists = (filePath: string): void => {
+  if (!filePath) {
+    return;
+  }
+
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch (error) {
+    logger.warn('Failed to delete temporary file', { filePath, error });
+  }
 };
 
 export class RecognitionController {
@@ -60,18 +115,37 @@ export class RecognitionController {
 
       logger.info('Processing image recognition request');
 
-      const recognitionResult = imageUrl
-        ? await recognitionService.recognizeFromUrl(imageUrl)
-        : await recognitionService.recognizeFromImage(
-            req.file!.buffer,
-            latitude,
-            longitude
-          );
+      let tempFile:
+        | { fullPath: string; relativePath: string; filename: string }
+        | undefined;
 
-      return res.status(200).json({
-        message: 'Species recognized successfully',
-        data: recognitionResult,
-      });
+      try {
+        let recognitionResult;
+
+        if (imageUrl) {
+          recognitionResult = await recognitionService.recognizeFromUrl(imageUrl);
+        } else {
+          if (!req.file) {
+            return res.status(400).json({
+              message: 'Provide an image file or an imageUrl to perform recognition.',
+            });
+          }
+
+          tempFile = saveUploadedFile(req.file, 'tmp');
+          const absoluteUrl = buildAccessibleImageUrl(tempFile.relativePath, req);
+
+          recognitionResult = await recognitionService.recognizeFromUrl(absoluteUrl);
+        }
+
+        return res.status(200).json({
+          message: 'Species recognized successfully',
+          data: recognitionResult,
+        });
+      } finally {
+        if (tempFile) {
+          deleteFileIfExists(tempFile.fullPath);
+        }
+      }
     } catch (error) {
       logger.error('Error in recognizeImage controller:', error);
 
@@ -121,210 +195,194 @@ export class RecognitionController {
       const latitude = parseCoordinate(rawLatitude);
       const longitude = parseCoordinate(rawLongitude);
 
-      // Recognize species
-      const recognitionResult = await recognitionService.recognizeFromImage(
-        req.file.buffer,
-        latitude,
-        longitude
-      );
+      const savedImage = saveUploadedFile(req.file, 'images');
+      let retainImageOnDisk = false;
 
-      // Get species from database
-      const species = await speciesRepository.findOrCreate({
-        inaturalistId: recognitionResult.species.id,
-        scientificName: recognitionResult.species.scientificName,
-        commonName: recognitionResult.species.commonName,
-        rank: recognitionResult.species.rank,
-        taxonomy: recognitionResult.species.taxonomy,
-        wikipediaUrl: recognitionResult.species.wikipediaUrl,
-        imageUrl: recognitionResult.species.imageUrl,
-      });
+      try {
+        const absoluteImageUrl = buildAccessibleImageUrl(savedImage.relativePath, req);
 
-      const imageHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+        const recognitionResult = await recognitionService.recognizeFromUrl(absoluteImageUrl);
 
-      // Create observation entry with image data stored in database
-      let catalogToLink: { _id: mongoose.Types.ObjectId } | null = null;
-      if (catalogId) {
-        if (!mongoose.Types.ObjectId.isValid(catalogId)) {
-          return res.status(400).json({
-            message: 'Invalid catalog ID',
-          });
+        const species = await speciesRepository.findOrCreate({
+          inaturalistId: recognitionResult.species.id,
+          scientificName: recognitionResult.species.scientificName,
+          commonName: recognitionResult.species.commonName,
+          rank: recognitionResult.species.rank,
+          taxonomy: recognitionResult.species.taxonomy,
+          wikipediaUrl: recognitionResult.species.wikipediaUrl,
+          imageUrl: recognitionResult.species.imageUrl,
+        });
+
+        const imageHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+
+        let catalogToLink: { _id: mongoose.Types.ObjectId } | null = null;
+        if (catalogId) {
+          if (!mongoose.Types.ObjectId.isValid(catalogId)) {
+            return res.status(400).json({
+              message: 'Invalid catalog ID',
+            });
+          }
+
+          const catalog = await catalogModel.findById(catalogId);
+          if (!catalog) {
+            return res.status(404).json({
+              message: 'Catalog not found',
+            });
+          }
+
+          const isOwner = catalog.owner.equals(user._id);
+          const share = isOwner
+            ? null
+            : await catalogShareModel.getUserAccess(catalog._id, user._id);
+          const hasEditPermission = isOwner || (share?.role === 'editor');
+
+          if (!hasEditPermission) {
+            return res.status(403).json({
+              message: 'You do not have permission to modify this catalog',
+            });
+          }
+
+          catalogToLink = { _id: catalog._id };
         }
 
-        const catalog = await catalogModel.findById(catalogId);
-        if (!catalog) {
-          return res.status(404).json({
-            message: 'Catalog not found',
-          });
+        let catalogEntry = await catalogRepository.findByHash(
+          user._id.toString(),
+          imageHash
+        );
+
+        let isNewEntry = false;
+
+        const locationInfo = latitude !== undefined && longitude !== undefined
+          ? await geocodingService.reverseGeocode(latitude, longitude)
+          : undefined;
+
+        if (!catalogEntry) {
+          try {
+            catalogEntry = await catalogRepository.create({
+              userId: user._id.toString(),
+              speciesId: species._id.toString(),
+              imageUrl: savedImage.relativePath,
+              imageData: req.file.buffer,
+              imageMimeType: req.file.mimetype,
+              latitude,
+              longitude,
+              city: locationInfo?.city,
+              province: locationInfo?.province,
+              confidence: recognitionResult.confidence,
+              notes,
+              imageHash,
+            });
+
+            isNewEntry = true;
+            retainImageOnDisk = true;
+          } catch (creationError) {
+            if ((creationError as { code?: number }).code === 11000) {
+              catalogEntry = await catalogRepository.findByHash(
+                user._id.toString(),
+                imageHash
+              );
+            } else {
+              throw creationError;
+            }
+          }
         }
 
-        const isOwner = catalog.owner.equals(user._id);
-        const share = isOwner
-          ? null
-          : await catalogShareModel.getUserAccess(catalog._id, user._id);
-        const hasEditPermission = isOwner || (share?.role === 'editor');
-
-        if (!hasEditPermission) {
-          return res.status(403).json({
-            message: 'You do not have permission to modify this catalog',
-          });
-        }
-
-        catalogToLink = { _id: catalog._id };
-      }
-
-      let catalogEntry = await catalogRepository.findByHash(
-        user._id.toString(),
-        imageHash
-      );
-
-      let isNewEntry = false;
-
-      const locationInfo = latitude !== undefined && longitude !== undefined
-        ? await geocodingService.reverseGeocode(latitude, longitude)
-        : undefined;
-
-      if (!catalogEntry) {
-        // Save image to disk (for backwards compatibility and quick access)
-        const IMAGES_DIR = path.join(__dirname, '../../uploads/images');
-        if (!fs.existsSync(IMAGES_DIR)) {
-          fs.mkdirSync(IMAGES_DIR, { recursive: true });
-        }
-
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-        const extension = path.extname(req.file.originalname) || '.jpg';
-        const filename = `${uniqueSuffix}${extension}`;
-        const filepath = path.join(IMAGES_DIR, filename);
-
-        try {
-          fs.writeFileSync(filepath, req.file.buffer);
-
-          const imageUrl = `/uploads/images/${filename}`;
-
-          catalogEntry = await catalogRepository.create({
+        if (!catalogEntry) {
+          logger.error('Catalog entry could not be created or retrieved for hash', {
             userId: user._id.toString(),
-            speciesId: species._id.toString(),
-            imageUrl,
-            imageData: req.file.buffer, // Save the actual image data to DB
-            imageMimeType: req.file.mimetype, // Save the image MIME type
-            latitude,
-            longitude,
-            city: locationInfo?.city,
-            province: locationInfo?.province,
-            confidence: recognitionResult.confidence,
-            notes,
             imageHash,
           });
 
-          isNewEntry = true;
-        } catch (error) {
-          if ((error as { code?: number }).code === 11000) {
-            catalogEntry = await catalogRepository.findByHash(
-              user._id.toString(),
-              imageHash
-            );
-
-            if (fs.existsSync(filepath)) {
-              fs.unlinkSync(filepath);
-            }
-          } else {
-            if (fs.existsSync(filepath)) {
-              fs.unlinkSync(filepath);
-            }
-            throw error;
-          }
+          return res.status(500).json({
+            message: 'Failed to save catalog entry',
+          });
         }
-      }
 
-      if (!catalogEntry) {
-        logger.error('Catalog entry could not be created or retrieved for hash', {
-          userId: user._id.toString(),
-          imageHash,
-        });
+        if (!isNewEntry) {
+          deleteFileIfExists(savedImage.fullPath);
+        }
 
-        return res.status(500).json({
-          message: 'Failed to save catalog entry',
-        });
-      }
-
-      let linkedCatalogId: mongoose.Types.ObjectId | undefined;
-      if (catalogToLink) {
-        const alreadyLinked = await catalogEntryLinkModel.isEntryLinked(
-          catalogToLink._id,
-          catalogEntry._id
-        );
-
-        if (!alreadyLinked) {
-          await catalogEntryLinkModel.linkEntry(
+        let linkedCatalogId: mongoose.Types.ObjectId | undefined;
+        if (catalogToLink) {
+          const alreadyLinked = await catalogEntryLinkModel.isEntryLinked(
             catalogToLink._id,
-            catalogEntry._id,
-            user._id
+            catalogEntry._id
           );
 
-          try {
-            const links = await catalogEntryLinkModel.listEntriesWithDetails(catalogToLink._id);
-            const entries = buildCatalogEntriesResponse(links, user._id);
-            emitCatalogEntriesUpdated(catalogToLink._id, entries, user._id);
-          } catch (broadcastError) {
-            logger.warn('Failed to broadcast catalog update after recognition save', {
-              catalogId: catalogToLink._id.toString(),
-              entryId: catalogEntry._id.toString(),
-              error: broadcastError,
-            });
+          if (!alreadyLinked) {
+            await catalogEntryLinkModel.linkEntry(
+              catalogToLink._id,
+              catalogEntry._id,
+              user._id
+            );
+
+            try {
+              const links = await catalogEntryLinkModel.listEntriesWithDetails(catalogToLink._id);
+              const entries = buildCatalogEntriesResponse(links, user._id);
+              emitCatalogEntriesUpdated(catalogToLink._id, entries, user._id);
+            } catch (broadcastError) {
+              logger.warn('Failed to broadcast catalog update after recognition save', {
+                catalogId: catalogToLink._id.toString(),
+                entryId: catalogEntry._id.toString(),
+                error: broadcastError,
+              });
+            }
+          }
+
+          linkedCatalogId = catalogToLink._id;
+        }
+
+        if (catalogEntry && locationInfo) {
+          let shouldSave = false;
+
+          if (!catalogEntry.city && locationInfo.city) {
+            catalogEntry.city = locationInfo.city;
+            shouldSave = true;
+          }
+
+          if (!catalogEntry.province && locationInfo.province) {
+            catalogEntry.province = locationInfo.province;
+            shouldSave = true;
+          }
+
+          if (shouldSave) {
+            await catalogEntry.save();
           }
         }
 
-        linkedCatalogId = catalogToLink._id;
-      }
+        if (isNewEntry) {
+          await userModel.incrementObservationCount(user._id);
 
-      if (catalogEntry && locationInfo) {
-        let shouldSave = false;
+          const userCatalog = await catalogRepository.findByUserId(user._id.toString());
+          const uniqueSpeciesIds = new Set(userCatalog.map(entry => entry.speciesId.toString()));
+          const newSpeciesCount = uniqueSpeciesIds.size;
 
-        if (!catalogEntry.city && locationInfo.city) {
-          catalogEntry.city = locationInfo.city;
-          shouldSave = true;
+          if (newSpeciesCount === 1) {
+            await userModel.addBadge(user._id, 'First Sighting');
+          }
+          if (newSpeciesCount === 10) {
+            await userModel.addBadge(user._id, 'Explorer');
+          }
+          if (newSpeciesCount === 50) {
+            await userModel.addBadge(user._id, 'Naturalist');
+          }
         }
 
-        if (!catalogEntry.province && locationInfo.province) {
-          catalogEntry.province = locationInfo.province;
-          shouldSave = true;
-        }
+        logger.info(`Observation entry created: ${catalogEntry._id}`);
 
-        if (shouldSave) {
-          await catalogEntry.save();
-        }
-      }
-
-      if (isNewEntry) {
-        // Update user stats only when a brand new entry is created
-        await userModel.incrementObservationCount(user._id);
-
-        // Check if this is a new species for this user
-        const userCatalog = await catalogRepository.findByUserId(user._id.toString());
-        const uniqueSpeciesIds = new Set(userCatalog.map(entry => entry.speciesId.toString()));
-        const newSpeciesCount = uniqueSpeciesIds.size;
-
-        // Award badges
-        if (newSpeciesCount === 1) {
-          await userModel.addBadge(user._id, 'First Sighting');
-        }
-        if (newSpeciesCount === 10) {
-          await userModel.addBadge(user._id, 'Explorer');
-        }
-        if (newSpeciesCount === 50) {
-          await userModel.addBadge(user._id, 'Naturalist');
+        return res.status(201).json({
+          message: 'Species recognized and saved successfully',
+          data: {
+            entry: catalogEntry,
+            recognition: recognitionResult,
+            linkedCatalogId,
+          },
+        });
+      } finally {
+        if (!retainImageOnDisk) {
+          deleteFileIfExists(savedImage.fullPath);
         }
       }
-
-      logger.info(`Observation entry created: ${catalogEntry._id}`);
-
-      return res.status(201).json({
-        message: 'Species recognized and saved successfully',
-        data: {
-          entry: catalogEntry,
-          recognition: recognitionResult,
-          linkedCatalogId,
-        },
-      });
     } catch (error) {
       logger.error('Error in recognizeAndSave controller:', error);
       next(error);
