@@ -17,7 +17,7 @@ export class RecognitionService {
 
       const response = await axios.post(
         this.zylaApiUrl,
-        { image_url: imageUrl },
+        { url: imageUrl },
         {
           headers: {
             Authorization: `Bearer ${this.zylaApiToken}`,
