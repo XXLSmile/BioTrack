@@ -9,6 +9,7 @@
 | 27/10/25 | 3.1; Changed where share catalog was mentioned | did this to align with the friends use case | 
 | 27/10/25 | 3.2; added colour coding and changed ordering of some use cases | did this to make it clear what use case is for what feature |
 | 27/10/25 | added Google Map Api to Use case diagram and described more accuratly where it is used in the use case descriptions | use of the google maps api was unclear in previous documentation |
+| 27/10/25 | updated dependency diagram to show google maps api in frontend as well as firebase | this more accuratly represents our application |
 
 
 ## 2. Project Description
