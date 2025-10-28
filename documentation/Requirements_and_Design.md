@@ -2,34 +2,13 @@
 
 ## 1. Change History
 
-|   **Change Date**   |    **Modified Sections**    |   **Rationale**   |
-|  -----------------  |  ---------------------      |  -------------    |
-|27/10/25             |4.1; Species Identification  |fetching from api  |
-|                     |Removed caching data logic   |is not too slow    |
--------------------------------------------------------------------------
-|13/10/25             |Changed non-functional req   |old functional     |
-|                     |                             |req were not       |
-|                     |                             |specific enough    |
--------------------------------------------------------------------------
-| 27/10/25            |3.1; Changed where share     |did this to align  |
-|                     |catalog was mentioned        |with the friends   |
-|                     |                             |use case           |
--------------------------------------------------------------------------   
-| 27/10/25            |3.2; added colour coding and |did this to make it|
-|                     |changed ordering of some use |clear what use case|
-|                     |cases                        |is for what feature|
-|                     |                             |                   |
-|                     |                             |                   |
-|                     |                             |                   |
-|                     |                             |                   |
-|                     |                             |                   |
-|                     |                             |                   |
-|                     |                             |                   |
-|                     |                             |                   |
-|                     |                             |                   |
-|                     |                             |                   |
-|                     |                             |                   |
-|                     |                             |                   |
+|**Change Date**|    **Modified Sections**    |     **Rationale**       |
+|---------------|  ---------------------      |-------------------------|
+| 27/10/25 | 4.1; Species Identification Removed caching data logic |fetching from api is not too slow |
+| 13/10/25 | Changed non-functional req | old functional req were not specific enough |
+| 27/10/25 | 3.1; Changed where share catalog was mentioned | did this to align with the friends use case | 
+| 27/10/25 | 3.2; added colour coding and changed ordering of some use cases | did this to make it clear what use case is for what feature |
+| 27/10/25 | added Google Map Api to Use case diagram and described more accuratly where it is used in the use case descriptions | use of the google maps api was unclear in previous documentation |
 
 
 ## 2. Project Description
@@ -52,7 +31,7 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 ### **3.2. Use Case Diagram**
 
-![use_case_diagram](images/Use-Case-Diagram-(CPEN).drawio.png)
+![use_case_diagram](images/useCaseDiagram.png)
 
 ### **3.3. Actors Description**
 1. **User**: The primary actor who interacts with the BioTrack app. Users can scan wildlife, view identifications, save observations to catalogs, manage their collections, and optionally share findings with friends or collaborators.
@@ -74,7 +53,7 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 8. **Create Catalog**: The user creates a personal collection to store the picture taken of the wildlife as well as the time and location of the sighting and the description of the wildlife and organize by species encountered wildlife. The user can title catalogs and make mulitple catalogs
 9. **Delete Catalog**: The user deletes their catalog, permanently removing all stored encounters in said catalog.
 10. **Edit Catalog**: The user can edit their catalog name, and remove entries from the catalog.
-11. **Catalog Scanned Picture**: After scanning, the user saves the identified species along with the time and location of the sighting as well as a description of the species to their catalog.
+11. **Catalog Scanned Picture**: After scanning, the user saves the identified species along with the time and location of the sighting via google maps as well as a description of the species to their catalog. 
 - Use cases for feature 4: Manage Friends
 12. **Add Friends**: The user can send or accept friend requests to connect with other app users. Users can search for usernames to add friends as well as remove friends from their friendslist. When users search for friends, there will be a reccommended list of friends the user can add based on catalog similarity.
 13. **Share Catalog**: The user can share one or multiple of their catalogs with friends. Friends can view the catalog or, if the catalog owner gives permission for collaboration, friends can contribute their own pictures to the catalog. The owner of the catalog can revoke collaboration permissions and remove friends from a catalog at any time.
