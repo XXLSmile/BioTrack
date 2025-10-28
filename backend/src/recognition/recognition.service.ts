@@ -83,7 +83,13 @@ export class RecognitionService {
 
   private getStableId(label: string): number {
     const hash = crypto.createHash('sha256').update(label).digest('hex');
-    return parseInt(hash.slice(0, 8), 16);
+    const unsigned = parseInt(hash.slice(0, 8), 16);
+    const stableId = unsigned & 0x7fffffff; // clamp to 31 bits to fit signed 32-bit int
+    if (stableId !== 0) {
+      return stableId;
+    }
+    const fallback = parseInt(hash.slice(8, 16), 16) & 0x7fffffff;
+    return fallback !== 0 ? fallback : 1;
   }
 }
 
