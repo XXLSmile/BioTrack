@@ -24,10 +24,12 @@ services:
         - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     ports:
       - "${PORT}:${PORT}"
+      - "8000:${PORT}"
     depends_on:
       - mongo
     volumes:
       - ./firebase-adminsdk.json:/app/firebase-adminsdk.json:ro
+      - ./uploads:/app/uploads
     command: npm start
 
 
