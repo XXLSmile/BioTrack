@@ -12,6 +12,7 @@ import { catalogModel } from './catalog.model';
 import { catalogShareModel } from './catalogShare.model';
 import { userModel } from '../user/user.model';
 import logger from '../logger.util';
+import { messaging } from "../firebase";
 
 export class CatalogShareController {
   async listCollaborators(
@@ -99,6 +100,27 @@ export class CatalogShareController {
         user._id,
         role
       );
+
+      // Send FCM notification to invitee if they have an FCM token
+      if (invitee.fcmToken) {
+        try {
+          await messaging.send({
+          token: invitee.fcmToken,
+          notification: {
+            title: "Catalog Invitation 📘",
+            body: `${user.name || user.username} invited you to collaborate on "${catalog.name}"`,
+          },
+          data: {
+            type: "CATALOG_INVITE_RECEIVED",
+            catalogId: catalog._id.toString(),
+            inviterId: user._id.toString(),
+          },
+          });
+          logger.info(`Sent catalog invitation notification to ${invitee.username}`);
+        } catch (err) {
+          logger.warn(`Failed to send catalog invitation notification to ${invitee.username}:`, err);
+        }
+      }
 
       res.status(201).json({
         message: 'Invitation sent successfully',
@@ -188,6 +210,45 @@ export class CatalogShareController {
       if (!updated) {
         return res.status(500).json({ message: 'Failed to update invitation' });
       }
+
+      if (newStatus === 'accepted' || newStatus === 'declined') {
+        try {
+          const catalog = await catalogModel.findById(invitation.catalog.toString());;
+          if (catalog) {
+            const owner = await userModel.findById(catalog.owner);
+            if (owner?.fcmToken) {
+              const title =
+              newStatus === 'accepted'
+              ? "Invitation Accepted ✅"
+              : "Invitation Declined 🚫";
+
+              const body =
+              newStatus === 'accepted'
+              ? `${user.name || user.username} accepted your invitation to "${catalog.name}"`
+              : `${user.name || user.username} declined your invitation to "${catalog.name}"`;
+
+              await messaging.send({
+                token: owner.fcmToken,
+                notification: { title, body },
+                data: {
+                  type:
+                  newStatus === 'accepted'
+                  ? "CATALOG_INVITE_ACCEPTED"
+                  : "CATALOG_INVITE_DECLINED",
+                  catalogId: catalog._id.toString(),
+                  inviteeId: user._id.toString(),
+                },
+              });
+
+              logger.info(
+              `Sent catalog ${newStatus} notification to ${owner.username}`
+              );
+            }
+          }
+        } catch (err) {
+          logger.warn(`Failed to send catalog invitation response notification:`, err);
+        }
+     }
 
       res.status(200).json({
         message: `Invitation ${action}ed successfully`,
