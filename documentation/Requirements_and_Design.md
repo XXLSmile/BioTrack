@@ -2,14 +2,16 @@
 
 ## 1. Change History
 
-|**Change Date**|    **Modified Sections**    |     **Rationale**       |
-|---------------|  ---------------------      |-------------------------|
-| 27/10/25 | 4.1; Species Identification Removed caching data logic |fetching from api is not too slow |
-| 13/10/25 | Changed non-functional req | old functional req were not specific enough |
-| 27/10/25 | 3.1; Changed where share catalog was mentioned | did this to align with the friends use case | 
-| 27/10/25 | 3.2; added colour coding and changed ordering of some use cases | did this to make it clear what use case is for what feature |
-| 27/10/25 | added Google Map Api to Use case diagram and described more accuratly where it is used in the use case descriptions | use of the google maps api was unclear in previous documentation |
-| 27/10/25 | updated dependency diagram to show google maps api in frontend as well as firebase | this more accuratly represents our application |
+| **Change Date** | **Modified Sections** | **Rationale** |
+| --- | --- | --- |
+| 27/10/25 | 4.1 | Consolidated components into species identification, catalog, and user groupings as per design review. |
+| 27/10/25 | 3.7, 4.1, 4.2, 4.3, 4.4, 4.6, 4.7 | Documented component interfaces, refreshed technology selections, and tied sequence/NFR sections to the implemented code. |
+| 27/10/25 | 4.1 (Species Identification) | Removed caching data logic because calling the API on demand already meets the latency target. |
+| 27/10/25 | 3.2 | Added colour coding and changed use-case ordering to clarify which feature each scenario supports. |
+| 27/10/25 | 3.1 | Adjusted shared-catalog references so that the flow matches the friends feature. |
+| 27/10/25 | 3.1, 3.2 | Highlighted Google Maps API usage in the use-case diagram and descriptions to make location handling explicit. |
+| 27/10/25 | 4.5 | Updated the dependency diagram to include Google Maps API on the frontend alongside Firebase. |
+| 13/10/25 | 3.7 | Replaced vague non-functional requirements with specific, measurable statements. |
 
 
 ## 2. Project Description
@@ -206,187 +208,175 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 <a name="nfr1"></a>
 
 1. **Recognition Latency**
-    - **Description**: The app must return wildlife recognition results within ≤ 10 seconds for [alomst] all scans.
+    - **Description**: The app must return wildlife recognition results within ≤ 10 seconds for almost all scans.
     - **Justification**: Real-time wildlife identification is a core value proposition; if results take too long, the app feels unusable in outdoor/field settings. The 10-second threshold balances API response times, network variability, and user patience. (https://www.nngroup.com/articles/response-times-3-important-limits/)
+<a name="nfr2"></a>
+
 2. **UI/UX Accessibility**
-    - **Description**: The apps UI/UX should be easily accessible for [almost] all our users.
-    - **Justification**: The goal of this app is to provide a simplified, easy way for users to scan, keep track of and learn about different wildlife they come across. So our UI/UX should be accessible to a wide range of users. (https://www.freecodecamp.org/news/why-accessibility-matters-in-ui-ux-design/).
+    - **Description**: The app’s UI/UX should be usable and accessible for the vast majority of our diverse user base, including new hikers and experienced researchers.
+    - **Justification**: The goal of this app is to provide a simplified, intuitive way for users to scan, keep track of, and learn about wildlife they encounter, so the UI must be inclusive. (https://www.freecodecamp.org/news/why-accessibility-matters-in-ui-ux-design/).
+<a name="nfr3"></a>
+
 3. **Privacy & Data Protection**
     - **Description**: All personal data (friend lists, catalog entries, location metadata) must be stored securely in the cloud database with encryption. Users must be able to delete all their data upon account removal.
-    - **Justification**: We have to made sure the application is complient with canadian data protection laws (https://www.priv.gc.ca/en/privacy-topics/privacy-laws-in-canada/the-personal-information-protection-and-electronic-documents-act-pipeda/pipeda_brief/). This means only data from a user that is absolutly neccessary is collected and a user can delete all their data from the app at any time.
+    - **Justification**: We must comply with Canadian data protection laws such as PIPEDA (https://www.priv.gc.ca/en/privacy-topics/privacy-laws-in-canada/the-personal-information-protection-and-electronic-documents-act-pipeda/pipeda_brief/) by collecting only necessary data and providing a complete deletion flow.
 
 ---
 
 ## 4. Designs Specification
 ### **4.1. Main Components**
 1. **Species Identification**
-    - **Purpose**: Receives an uploaded photo and returns the most likely species with confidence scores and metadata. It abstracts over multiple image recognition APIs.
-    - **Interfaces**: 
-        1. **POST /api/recognition**
-            - **Purpose**: Accepts an image from the client and returns species predictions with confidence and metadata.
-            - **Parameters**: file image (The uploaded image file).
-            - **Returns**: 
-            {
-                "message": "Species recognized successfully",
-                "data": {
-                    "species": {
-                        "id": 12345,
-                        "scientificName": "Corvus brachyrhynchos",
-                        "commonName": "American Crow",
-                        "rank": "species",
-                        "taxonomy": "Aves",
-                        "wikipediaUrl": "https://en.wikipedia.org/wiki/American_crow",
-                        "imageUrl": "https://..."
-                    },
-                    "confidence": 0.91,
-                    "alternatives": [
-                    {
-                        "scientificName": "...",
-                        "commonName": "...",
-                        "confidence": 0.42
-                    }
-                    ]
-                }
-            }
-        2. **Recognition Result recognizeFromUrl(imageUrl: string)**
-            - **Purpose**: Internal server method that queries iNatuarlist and zylalabs and returns more confident result.
-            - **Parameters**: Image image
-            - **Returns**: 
-            {
-                "message": "Species recognized successfully",
-                "data": {
-                    "species": {
-                        "id": 12345,
-                        "scientificName": "Corvus brachyrhynchos",
-                        "commonName": "American Crow",
-                        "rank": "species",
-                        "taxonomy": "Aves",
-                        "wikipediaUrl": "https://en.wikipedia.org/wiki/American_crow",
-                        "imageUrl": "https://..."
-                    },
-                    "confidence": 0.91,
-                    "alternatives": [
-                    {
-                        "scientificName": "...",
-                        "commonName": "...",
-                        "confidence": 0.42
-                    }
-                    ]
-                }
-            }
-
-2. **Catalog**
-    - **Purpose**: Creates and manages a user’s catalog of sightings, and maintains a list of unique species seen. Keeps domain logic server-side for consistency and offline-friendly syncing; cleaner than pushing all logic to the client.
-    - **Interfaces**: 
-        1. **POST /api/catalogs**
-            - **Purpose**: Adds a new species sighting to the user’s catalog.
-            - **Parameters**: _id, name, description, owner, createdAt, updatedAt, entries
-            - **Returns**: 
-            {
-                "message": "Entry linked to catalog successfully",
-                "data": {
-                    "catalog": {
-                        "_id": "...",
-                        "name": "Spring Birds",
-                        "description": "...",
-                        "owner": "...",
-                        "createdAt": "...",
-                        "updatedAt": "...",
-                        "entries": [
-                             {
-                            "entry": {
-                                "_id": "...",
-                                "userId": "...",
-                                "speciesId": {
-                                    "_id": "...",
-                                    "scientificName": "Corvus brachyrhynchos",
-                                    "commonName": "American Crow",
-                                     "...": "..."
-                                },
-                                "confidence": 0.91,
-                                "latitude": 49.28,
-                                "longitude": -123.12,
-                                "imageUrl": "/uploads/images/....jpg",
-                                "notes": "Perched on cedar tree",
-                                "createdAt": "...",
-                                "updatedAt": "..."
-                            },
-                            "linkedAt": "2024-05-01T19:30:00.000Z",
-                            "addedBy": "..."
-                        }
-                        ]
-                    }
-                }
-            }
-        2. **GET /api/catalogs/**
-            - **Purpose**: Lists all catalogs owned by the authenticated user.
-            - **Parameters**: Bearer JWT
-            - **Returns**: Array of catalogs with metadata and entry counts.
-
-3. **User**
-    - **Purpose**: Handles user profiles, OAuth login, friends.
+    - **Purpose**: Captures wildlife photos, enriches them with basic context, and transforms raw images into recognised species that downstream catalog and user flows can consume.
     - **Interfaces**:
-        1. **POST /api/auth/signup**
-            - **Purpose**: Register a new user using a Google ID token and return JWT + profile.
-            - **Parameters**: idToken: string
-            - **Returns**:
-            {
-                "message": "User signed up successfully",
-                "data": { "token": "jwt-token", "user": { "_id": "...", "email": "...", "name": "..." } }
-            }
-        2. **POST /api/auth/signin**
-            - **Purpose**: Log in an existing user and return JWT + profile.
-            - **Parameters**: idToken: string
-            - **Returns**:
-            {
-                "message": "User signed up successfully",
-                "data": { "token": "jwt-token", "user": { "_id": "...", "email": "...", "name": "..." } }
-            }
-        3. **GET /api/user/profile**
-            - **Purpose**: Retrieve the authenticated user’s profile.
-            - **Parameters**: Authorization: Bearer <JWT>
-            - **Returns**: User profile object (name, email, stats).
-        4. **POST /api/user/profile**
-            - **Purpose**: Update user profile fields.
-            - **Parameters**: Authorization: Bearer <JWT>, Request Body: { name?, username?, location?, region?, isPublicProfile?, favoriteSpecies?[] }
+        - `POST /api/recognition(image: multipart/form-data, latitude?: number, longitude?: number) -> RecognitionResponse`
+            - **Parameters**: Multipart image upload plus optional latitude/longitude fields from the client.
+            - **Returns**: `RecognitionResponse` JSON describing the predicted species and alternates.
+            - **Description**: Entry point for ad-hoc scans triggered from the mobile client.
+        - `POST /api/recognition/save(image: multipart/form-data, catalogId?: string, latitude?: number, longitude?: number, notes?: string) -> RecognizeAndSaveResponse`
+            - **Parameters**: Same photo payload with optional catalog target and metadata.
+            - **Returns**: JSON payload with persisted catalog entry identifiers and species details.
+            - **Description**: Supports the one-tap recognise-and-store workflow.
+        - `RecognitionResult RecognitionService.recognizeFromUrl(String imageUrl)`
+            - **Parameters**: Publicly reachable image URL generated during upload.
+            - **Returns**: Domain `RecognitionResult` containing species metadata and alternative candidates.
+            - **Description**: Wraps the Zyla Animal Recognition API call with timeout handling and logging.
+        - `SpeciesDocument speciesRepository.findOrCreate(SpeciesDraft draft)`
+            - **Parameters**: Species attributes (scientific/common names, taxonomy, image URL) derived from recognition.
+            - **Returns**: MongoDB species document, reusing previous entries when available.
+            - **Description**: Guarantees consistent species identifiers for catalog entries.
+        - `suspend fun WildlifeApi.recognizeAnimal(MultipartBody.Part image, RequestBody? latitude, RequestBody? longitude): Response<ScanResponse>`
+            - **Parameters**: Binary photo payload and optional coordinate bodies captured on Android.
+            - **Returns**: Retrofit `Response` with the recognition payload.
+            - **Description**: Mobile client call that kicks off the `POST /api/recognition` workflow.
+        - `suspend fun WildlifeApi.recognizeAndSave(MultipartBody.Part image, RequestBody? catalogId, RequestBody? latitude, RequestBody? longitude): Response<RecognizeAndSaveResponse>`
+            - **Parameters**: Photo payload plus optional catalog identifier.
+            - **Returns**: Retrofit `Response` with saved entry details.
+            - **Description**: Invokes the combined recognition-and-persist endpoint when users bypass manual review.
+2. **Catalog**
+    - **Purpose**: Organises recognised sightings into personal or shared catalogs, enriches entries with location data, and keeps collaborators in sync.
+    - **Interfaces**:
+        - `GET /api/catalogs -> CatalogListResponse`
+            - **Parameters**: Authenticated request with `Authorization: Bearer <token>`.
+            - **Returns**: JSON array of catalogs owned by the caller with counts and timestamps.
+            - **Description**: Powers catalog pickers and list screens on the client.
+        - `POST /api/catalogs(name: string, description?: string) -> CatalogResponse`
+            - **Parameters**: JSON body defining catalog `name` and optional `description`.
+            - **Returns**: Newly created catalog object.
+            - **Description**: Allows users to create themed collections for future sightings.
+        - `Catalog CatalogModel.createCatalog(ObjectId ownerId, CatalogDraft payload)`
+            - **Parameters**: Owner id plus validated catalog payload.
+            - **Returns**: Persisted catalog document.
+            - **Description**: Back-end creation path that enforces per-user uniqueness constraints.
+        - `ICatalogEntryLink CatalogEntryLinkModel.linkEntry(ObjectId catalogId, ObjectId entryId, ObjectId addedBy)`
+            - **Parameters**: Catalog, entry, and acting user identifiers.
+            - **Returns**: Link document recording who added the entry and when.
+            - **Description**: Maintains many-to-many relationships for shared catalogs.
+        - `void SocketManager.emitCatalogEntriesUpdated(String catalogId, CatalogEntryLinkResponse[] entries, String triggeredBy)`
+            - **Parameters**: Catalog identifier, updated entries payload, and triggering user id.
+            - **Returns**: None.
+            - **Description**: Broadcasts real-time updates to collaborators via Socket.IO rooms.
+        - `ReverseGeocodeResult? GeocodingService.reverseGeocode(double latitude, double longitude)`
+            - **Parameters**: Latitude and longitude values stored with an entry.
+            - **Returns**: Optional city and province metadata.
+            - **Description**: Uses Google Geocoding to enrich catalog entries with human-readable locations.
+        - `suspend fun RecognitionApi.getRecentEntries(limit: Int = 10): Response<ApiResponse<RecentEntriesResponse>>`
+            - **Parameters**: Optional limit controlling how many entries to fetch.
+            - **Returns**: Retrofit `Response` containing recently catalogued sightings.
+            - **Description**: Supplies the activity feed that surfaces catalog changes on Android.
+3. **User**
+    - **Purpose**: Authenticates users, manages profiles, and coordinates social interactions such as friend requests, recommendations, and notifications.
+    - **Interfaces**:
+        - `POST /api/auth/signup(idToken: string) -> AuthResponse`
+            - **Parameters**: JSON body containing the Google `idToken`.
+            - **Returns**: Response with JWT `token` and initial profile fields.
+            - **Description**: Registers new accounts based on Google identity.
+        - `POST /api/auth/signin(idToken: string) -> AuthResponse`
+            - **Parameters**: Google `idToken`.
+            - **Returns**: Same `AuthResponse` schema as signup.
+            - **Description**: Issues application sessions for returning users.
+        - `AuthResult AuthService.signInWithGoogle(String idToken)`
+            - **Parameters**: Verified Google token.
+            - **Returns**: Domain result bundling MongoDB user and JWT.
+            - **Description**: Server-side helper used by both sign-in and sign-up controllers.
+        - `GET /api/user/profile -> GetProfileResponse`
+            - **Parameters**: Authenticated request headers.
+            - **Returns**: JSON payload with the user’s profile data.
+            - **Description**: Supports profile screens and cached identity state on the client.
+        - `POST /api/user/profile(UpdateProfileRequest body) -> GetProfileResponse`
+            - **Parameters**: JSON body with mutable profile fields (name, username, location, etc.).
             - **Returns**: Updated profile object.
-        5. **DELETE /api/user/profile**
-            - **Purpose**: Permanently delete the user’s account.
-            - **Parameters**: Authorization: Bearer <JWT>
-            - **Returns**: { "message": "User deleted successfully" }
+            - **Description**: Lets users edit public information and notification preferences.
+        - `DELETE /api/user/profile -> { message: string }`
+            - **Parameters**: Authenticated request.
+            - **Returns**: Confirmation message.
+            - **Description**: Triggers full account deletion, including catalog data and friendships.
+        - `POST /api/friends/requests({ addresseeId: string }) -> ApiResponse<Void>`
+            - **Parameters**: Target user id in the JSON body.
+            - **Returns**: Envelope confirming the request.
+            - **Description**: Entry point for sending new friend invitations.
+        - `GET /api/friends/recommendations(limit?: number) -> ApiResponse<FriendRecommendationsResponse>`
+            - **Parameters**: Optional limit query.
+            - **Returns**: Recommendation list with mutual species and proximity metadata.
+            - **Description**: Backs the friend recommendations tab in the app.
+        - `IFriendship FriendshipModel.createRequest(ObjectId requesterId, ObjectId addresseeId)`
+            - **Parameters**: Requester and addressee identifiers.
+            - **Returns**: Newly created friendship document.
+            - **Description**: Persists friend requests and seeds notification workflows.
+        - `IFriendship? FriendshipModel.updateRequestStatus(ObjectId requestId, FriendshipStatus status)`
+            - **Parameters**: Request id and the new status value.
+            - **Returns**: Updated friendship or `null` if not found.
+            - **Description**: Centralises transitions for accept/decline flows.
+        - `suspend fun FriendApi.sendFriendRequest(SendFriendRequestBody body): Response<ApiResponse<Void>>`
+            - **Parameters**: Kotlin data class containing the target user id.
+            - **Returns**: Retrofit `Response` mirroring the REST endpoint.
+            - **Description**: View models call this to create outgoing invitations.
+        - `suspend fun FriendApi.getFriendRecommendations(Int? limit): Response<ApiResponse<FriendRecommendationsResponse>>`
+            - **Parameters**: Optional limit integer.
+            - **Returns**: Retrofit `Response` with recommendation data.
+            - **Description**: Populates the recommendation UI state in `FriendViewModel`.
+        - `Promise<string> FirebaseMessaging.send(Message message)`
+            - **Parameters**: Firebase message with recipient token plus notification payload.
+            - **Returns**: Message id string.
+            - **Description**: Sends push notifications for friend requests, catalog shares, and other social alerts.
 
 
 
 ### **4.2. Databases**
-**MySQL (self-hosted on cloud VM)**
-    - **Purpose**: Primary relational store: `users`, `sessions`, `friends`, `species`, `sightings`, `photos`. Chosen over MongoDB to benefit from strong relational integrity for joins (e.g., user<-->sightings, species<-->sightings).
+**MongoDB + Mongoose ODM**
+    - **Purpose**: Primary document store for `users`, `species`, `catalogs`, `entries`, `friendships`, and share invitations. Schemas encode indexes for lookups (owner, status, species) while keeping the flexibility needed for evolving recognition metadata. Mongoose models (e.g., `catalogModel`, `friendshipModel`) centralise validation and lifecycle hooks.
 
 
 ### **4.3. External Modules**
-1. **iNaturalist / Pl@ntNet / Kindwise (image Recognition APIs)**
-    - **Purpose**: Perform image-based species identification and return candidate species with scores; we normalize these to a unified schema. We believe domain-trained models outperform generic vision APIs; avoids training our own model within course scope.
-2. **Google Map**
-    - **Purpose**: Display and record locations. Mature SDKs, reliable tiles, and strong mobile support.
+1. **Zyla Animal Recognition API**
+    - **Purpose**: Performs wildlife classification from still images; the backend streams uploads to this API and normalises the response into our `RecognitionResult` type.
+2. **Google Maps Platform (Maps Compose + Geocoding API)**
+    - **Purpose**: Displays map overlays in the Android client and translates coordinates into city/province metadata through the Geocoding REST endpoint.
 3. **Firebase Cloud Messaging**
-    - **Purpose**: Push notifications for friend requests and catalog sharing.
-4. **Google Authentication**
-    - **Purpose**: Create accounts and manage login.
+    - **Purpose**: Delivers push notifications for friend invitations, catalog shares, and real-time updates when collaborators add entries.
+4. **Google Identity Services**
+    - **Purpose**: Supplies Google Sign-In on Android and server-side token verification so we can authenticate users without storing passwords.
 
 
 
 ### **4.4. Frameworks**
-1. **Android (Kotlin) + Jetpack Compose + CameraX**
-    - **Purpose**: Native UI and camera capture that meet course constraints; Compose for UI, CameraX for image acquisition.
-    - **Reason**: Compliant to syllabus.
-2. **Node.js (TypeScript) + Express**
-    - **Purpose**: Implement the RESTful APIs with typing and middleware ecosystem.
-    - **Reason**: Compliant to syllabus, easy to test and deploy.
-3. **Azure Virtual Machine (Ubuntu) + Docker**
-    - **Purpose**: Cloud deployment of the Node/TS services and MySQL database on a self-managed VM; Nginx for TLS termination and static photo serving.
-    - **Reason**: Cloud is required and free Azure service can be requested from course staff. Docker simplifies reproducible grading.
-4. **GitHub Actions**
-    - **Purpose**: Build/test pipelines for Android app and Node back end; push Docker images and perform zero-downtime deploys.
-    - **Reason**: Streamlines deployment, improves efficiency.
+1. **Android Jetpack Stack (Kotlin, Compose, Hilt, CameraX, Coroutines)**
+    - **Purpose**: Compose renders the reactive UI, CameraX captures photos, Hilt wires view models/repositories, and Coroutines keep network calls off the main thread.
+    - **Reason**: Delivers a modern, testable Android architecture that meets the course’s native-app requirement.
+2. **Retrofit 2 + OkHttp**
+    - **Purpose**: Generates type-safe HTTP clients for the Android app, handles multipart uploads, and centralises auth header management.
+    - **Reason**: Simplifies calling our REST APIs and external services from Kotlin with minimal boilerplate.
+3. **Node.js 20 + Express 4 + Socket.IO**
+    - **Purpose**: Express hosts REST endpoints, Socket.IO streams real-time catalog updates, and native ES modules keep the stack lightweight.
+    - **Reason**: Matches the team’s experience, has rich middleware support, and integrates cleanly with TypeScript tooling.
+4. **TypeScript + Zod + Mongoose**
+    - **Purpose**: TypeScript enforces compile-time contracts, Zod validates request payloads, and Mongoose maps MongoDB collections to strongly-typed models.
+    - **Reason**: Prevents runtime schema drift and codifies validation logic alongside the data layer.
+5. **Docker + Docker Compose**
+    - **Purpose**: Packages the backend, MongoDB, and supporting services for local development and deployment parity.
+    - **Reason**: Provides reproducible environments and one-command startup for testers.
+6. **GitHub Actions**
+    - **Purpose**: Automates linting, builds, and container pushes for both Android and backend projects.
+    - **Reason**: Gives the team consistent CI feedback before merging changes.
 
 
 ### **4.5. Dependencies Diagram**
@@ -394,22 +384,22 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 ![dependencies_diagram](images/CPEN321M2-DependencyDiagramV2.drawio.png)
 
 ### **4.6. Use Case Sequence Diagram (5 Most Major Use Cases)**
-1. [**Get Picture**](#uc1)\
+1. [**Get Picture**](#uc1) — Android Client uses CameraX to capture an image and stage metadata before invoking `WildlifeApi.recognizeAnimal`.\
 ![sequence_diagram1](images/getPicture.png)
-2. [**Scan Picture**](#uc1)\
+2. [**Scan Picture**](#uc2) — The mobile app calls `POST /api/recognition`, which triggers `RecognitionService.recognizeFromUrl` and the Zyla API adapter.\
 ![sequence_diagram2](images/scanPicture.png)
-3. [**Catalog Scanned Picture**](#uc1)\
+3. [**Catalog Scanned Picture**](#uc3) — Recognition results flow into `CatalogEntryLinkModel.linkEntry` so the catalog gains the new observation.\
 ![sequence_diagram3](images/catalogScannedPicture.png)
-4. [**Add Friends**](#uc1)\
+4. [**Add Friends**](#uc4) — Friend requests travel through `FriendApi.sendFriendRequest` to `FriendshipModel.createRequest`, emitting an FCM notification.\
 ![sequence_diagram4](images/addFriends.png)
-5. [**Share Scanned Picture**](#uc1)\
+5. [**Share Scanned Picture**](#uc5) — Sharing a photo updates collaborators via `SocketManager.emitCatalogEntriesUpdated` and notifies them through FCM.\
 ![sequence_diagram5](images/shareScannedPicture.png)
 
 
 ### **4.7. Design and Ways to Test Non-Functional Requirements**
 1. [**Recognition Latency**](#nfr1)
-    - **Validation**: The backend uses asynchronous Express routes with non-blocking I/O to ensure fast responses. We can test the total response time between image upload and recognition result using Postman load tests
-2. [**UI/UX Accessibility**](#nfr1)
-    - **Validation**: The frontend uses semantic UI elements and and clear color contrast. We can perform user testing to ensure key tasks remain intuitive and consistent.
-3. [**Privacy & Data Protection**](#nfr1)
-    - **Validation**: JWT tokens secure user sessions, and Google OAuth 2.0 ensures authentication without storing raw passwords. The backend provides a dedicated /api/user/profile (DELETE) endpoint to permanently remove user data, complying with PIPEDA principles.
+    - **Implementation**: `RecognitionService.recognizeFromUrl` streams images to the Zyla API with axios’ async pipeline, enforces a 30s timeout, and persists species via `speciesRepository.findOrCreate` so repeat recognitions reuse cached metadata. On the client, `CameraScreen` compresses captures to JPEG before Retrofit uploads, trimming payload size to keep end-to-end latency below the 10 s budget.
+2. [**UI/UX Accessibility**](#nfr2)
+    - **Implementation**: Compose screens rely on Material 3 components, typography scales, and `stringResource` labels, while `FriendViewModel` exposes loading/error state through `StateFlow` so each screen shows progress indicators and retry actions compatible with TalkBack and large-font settings.
+3. [**Privacy & Data Protection**](#nfr3)
+    - **Implementation**: `AuthService.signInWithGoogle` validates Google ID tokens and issues short-lived JWTs that `authenticateToken` requires for every catalog, recognition, and friend route, preventing unauthorised access. When a user invokes `DELETE /api/user/profile`, `UserController.deleteProfile` calls `friendshipModel.deleteAllForUser` and `userModel.delete` to remove their data and disconnect friends, aligning with the deletion guarantees.
