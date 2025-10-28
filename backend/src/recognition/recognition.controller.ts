@@ -174,6 +174,7 @@ export class RecognitionController {
       const savedImage = saveUploadedFile(req.file, 'images');
 
       const absoluteImageUrl = buildAccessibleImageUrl(savedImage.relativePath, req);
+      logger.info('Invoking recognition service with image URL', { absoluteImageUrl });
 
       const recognitionResult = await recognitionService.recognizeFromUrl(absoluteImageUrl);
 
