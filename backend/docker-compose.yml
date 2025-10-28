@@ -26,6 +26,8 @@ services:
       - "${PORT}:${PORT}"
     depends_on:
       - mongo
+    volumes:
+      - ./firebase-adminsdk.json:/app/firebase-adminsdk.json:ro
     command: npm start
 
 
