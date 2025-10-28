@@ -76,20 +76,6 @@ const buildAccessibleImageUrl = (relativePath: string, req: Request): string => 
   return absoluteUrl;
 };
 
-const deleteFileIfExists = (filePath: string): void => {
-  if (!filePath) {
-    return;
-  }
-
-  try {
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-  } catch (error) {
-    logger.warn('Failed to delete temporary file', { filePath, error });
-  }
-};
-
 export class RecognitionController {
   /**
    * POST /api/recognition
@@ -115,37 +101,27 @@ export class RecognitionController {
 
       logger.info('Processing image recognition request');
 
-      let tempFile:
-        | { fullPath: string; relativePath: string; filename: string }
-        | undefined;
+      let recognitionResult;
 
-      try {
-        let recognitionResult;
-
-        if (imageUrl) {
-          recognitionResult = await recognitionService.recognizeFromUrl(imageUrl);
-        } else {
-          if (!req.file) {
-            return res.status(400).json({
-              message: 'Provide an image file or an imageUrl to perform recognition.',
-            });
-          }
-
-          tempFile = saveUploadedFile(req.file, 'tmp');
-          const absoluteUrl = buildAccessibleImageUrl(tempFile.relativePath, req);
-
-          recognitionResult = await recognitionService.recognizeFromUrl(absoluteUrl);
+      if (imageUrl) {
+        recognitionResult = await recognitionService.recognizeFromUrl(imageUrl);
+      } else {
+        if (!req.file) {
+          return res.status(400).json({
+            message: 'Provide an image file or an imageUrl to perform recognition.',
+          });
         }
 
-        return res.status(200).json({
-          message: 'Species recognized successfully',
-          data: recognitionResult,
-        });
-      } finally {
-        if (tempFile) {
-          deleteFileIfExists(tempFile.fullPath);
-        }
+        const savedImage = saveUploadedFile(req.file, 'tmp');
+        const absoluteUrl = buildAccessibleImageUrl(savedImage.relativePath, req);
+
+        recognitionResult = await recognitionService.recognizeFromUrl(absoluteUrl);
       }
+
+      return res.status(200).json({
+        message: 'Species recognized successfully',
+        data: recognitionResult,
+      });
     } catch (error) {
       logger.error('Error in recognizeImage controller:', error);
 
@@ -196,24 +172,22 @@ export class RecognitionController {
       const longitude = parseCoordinate(rawLongitude);
 
       const savedImage = saveUploadedFile(req.file, 'images');
-      let retainImageOnDisk = false;
 
-      try {
-        const absoluteImageUrl = buildAccessibleImageUrl(savedImage.relativePath, req);
+      const absoluteImageUrl = buildAccessibleImageUrl(savedImage.relativePath, req);
 
-        const recognitionResult = await recognitionService.recognizeFromUrl(absoluteImageUrl);
+      const recognitionResult = await recognitionService.recognizeFromUrl(absoluteImageUrl);
 
-        const species = await speciesRepository.findOrCreate({
-          inaturalistId: recognitionResult.species.id,
-          scientificName: recognitionResult.species.scientificName,
-          commonName: recognitionResult.species.commonName,
-          rank: recognitionResult.species.rank,
-          taxonomy: recognitionResult.species.taxonomy,
-          wikipediaUrl: recognitionResult.species.wikipediaUrl,
-          imageUrl: recognitionResult.species.imageUrl,
-        });
+      const species = await speciesRepository.findOrCreate({
+        inaturalistId: recognitionResult.species.id,
+        scientificName: recognitionResult.species.scientificName,
+        commonName: recognitionResult.species.commonName,
+        rank: recognitionResult.species.rank,
+        taxonomy: recognitionResult.species.taxonomy,
+        wikipediaUrl: recognitionResult.species.wikipediaUrl,
+        imageUrl: recognitionResult.species.imageUrl,
+      });
 
-        const imageHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+      const imageHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
 
         let catalogToLink: { _id: mongoose.Types.ObjectId } | null = null;
         if (catalogId) {
@@ -274,7 +248,6 @@ export class RecognitionController {
             });
 
             isNewEntry = true;
-            retainImageOnDisk = true;
           } catch (creationError) {
             if ((creationError as { code?: number }).code === 11000) {
               catalogEntry = await catalogRepository.findByHash(
@@ -296,10 +269,6 @@ export class RecognitionController {
           return res.status(500).json({
             message: 'Failed to save catalog entry',
           });
-        }
-
-        if (!isNewEntry) {
-          deleteFileIfExists(savedImage.fullPath);
         }
 
         let linkedCatalogId: mongoose.Types.ObjectId | undefined;
@@ -378,11 +347,6 @@ export class RecognitionController {
             linkedCatalogId,
           },
         });
-      } finally {
-        if (!retainImageOnDisk) {
-          deleteFileIfExists(savedImage.fullPath);
-        }
-      }
     } catch (error) {
       logger.error('Error in recognizeAndSave controller:', error);
       next(error);
