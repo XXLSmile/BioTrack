@@ -13,13 +13,17 @@ interface WildlifeApi {
     @Multipart
     @POST("recognition")
     suspend fun recognizeAnimal(
-        @Part image: MultipartBody.Part
+        @Part image: MultipartBody.Part,
+        @Part("latitude") latitude: RequestBody? = null,
+        @Part("longitude") longitude: RequestBody? = null
     ): Response<ScanResponse>
 
     @Multipart
     @POST("recognition/save")
     suspend fun recognizeAndSave(
         @Part image: MultipartBody.Part,
-        @Part("catalogId") catalogId: RequestBody?
+        @Part("catalogId") catalogId: RequestBody?,
+        @Part("latitude") latitude: RequestBody? = null,
+        @Part("longitude") longitude: RequestBody? = null
     ): Response<RecognizeAndSaveResponse>
 }

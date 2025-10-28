@@ -2,8 +2,11 @@
 
 package com.cpen321.usermanagement.ui.screens
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.location.Location
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import coil.compose.rememberAsyncImagePainter
 import com.cpen321.usermanagement.data.remote.api.RetrofitClient
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
@@ -36,6 +40,12 @@ import java.io.File
 import java.io.FileOutputStream
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.cpen321.usermanagement.data.remote.dto.ScanResponse
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import kotlinx.coroutines.tasks.await
+import android.annotation.SuppressLint
 
 
 @Composable
@@ -48,9 +58,26 @@ fun CameraScreen(
     val profileViewModel: ProfileViewModel = hiltViewModel()
     val catalogShareViewModel: CatalogShareViewModel = hiltViewModel()
     val shareUiState by catalogShareViewModel.uiState.collectAsState()
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    var currentLocation by remember { mutableStateOf<Location?>(null) }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (granted) {
+            scope.launch {
+                currentLocation = fetchCurrentLocation(fusedLocationClient)
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         catalogShareViewModel.loadSharedWithMe()
+        if (hasLocationPermission(context)) {
+            currentLocation = fetchCurrentLocation(fusedLocationClient)
+        }
     }
 
     val additionalCatalogOptions = remember(shareUiState.sharedCatalogs) {
@@ -138,10 +165,26 @@ fun CameraScreen(
 
             Button(
                 onClick = {
+                    val hasPermission = hasLocationPermission(context)
+                    if (!hasPermission) {
+                        locationPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            )
+                        )
+                        resultText = "Grant location permission to attach coordinates."
+                        return@Button
+                    }
+
                     imageUri?.let { uri ->
                         scope.launch {
+                            val locationToUse = currentLocation ?: fetchCurrentLocation(fusedLocationClient).also {
+                                currentLocation = it
+                            }
+
                             resultText = "Recognizing..."
-                            val (message, response) = recognizeImage(context, uri)
+                            val (message, response) = recognizeImage(context, uri, locationToUse)
                             resultText = message
                             recognitionResult = response
                             showCatalogDialog = response != null
@@ -188,7 +231,20 @@ fun CameraScreen(
                 }
                 isSaving = true
                 scope.launch {
-                    val (success, message) = saveRecognitionToCatalog(context, uriToSave, catalogId)
+                    val locationToUse = if (hasLocationPermission(context)) {
+                        currentLocation ?: fetchCurrentLocation(fusedLocationClient).also {
+                            currentLocation = it
+                        }
+                    } else {
+                        currentLocation
+                    }
+
+                    val (success, message) = saveRecognitionToCatalog(
+                        context,
+                        uriToSave,
+                        catalogId,
+                        locationToUse
+                    )
                     resultText = message
                     if (success) {
                         showCatalogDialog = false
@@ -221,14 +277,17 @@ private fun saveBitmapToCache(context: Context, bitmap: Bitmap): Uri {
 
 private suspend fun recognizeImage(
     context: Context,
-    uri: Uri
+    uri: Uri,
+    location: Location?
 ): Pair<String, ScanResponse?> {
     var tempFile: File? = null
     return try {
         val (imagePart, file) = createImagePart(context, uri)
         tempFile = file
+        val latitudeBody = location?.latitude?.toTextRequestBody()
+        val longitudeBody = location?.longitude?.toTextRequestBody()
         val response = withContext(Dispatchers.IO) {
-            RetrofitClient.wildlifeApi.recognizeAnimal(imagePart)
+            RetrofitClient.wildlifeApi.recognizeAnimal(imagePart, latitudeBody, longitudeBody)
         }
 
         if (response.isSuccessful) {
@@ -252,16 +311,24 @@ private suspend fun recognizeImage(
 private suspend fun saveRecognitionToCatalog(
     context: Context,
     uri: Uri,
-    catalogId: String
+    catalogId: String,
+    location: Location?
 ): Pair<Boolean, String> {
     var tempFile: File? = null
     return try {
         val (imagePart, file) = createImagePart(context, uri)
         tempFile = file
         val catalogIdBody = catalogId.toRequestBody("text/plain".toMediaTypeOrNull())
+        val latitudeBody = location?.latitude?.toTextRequestBody()
+        val longitudeBody = location?.longitude?.toTextRequestBody()
 
         val response = withContext(Dispatchers.IO) {
-            RetrofitClient.wildlifeApi.recognizeAndSave(imagePart, catalogIdBody)
+            RetrofitClient.wildlifeApi.recognizeAndSave(
+                imagePart,
+                catalogIdBody,
+                latitudeBody,
+                longitudeBody
+            )
         }
 
         if (response.isSuccessful) {
@@ -314,3 +381,38 @@ private fun formatRecognitionMessage(response: ScanResponse): String {
         "⚠️ No species identified. Try again!"
     }
 }
+
+private fun hasLocationPermission(context: Context): Boolean {
+    val fineGranted = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+    val coarseGranted = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_COARSE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+    return fineGranted || coarseGranted
+}
+
+@SuppressLint("MissingPermission")
+private suspend fun fetchCurrentLocation(
+    client: FusedLocationProviderClient
+): Location? {
+    return try {
+        val tokenSource = CancellationTokenSource()
+        try {
+            client.getCurrentLocation(
+                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                tokenSource.token
+            ).await()
+                ?: client.lastLocation.await()
+        } finally {
+            tokenSource.cancel()
+        }
+    } catch (exception: Exception) {
+        null
+    }
+}
+
+private fun Double.toTextRequestBody() =
+    toString().toRequestBody("text/plain".toMediaTypeOrNull())
