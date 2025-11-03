@@ -20,6 +20,6 @@ export interface RecognitionResult {
 // Request/response types
 export interface RecognitionImageResponse {
   message: string;
-  data?: RecognitionResult | any;
+  data?: RecognitionResult | unknown;
   available?: boolean;
 }

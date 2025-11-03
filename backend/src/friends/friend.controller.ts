@@ -634,7 +634,7 @@ export class FriendController {
         // Send FCM notification to requester if they have an FCM token
         if (requesterUser?.fcmToken) {
           try {
-            let message : any = {
+            const message = {
               token: requesterUser.fcmToken,
               notification: {
                 title: "Friend Request Accepted ✅",

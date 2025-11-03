@@ -12,11 +12,10 @@ const router = Router();
 
 router.use(authenticateToken);
 
-type ReqOf<T> = T extends (req: infer Req, res: any, next: any) => any ? Req : never;
-type ResOf<T> = T extends (req: any, res: infer Res, next: any) => any ? Res : never;
-
-const wrapController = <T extends (req: any, res: any, next: NextFunction) => any>(fn: T) => {
-  return (req: ReqOf<T>, res: ResOf<T>, next: NextFunction): void => {
+const wrapController = <Req, Res>(
+  fn: (req: Req, res: Res, next: NextFunction) => unknown
+) => {
+  return (req: Req, res: Res, next: NextFunction): void => {
     const maybePromise = fn(req, res, next);
     if (maybePromise && typeof (maybePromise as Promise<unknown>).catch === 'function') {
       void (maybePromise as Promise<unknown>).catch(next);
