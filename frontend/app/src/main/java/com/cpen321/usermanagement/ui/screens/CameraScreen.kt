@@ -174,20 +174,19 @@ fun CameraScreen(
                             )
                         )
                         resultText = "Grant location permission to attach coordinates."
-                        return@Button
-                    }
+                    } else {
+                        imageUri?.let { uri ->
+                            scope.launch {
+                                val locationToUse = currentLocation ?: fetchCurrentLocation(fusedLocationClient).also {
+                                    currentLocation = it
+                                }
 
-                    imageUri?.let { uri ->
-                        scope.launch {
-                            val locationToUse = currentLocation ?: fetchCurrentLocation(fusedLocationClient).also {
-                                currentLocation = it
+                                resultText = "Recognizing..."
+                                val (message, response) = recognizeImage(context, uri, locationToUse)
+                                resultText = message
+                                recognitionResult = response
+                                showCatalogDialog = response != null
                             }
-
-                            resultText = "Recognizing..."
-                            val (message, response) = recognizeImage(context, uri, locationToUse)
-                            resultText = message
-                            recognitionResult = response
-                            showCatalogDialog = response != null
                         }
                     }
                 },
@@ -223,37 +222,38 @@ fun CameraScreen(
             viewModel = viewModel,
             isSaving = isSaving,
             onSave = { catalogId ->
-                if (isSaving) return@AddToCatalogDialog
-                val uriToSave = imageUri
-                if (uriToSave == null) {
-                    resultText = "⚠️ Select an image before saving."
-                    return@AddToCatalogDialog
-                }
-                isSaving = true
-                scope.launch {
-                    val locationToUse = if (hasLocationPermission(context)) {
-                        currentLocation ?: fetchCurrentLocation(fusedLocationClient).also {
-                            currentLocation = it
-                        }
+                if (!isSaving) {
+                    val uriToSave = imageUri
+                    if (uriToSave == null) {
+                        resultText = "⚠️ Select an image before saving."
                     } else {
-                        currentLocation
-                    }
+                        isSaving = true
+                        scope.launch {
+                            val locationToUse = if (hasLocationPermission(context)) {
+                                currentLocation ?: fetchCurrentLocation(fusedLocationClient).also {
+                                    currentLocation = it
+                                }
+                            } else {
+                                currentLocation
+                            }
 
-                    val (success, message) = saveRecognitionToCatalog(
-                        context,
-                        uriToSave,
-                        catalogId,
-                        locationToUse
-                    )
-                    resultText = message
-                    if (success) {
-                        showCatalogDialog = false
-                        recognitionResult = null
-                        imageUri = null
-                        viewModel.loadCatalogs()
-                        profileViewModel.refreshStats()
+                            val (success, message) = saveRecognitionToCatalog(
+                                context,
+                                uriToSave,
+                                catalogId,
+                                locationToUse
+                            )
+                            resultText = message
+                            if (success) {
+                                showCatalogDialog = false
+                                recognitionResult = null
+                                imageUri = null
+                                viewModel.loadCatalogs()
+                                profileViewModel.refreshStats()
+                            }
+                            isSaving = false
+                        }
                     }
-                    isSaving = false
                 }
             },
             onDismiss = {

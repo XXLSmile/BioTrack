@@ -192,20 +192,24 @@ fun MainScreen(
                 viewModel = catalogViewModel,
                 isSaving = isDialogProcessing,
                 onSave = { catalogId ->
-                    val entryId = selectedEntry?.entry?._id ?: return@AddToCatalogDialog
-                    isDialogProcessing = true
-                    detailErrorMessage = null
-                    catalogViewModel.addEntryToCatalog(catalogId, entryId, null) { success, error ->
-                        isDialogProcessing = false
-                        if (success) {
-                            showAddDialog = false
-                            mainViewModel.loadRecentObservations()
-                            profileViewModel.refreshStats()
-                            coroutineScope.launch {
-                                snackBarHostState.showSnackbar("Observation added to catalog")
+                    val entryId = selectedEntry?.entry?._id
+                    if (entryId == null) {
+                        detailErrorMessage = "Observation unavailable"
+                    } else {
+                        isDialogProcessing = true
+                        detailErrorMessage = null
+                        catalogViewModel.addEntryToCatalog(catalogId, entryId, null) { success, error ->
+                            isDialogProcessing = false
+                            if (success) {
+                                showAddDialog = false
+                                mainViewModel.loadRecentObservations()
+                                profileViewModel.refreshStats()
+                                coroutineScope.launch {
+                                    snackBarHostState.showSnackbar("Observation added to catalog")
+                                }
+                            } else {
+                                detailErrorMessage = error ?: "Failed to add observation to catalog"
                             }
-                        } else {
-                            detailErrorMessage = error ?: "Failed to add observation to catalog"
                         }
                     }
                 },

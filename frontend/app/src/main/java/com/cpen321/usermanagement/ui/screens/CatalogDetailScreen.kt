@@ -207,18 +207,22 @@ fun CatalogDetailScreen(
             viewModel = viewModel,
             isSaving = isActionInProgress,
             onSave = { targetCatalogId ->
-                val entryId = selectedEntry?.entry?._id ?: return@AddToCatalogDialog
-                isActionInProgress = true
-                detailErrorMessage = null
-                viewModel.addEntryToCatalog(targetCatalogId, entryId, currentCatalogId) { success, error ->
-                    isActionInProgress = false
-                    if (success) {
-                        showAddDialog = false
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Observation added to catalog")
+                val entryId = selectedEntry?.entry?._id
+                if (entryId == null) {
+                    detailErrorMessage = "Observation unavailable"
+                } else {
+                    isActionInProgress = true
+                    detailErrorMessage = null
+                    viewModel.addEntryToCatalog(targetCatalogId, entryId, currentCatalogId) { success, error ->
+                        isActionInProgress = false
+                        if (success) {
+                            showAddDialog = false
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Observation added to catalog")
+                            }
+                        } else {
+                            detailErrorMessage = error ?: "Failed to add observation to catalog"
                         }
-                    } else {
-                        detailErrorMessage = error ?: "Failed to add observation to catalog"
                     }
                 }
             },
@@ -265,21 +269,21 @@ fun CatalogDetailScreen(
                         if (catalogId == null) {
                             detailErrorMessage = "Catalog unavailable"
                             pendingAction = null
-                            return@ConfirmEntryActionDialog
-                        }
-                        isActionInProgress = true
-                        detailErrorMessage = null
-                        viewModel.removeEntryFromCatalog(catalogId, entryId) { success, error ->
-                            isActionInProgress = false
-                            pendingAction = null
-                            if (success) {
-                                selectedEntry = null
-                                showAddDialog = false
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("Observation removed from catalog")
+                        } else {
+                            isActionInProgress = true
+                            detailErrorMessage = null
+                            viewModel.removeEntryFromCatalog(catalogId, entryId) { success, error ->
+                                isActionInProgress = false
+                                pendingAction = null
+                                if (success) {
+                                    selectedEntry = null
+                                    showAddDialog = false
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("Observation removed from catalog")
+                                    }
+                                } else {
+                                    detailErrorMessage = error ?: "Failed to remove observation"
                                 }
-                            } else {
-                                detailErrorMessage = error ?: "Failed to remove observation"
                             }
                         }
                     }
