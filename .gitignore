@@ -60,3 +60,6 @@ DerivedData/
 Thumbs.db
 
 backend/firebase-adminsdk.json
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
