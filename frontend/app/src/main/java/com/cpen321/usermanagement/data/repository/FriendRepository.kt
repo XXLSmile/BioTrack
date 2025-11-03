@@ -41,7 +41,7 @@ class FriendRepository @Inject constructor(
         if (response.isSuccessful) {
             response.body()?.data ?: FriendListResponse(emptyList(), 0)
         } else {
-            throw Exception(response.errorBody()?.string() ?: "Failed to load friends")
+            throw FriendRepositoryException(response.errorBody()?.string() ?: "Failed to load friends")
         }
     }
 
@@ -50,35 +50,35 @@ class FriendRepository @Inject constructor(
         if (response.isSuccessful) {
             response.body()?.data ?: FriendRequestsResponse(emptyList(), 0)
         } else {
-            throw Exception(response.errorBody()?.string() ?: "Failed to load friend requests")
+            throw FriendRepositoryException(response.errorBody()?.string() ?: "Failed to load friend requests")
         }
     }
 
     suspend fun sendFriendRequest(targetUserId: String): Result<Unit> = runCatching {
         val response = friendApi.sendFriendRequest(SendFriendRequestBody(targetUserId))
         if (!response.isSuccessful) {
-            throw Exception(response.errorBody()?.string() ?: "Failed to send friend request")
+            throw FriendRepositoryException(response.errorBody()?.string() ?: "Failed to send friend request")
         }
     }
 
     suspend fun respondToRequest(requestId: String, action: String): Result<Unit> = runCatching {
         val response = friendApi.respondToFriendRequest(requestId, UpdateFriendRequestBody(action))
         if (!response.isSuccessful) {
-            throw Exception(response.errorBody()?.string() ?: "Failed to update friend request")
+            throw FriendRepositoryException(response.errorBody()?.string() ?: "Failed to update friend request")
         }
     }
 
     suspend fun cancelFriendRequest(requestId: String): Result<Unit> = runCatching {
         val response = friendApi.cancelFriendRequest(requestId)
         if (!response.isSuccessful) {
-            throw Exception(response.errorBody()?.string() ?: "Failed to cancel friend request")
+            throw FriendRepositoryException(response.errorBody()?.string() ?: "Failed to cancel friend request")
         }
     }
 
     suspend fun removeFriend(friendshipId: String): Result<Unit> = runCatching {
         val response = friendApi.removeFriend(friendshipId)
         if (!response.isSuccessful) {
-            throw Exception(response.errorBody()?.string() ?: "Failed to remove friend")
+            throw FriendRepositoryException(response.errorBody()?.string() ?: "Failed to remove friend")
         }
     }
 
@@ -87,7 +87,7 @@ class FriendRepository @Inject constructor(
         if (response.isSuccessful) {
             response.body()?.data ?: SearchUsersResponse(emptyList(), 0)
         } else {
-            throw Exception(response.errorBody()?.string() ?: "Failed to search users")
+            throw FriendRepositoryException(response.errorBody()?.string() ?: "Failed to search users")
         }
     }
 
@@ -113,7 +113,7 @@ class FriendRepository @Inject constructor(
                 )
             }
         } else {
-            throw Exception(response.errorBody()?.string() ?: "Failed to load friend recommendations")
+            throw FriendRepositoryException(response.errorBody()?.string() ?: "Failed to load friend recommendations")
         }
     }
 
@@ -130,7 +130,7 @@ class FriendRepository @Inject constructor(
             when (response.code()) {
               403 -> throw PrivateProfileException(message)
               404 -> throw UserNotFoundException(message)
-              else -> throw Exception(message)
+              else -> throw FriendRepositoryException(message)
             }
         }
     }
