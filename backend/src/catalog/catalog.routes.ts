@@ -17,71 +17,72 @@ import {
   UpdateCollaboratorRequest,
 } from './catalogShare.types';
 import { validateBody } from '../validation.middleware';
+import { asyncHandler } from '../utils/asyncHandler';
 
 const router = Router();
 const catalogController = new CatalogController();
 
-router.get('/', catalogController.listCatalogs);
+router.get('/', asyncHandler(catalogController.listCatalogs.bind(catalogController)));
 router.post(
   '/',
   validateBody<CreateCatalogRequest>(createCatalogSchema),
-  catalogController.createCatalog
+  asyncHandler(catalogController.createCatalog.bind(catalogController))
 );
 
 router.get(
   '/shared-with/me',
-  catalogShareController.listSharedWithMe.bind(catalogShareController)
+  asyncHandler(catalogShareController.listSharedWithMe.bind(catalogShareController))
 );
 
 router.get(
   '/share/pending',
-  catalogShareController.listPendingInvitations.bind(catalogShareController)
+  asyncHandler(catalogShareController.listPendingInvitations.bind(catalogShareController))
 );
 
 router.patch(
   '/share/:shareId/respond',
   validateBody<RespondToInvitationRequest>(respondToInvitationSchema),
-  catalogShareController.respondToInvitation.bind(catalogShareController)
+  asyncHandler(catalogShareController.respondToInvitation.bind(catalogShareController))
 );
 
 router.get(
   '/:catalogId',
-  catalogController.getCatalogById
+  asyncHandler(catalogController.getCatalogById.bind(catalogController))
 );
 router.patch(
   '/:catalogId',
   validateBody<UpdateCatalogRequest>(updateCatalogSchema),
-  catalogController.updateCatalog
+  asyncHandler(catalogController.updateCatalog.bind(catalogController))
 );
 router.delete(
   '/:catalogId',
-  catalogController.deleteCatalog
+  asyncHandler(catalogController.deleteCatalog.bind(catalogController))
 );
 
 router.post(
   '/:catalogId/entries/:entryId',
-  catalogController.linkCatalogEntry.bind(catalogController)
+  asyncHandler(catalogController.linkCatalogEntry.bind(catalogController))
 );
 router.delete(
   '/:catalogId/entries/:entryId',
-  catalogController.unlinkCatalogEntry.bind(catalogController)
+  asyncHandler(catalogController.unlinkCatalogEntry.bind(catalogController))
 );
 
 router.get(
   '/:catalogId/share',
-  catalogShareController.listCollaborators.bind(catalogShareController)
+  asyncHandler(catalogShareController.listCollaborators.bind(catalogShareController))
 );
 
 router.post(
   '/:catalogId/share',
   validateBody<InviteCollaboratorRequest>(inviteCollaboratorSchema),
-  catalogShareController.inviteCollaborator.bind(catalogShareController)
+  asyncHandler(catalogShareController.inviteCollaborator.bind(catalogShareController))
 );
 
 router.patch(
   '/:catalogId/share/:shareId',
   validateBody<UpdateCollaboratorRequest>(updateCollaboratorSchema),
-  catalogShareController.updateCollaborator.bind(catalogShareController)
+  asyncHandler(catalogShareController.updateCollaborator.bind(catalogShareController))
 );
 
 export default router;

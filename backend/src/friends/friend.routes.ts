@@ -6,36 +6,37 @@ import {
   respondFriendRequestSchema,
 } from './friend.types';
 import { validateBody } from '../validation.middleware';
+import { asyncHandler } from '../utils/asyncHandler';
 
 const router = Router();
 
 router.use(authenticateToken);
 
-router.get('/', friendController.listFriends.bind(friendController));
+router.get('/', asyncHandler(friendController.listFriends.bind(friendController)));
 
 router.get(
   '/recommendations',
-  friendController.getRecommendations.bind(friendController)
+  asyncHandler(friendController.getRecommendations.bind(friendController))
 );
 
-router.get('/requests', friendController.listRequests.bind(friendController));
+router.get('/requests', asyncHandler(friendController.listRequests.bind(friendController)));
 
 router.post(
   '/requests',
   validateBody(createFriendRequestSchema),
-  friendController.sendRequest.bind(friendController)
+  asyncHandler(friendController.sendRequest.bind(friendController))
 );
 
 router.patch(
   '/requests/:requestId',
   validateBody(respondFriendRequestSchema),
-  friendController.respondToRequest.bind(friendController)
+  asyncHandler(friendController.respondToRequest.bind(friendController))
 );
 
-router.delete('/:friendshipId', friendController.removeFriend.bind(friendController));
+router.delete('/:friendshipId', asyncHandler(friendController.removeFriend.bind(friendController)));
 router.delete(
   '/requests/:requestId',
-  friendController.cancelRequest.bind(friendController)
+  asyncHandler(friendController.cancelRequest.bind(friendController))
 );
 
 export default router;
