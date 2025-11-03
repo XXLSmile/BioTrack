@@ -1,10 +1,29 @@
 import { Router } from 'express';
+import type { NextFunction } from 'express';
 import { recognitionController } from './recognition.controller';
 import { uploadMemory } from '../storage';
 import { authenticateToken } from '../auth/auth.middleware';
-import { asyncHandler } from '../utils/asyncHandler';
 
 const router = Router();
+
+type ReqOf<T> = T extends (req: infer Req, res: any, next: any) => any ? Req : never;
+type ResOf<T> = T extends (req: any, res: infer Res, next: any) => any ? Res : never;
+
+const wrapController = <T extends (req: any, res: any, next: NextFunction) => any>(fn: T) => {
+  return (req: ReqOf<T>, res: ResOf<T>, next: NextFunction): void => {
+    const maybePromise = fn(req, res, next);
+    if (maybePromise && typeof (maybePromise as Promise<unknown>).catch === 'function') {
+      void (maybePromise as Promise<unknown>).catch(next);
+    }
+  };
+};
+
+const recognizeImage = wrapController(recognitionController.recognizeImage.bind(recognitionController));
+const recognizeAndSave = wrapController(recognitionController.recognizeAndSave.bind(recognitionController));
+const getUserCatalog = wrapController(recognitionController.getUserCatalog.bind(recognitionController));
+const getRecentEntries = wrapController(recognitionController.getRecentEntries.bind(recognitionController));
+const getImageFromDatabase = wrapController(recognitionController.getImageFromDatabase.bind(recognitionController));
+const deleteEntry = wrapController(recognitionController.deleteEntry.bind(recognitionController));
 
 /**
  * POST /api/recognition
@@ -13,7 +32,7 @@ const router = Router();
 router.post(
   '/',
   uploadMemory.single('image'),
-  asyncHandler(recognitionController.recognizeImage.bind(recognitionController))
+  recognizeImage
 );
 
 /**
@@ -24,7 +43,7 @@ router.post(
   '/save',
   authenticateToken,
   uploadMemory.single('image'),
-  asyncHandler(recognitionController.recognizeAndSave.bind(recognitionController))
+  recognizeAndSave
 );
 
 /**
@@ -34,13 +53,13 @@ router.post(
 router.get(
   '/catalog',
   authenticateToken,
-  asyncHandler(recognitionController.getUserCatalog.bind(recognitionController))
+  getUserCatalog
 );
 
 router.get(
   '/recent',
   authenticateToken,
-  asyncHandler(recognitionController.getRecentEntries.bind(recognitionController))
+  getRecentEntries
 );
 
 /**
@@ -49,13 +68,13 @@ router.get(
  */
 router.get(
   '/image/:entryId',
-  asyncHandler(recognitionController.getImageFromDatabase.bind(recognitionController))
+  getImageFromDatabase
 );
 
 router.delete(
   '/entry/:entryId',
   authenticateToken,
-  asyncHandler(recognitionController.deleteEntry.bind(recognitionController))
+  deleteEntry
 );
 
 export default router;

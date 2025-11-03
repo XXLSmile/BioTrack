@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { NextFunction } from 'express';
 
 import {
   CreateCatalogRequest,
@@ -17,72 +18,97 @@ import {
   UpdateCollaboratorRequest,
 } from './catalogShare.types';
 import { validateBody } from '../validation.middleware';
-import { asyncHandler } from '../utils/asyncHandler';
 
 const router = Router();
 const catalogController = new CatalogController();
 
-router.get('/', asyncHandler(catalogController.listCatalogs.bind(catalogController)));
+type ReqOf<T> = T extends (req: infer Req, res: any, next: any) => any ? Req : never;
+type ResOf<T> = T extends (req: any, res: infer Res, next: any) => any ? Res : never;
+
+const wrapController = <T extends (req: any, res: any, next: NextFunction) => any>(fn: T) => {
+  return (req: ReqOf<T>, res: ResOf<T>, next: NextFunction): void => {
+    const maybePromise = fn(req, res, next);
+    if (maybePromise && typeof (maybePromise as Promise<unknown>).catch === 'function') {
+      void (maybePromise as Promise<unknown>).catch(next);
+    }
+  };
+};
+
+const listCatalogs = wrapController(catalogController.listCatalogs.bind(catalogController));
+const createCatalog = wrapController(catalogController.createCatalog.bind(catalogController));
+const listSharedWithMe = wrapController(catalogShareController.listSharedWithMe.bind(catalogShareController));
+const listPendingInvitations = wrapController(catalogShareController.listPendingInvitations.bind(catalogShareController));
+const respondToInvitation = wrapController(catalogShareController.respondToInvitation.bind(catalogShareController));
+const getCatalogById = wrapController(catalogController.getCatalogById.bind(catalogController));
+const updateCatalog = wrapController(catalogController.updateCatalog.bind(catalogController));
+const deleteCatalog = wrapController(catalogController.deleteCatalog.bind(catalogController));
+const linkCatalogEntry = wrapController(catalogController.linkCatalogEntry.bind(catalogController));
+const unlinkCatalogEntry = wrapController(catalogController.unlinkCatalogEntry.bind(catalogController));
+const listCollaborators = wrapController(catalogShareController.listCollaborators.bind(catalogShareController));
+const inviteCollaborator = wrapController(catalogShareController.inviteCollaborator.bind(catalogShareController));
+const updateCollaborator = wrapController(catalogShareController.updateCollaborator.bind(catalogShareController));
+
+router.get('/', listCatalogs);
 router.post(
   '/',
   validateBody<CreateCatalogRequest>(createCatalogSchema),
-  asyncHandler(catalogController.createCatalog.bind(catalogController))
+  createCatalog
 );
 
 router.get(
   '/shared-with/me',
-  asyncHandler(catalogShareController.listSharedWithMe.bind(catalogShareController))
+  listSharedWithMe
 );
 
 router.get(
   '/share/pending',
-  asyncHandler(catalogShareController.listPendingInvitations.bind(catalogShareController))
+  listPendingInvitations
 );
 
 router.patch(
   '/share/:shareId/respond',
   validateBody<RespondToInvitationRequest>(respondToInvitationSchema),
-  asyncHandler(catalogShareController.respondToInvitation.bind(catalogShareController))
+  respondToInvitation
 );
 
 router.get(
   '/:catalogId',
-  asyncHandler(catalogController.getCatalogById.bind(catalogController))
+  getCatalogById
 );
 router.patch(
   '/:catalogId',
   validateBody<UpdateCatalogRequest>(updateCatalogSchema),
-  asyncHandler(catalogController.updateCatalog.bind(catalogController))
+  updateCatalog
 );
 router.delete(
   '/:catalogId',
-  asyncHandler(catalogController.deleteCatalog.bind(catalogController))
+  deleteCatalog
 );
 
 router.post(
   '/:catalogId/entries/:entryId',
-  asyncHandler(catalogController.linkCatalogEntry.bind(catalogController))
+  linkCatalogEntry
 );
 router.delete(
   '/:catalogId/entries/:entryId',
-  asyncHandler(catalogController.unlinkCatalogEntry.bind(catalogController))
+  unlinkCatalogEntry
 );
 
 router.get(
   '/:catalogId/share',
-  asyncHandler(catalogShareController.listCollaborators.bind(catalogShareController))
+  listCollaborators
 );
 
 router.post(
   '/:catalogId/share',
   validateBody<InviteCollaboratorRequest>(inviteCollaboratorSchema),
-  asyncHandler(catalogShareController.inviteCollaborator.bind(catalogShareController))
+  inviteCollaborator
 );
 
 router.patch(
   '/:catalogId/share/:shareId',
   validateBody<UpdateCollaboratorRequest>(updateCollaboratorSchema),
-  asyncHandler(catalogShareController.updateCollaborator.bind(catalogShareController))
+  updateCollaborator
 );
 
 export default router;

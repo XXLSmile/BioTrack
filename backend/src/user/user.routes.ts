@@ -1,43 +1,65 @@
 import { Router } from 'express';
+import type { NextFunction } from 'express';
 
 import { UserController } from './user.controller';
 import { UpdateProfileRequest, updateProfileSchema } from './user.types';
 import { validateBody } from '../validation.middleware';
-import { asyncHandler } from '../utils/asyncHandler';
 
 const router = Router();
 const userController = new UserController();
 
-router.get('/profile', asyncHandler(userController.getProfile.bind(userController)));
+type ReqOf<T> = T extends (req: infer Req, res: any, next: any) => any ? Req : never;
+type ResOf<T> = T extends (req: any, res: infer Res, next: any) => any ? Res : never;
 
-router.post(
-  '/profile',
-  validateBody<UpdateProfileRequest>(updateProfileSchema),
-  asyncHandler(userController.updateProfile.bind(userController))
-);
+const wrapController = <T extends (req: any, res: any, next: NextFunction) => any>(fn: T) => {
+  return (req: ReqOf<T>, res: ResOf<T>, next: NextFunction): void => {
+    const maybePromise = fn(req, res, next);
+    if (maybePromise && typeof (maybePromise as Promise<unknown>).catch === 'function') {
+      void (maybePromise as Promise<unknown>).catch(next);
+    }
+  };
+};
 
-router.delete('/profile', asyncHandler(userController.deleteProfile.bind(userController)));
+const getProfile = wrapController(userController.getProfile.bind(userController));
+const updateProfile = wrapController(userController.updateProfile.bind(userController));
+const deleteProfile = wrapController(userController.deleteProfile.bind(userController));
+const getUserStats = wrapController(userController.getUserStats.bind(userController));
+const checkUsername = wrapController(userController.checkUsernameAvailability.bind(userController));
+const searchUsers = wrapController(userController.searchUsers.bind(userController));
+const getUserByUsername = wrapController(userController.getUserByUsername.bind(userController));
+const getUserByName = wrapController(userController.getUserByName.bind(userController));
+const getUserId = wrapController(userController.getUserById.bind(userController));
+const addFavoriteSpecies = wrapController(userController.addFavoriteSpecies.bind(userController));
+const updateFcmToken = wrapController(userController.updateFcmToken.bind(userController));
+const clearFcmToken = wrapController(userController.clearFcmToken.bind(userController));
+const removeFavoriteSpecies = wrapController(userController.removeFavoriteSpecies.bind(userController));
+
+router.get('/profile', getProfile);
+
+router.post('/profile', validateBody<UpdateProfileRequest>(updateProfileSchema), updateProfile);
+
+router.delete('/profile', deleteProfile);
 
 // BioTrack specific routes
-router.get('/stats', asyncHandler(userController.getUserStats.bind(userController)));
+router.get('/stats', getUserStats);
 
-router.get('/check-username', asyncHandler(userController.checkUsernameAvailability.bind(userController)));
+router.get('/check-username', checkUsername);
 
-router.get('/search', asyncHandler(userController.searchUsers.bind(userController)));
+router.get('/search', searchUsers);
 
-router.get('/username/:username', asyncHandler(userController.getUserByUsername.bind(userController)));
+router.get('/username/:username', getUserByUsername);
 
-router.get('/profile/:username', asyncHandler(userController.getUserByName.bind(userController)));
+router.get('/profile/:username', getUserByName);
 
-router.get('/name/:username', asyncHandler(userController.getUserByName.bind(userController)));
+router.get('/name/:username', getUserByName);
 
-router.get('/:userId', asyncHandler(userController.getUserById.bind(userController)));
+router.get('/:userId', getUserId);
 
-router.post('/favorite-species', asyncHandler(userController.addFavoriteSpecies.bind(userController)));
+router.post('/favorite-species', addFavoriteSpecies);
 
-router.post('/update-fcm-token', asyncHandler(userController.updateFcmToken.bind(userController)));
-router.delete('/fcm-token', asyncHandler(userController.clearFcmToken.bind(userController)));
+router.post('/update-fcm-token', updateFcmToken);
+router.delete('/fcm-token', clearFcmToken);
 
-router.delete('/favorite-species', asyncHandler(userController.removeFavoriteSpecies.bind(userController)));
+router.delete('/favorite-species', removeFavoriteSpecies);
 
 export default router;

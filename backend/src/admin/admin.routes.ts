@@ -1,9 +1,21 @@
 import { Router, Request, Response } from 'express';
+import type { NextFunction } from 'express';
 import { userModel } from '../user/user.model';
 import { adminController } from './admin.controller';
-import { asyncHandler } from '../utils/asyncHandler';
 
 const router = Router();
+
+type ReqOf<T> = T extends (req: infer Req, res: any, next: any) => any ? Req : never;
+type ResOf<T> = T extends (req: any, res: infer Res, next: any) => any ? Res : never;
+
+const wrapController = <T extends (req: any, res: any, next: NextFunction) => any>(fn: T) => {
+  return (req: ReqOf<T>, res: ResOf<T>, next: NextFunction): void => {
+    const maybePromise = fn(req, res, next);
+    if (maybePromise && typeof (maybePromise as Promise<unknown>).catch === 'function') {
+      void (maybePromise as Promise<unknown>).catch(next);
+    }
+  };
+};
 
 // TEMPORARY ADMIN ROUTES - Remove in production!
 // These are for development/testing only
@@ -12,7 +24,7 @@ const router = Router();
  * GET /admin/users
  * List all users (for testing only)
  */
-router.get('/users', asyncHandler(async (req: Request, res: Response) => {
+const listUsers = wrapController(async (req: Request, res: Response, _next: NextFunction) => {
   try {
     const mongoose = require('mongoose');
     const User = mongoose.model('User');
@@ -29,13 +41,13 @@ router.get('/users', asyncHandler(async (req: Request, res: Response) => {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
-}));
+});
 
 /**
  * GET /admin/users/:userId
  * Get specific user details
  */
-router.get('/users/:userId', asyncHandler(async (req: Request, res: Response) => {
+const getUser = wrapController(async (req: Request, res: Response, _next: NextFunction) => {
   try {
     const user = await userModel.findById(new (require('mongoose').Types.ObjectId)(req.params.userId));
 
@@ -54,13 +66,13 @@ router.get('/users/:userId', asyncHandler(async (req: Request, res: Response) =>
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
-}));
+});
 
 /**
  * GET /admin/stats
  * Get database statistics
  */
-router.get('/stats', asyncHandler(async (req: Request, res: Response) => {
+const getStats = wrapController(async (req: Request, res: Response, _next: NextFunction) => {
   try {
     const mongoose = require('mongoose');
 
@@ -80,12 +92,17 @@ router.get('/stats', asyncHandler(async (req: Request, res: Response) => {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
-}));
+});
 
 /**
  * POST /admin/create-user
  * Manually create a test user (DEV ONLY)
  */
-router.post('/create-user', asyncHandler(adminController.createTestUser.bind(adminController)));
+const createTestUser = wrapController(adminController.createTestUser.bind(adminController));
+
+router.get('/users', listUsers);
+router.get('/users/:userId', getUser);
+router.get('/stats', getStats);
+router.post('/create-user', createTestUser);
 
 export default router;
