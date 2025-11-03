@@ -8,6 +8,8 @@ import {
   CatalogResponse,
   CreateCatalogRequest,
   UpdateCatalogRequest,
+  createCatalogSchema,
+  updateCatalogSchema,
 } from './catalog.types';
 import { catalogModel } from './catalog.model';
 import { catalogShareModel } from './catalogShare.model';
@@ -29,7 +31,8 @@ export class CatalogController {
     try {
       const user = req.user!;
 
-      const catalog = await catalogModel.createCatalog(user._id, req.body);
+      const catalogData = createCatalogSchema.parse(req.body);
+      const catalog = await catalogModel.createCatalog(user._id, catalogData);
 
       res.status(201).json({
         message: 'Catalog created successfully',
@@ -143,11 +146,9 @@ export class CatalogController {
         });
       }
 
-      const updatedCatalog = await catalogModel.updateCatalog(
-        catalogId,
-        user._id,
-        req.body
-      );
+      const catalogUpdates = updateCatalogSchema.parse(req.body);
+
+      const updatedCatalog = await catalogModel.updateCatalog(catalogId, user._id, catalogUpdates);
 
       if (!updatedCatalog) {
         return res.status(404).json({

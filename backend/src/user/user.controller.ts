@@ -1,11 +1,16 @@
 import { NextFunction, Request, Response } from 'express';
 
 import mongoose from 'mongoose';
+import { z } from 'zod';
 
-import { GetProfileResponse, UpdateProfileRequest } from '../user/user.types';
+import { GetProfileResponse, UpdateProfileRequest, updateProfileSchema } from '../user/user.types';
 import logger from '../logger.util';
 import { userModel } from '../user/user.model';
 import { friendshipModel } from '../friends/friend.model';
+
+const speciesBodySchema = z.object({
+  speciesName: z.string().min(1, 'Species name is required'),
+});
 
 export class UserController {
   getProfile(req: Request, res: Response<GetProfileResponse>) {
@@ -24,7 +29,8 @@ export class UserController {
   ) {
     try {
       const user = req.user!;
-      const { username } = req.body;
+      const updateData = updateProfileSchema.parse(req.body);
+      const { username } = updateData;
 
       // Check if username is being changed and if it's available
       if (username && username !== user.username) {
@@ -36,7 +42,7 @@ export class UserController {
         }
       }
 
-      const updatedUser = await userModel.update(user._id, req.body);
+      const updatedUser = await userModel.update(user._id, updateData);
 
       if (!updatedUser) {
         return res.status(404).json({
@@ -320,13 +326,7 @@ export class UserController {
   async addFavoriteSpecies(req: Request, res: Response, next: NextFunction) {
     try {
       const user = req.user!;
-      const { speciesName } = req.body;
-
-      if (!speciesName) {
-        return res.status(400).json({
-          message: 'Species name is required',
-        });
-      }
+      const { speciesName } = speciesBodySchema.parse(req.body);
 
       await userModel.addFavoriteSpecies(user._id, speciesName);
 
@@ -342,13 +342,7 @@ export class UserController {
   async removeFavoriteSpecies(req: Request, res: Response, next: NextFunction) {
     try {
       const user = req.user!;
-      const { speciesName } = req.body;
-
-      if (!speciesName) {
-        return res.status(400).json({
-          message: 'Species name is required',
-        });
-      }
+      const { speciesName } = speciesBodySchema.parse(req.body);
 
       await userModel.removeFavoriteSpecies(user._id, speciesName);
 

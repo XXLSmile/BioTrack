@@ -4,6 +4,7 @@ import { authService } from './auth.service';
 import {
   AuthenticateUserRequest,
   AuthenticateUserResponse,
+  authenticateUserSchema,
 } from '../auth/auth.types';
 import logger from '../logger.util';
 
@@ -14,7 +15,7 @@ export class AuthController {
     next: NextFunction
   ) {
     try {
-      const { idToken } = req.body;
+      const { idToken } = authenticateUserSchema.parse(req.body);
 
       const data = await authService.signUpWithGoogle(idToken);
 
@@ -55,7 +56,7 @@ export class AuthController {
     next: NextFunction
   ) {
     try {
-      const { idToken } = req.body;
+      const { idToken } = authenticateUserSchema.parse(req.body);
 
       const data = await authService.signInWithGoogle(idToken);
 

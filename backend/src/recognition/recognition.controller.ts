@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
+import { z } from 'zod';
 
 import { recognitionService } from './recognition.service';
 import { catalogRepository } from './catalog.model';
@@ -51,10 +52,12 @@ const saveUploadedFile = (
   const directory = path.join(UPLOADS_ROOT, sanitizedSubDir);
   ensureDirectoryExists(directory);
 
-  const extension = path.extname(file.originalname || '').toLowerCase() || '.jpg';
+  const originalName: string = file.originalname;
+  const extension = path.extname(originalName).toLowerCase() || '.jpg';
   const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extension}`;
   const fullPath = path.join(directory, filename);
-  fs.writeFileSync(fullPath, file.buffer);
+  const fileBuffer: Buffer = file.buffer;
+  fs.writeFileSync(fullPath, fileBuffer);
 
   const relativePath = `/uploads/${sanitizedSubDir}/${filename}`;
   return { fullPath, relativePath, filename };
@@ -75,6 +78,13 @@ const buildAccessibleImageUrl = (relativePath: string, req: Request): string => 
 
   return absoluteUrl;
 };
+
+const recognizeAndSaveSchema = z.object({
+  latitude: z.union([z.number(), z.string()]).optional(),
+  longitude: z.union([z.number(), z.string()]).optional(),
+  notes: z.string().optional(),
+  catalogId: z.string().min(1).optional(),
+});
 
 export class RecognitionController {
   /**
@@ -167,7 +177,9 @@ export class RecognitionController {
       }
 
       const user = req.user!;
-      const { latitude: rawLatitude, longitude: rawLongitude, notes, catalogId } = req.body;
+      const { latitude: rawLatitude, longitude: rawLongitude, notes, catalogId } = recognizeAndSaveSchema.parse(
+        req.body ?? {}
+      );
 
       const latitude = parseCoordinate(rawLatitude);
       const longitude = parseCoordinate(rawLongitude);
@@ -189,7 +201,8 @@ export class RecognitionController {
         imageUrl: recognitionResult.species.imageUrl,
       });
 
-      const imageHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+      const fileBuffer: Buffer = req.file.buffer;
+      const imageHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
 
         let catalogToLink: { _id: mongoose.Types.ObjectId } | null = null;
         if (catalogId) {
@@ -238,7 +251,7 @@ export class RecognitionController {
               userId: user._id.toString(),
               speciesId: species._id.toString(),
               imageUrl: savedImage.relativePath,
-              imageData: req.file.buffer,
+              imageData: fileBuffer,
               imageMimeType: req.file.mimetype,
               latitude,
               longitude,

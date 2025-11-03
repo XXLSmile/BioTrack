@@ -10,6 +10,7 @@ import {
 } from './catalogShare.types';
 import { catalogModel } from './catalog.model';
 import { catalogShareModel } from './catalogShare.model';
+import type { CatalogShareRole } from './catalogShare.types';
 import { userModel } from '../user/user.model';
 import logger from '../logger.util';
 import { messaging } from "../firebase";
@@ -54,6 +55,7 @@ export class CatalogShareController {
       const user = req.user!;
       const { catalogId } = req.params;
       const { inviteeId, role } = inviteCollaboratorSchema.parse(req.body);
+      const inviteeRole: CatalogShareRole = role;
 
       const catalog = await catalogModel.findById(catalogId);
       if (!catalog) {
@@ -98,7 +100,7 @@ export class CatalogShareController {
         catalog.owner,
         inviteeObjectId,
         user._id,
-        role
+        inviteeRole
       );
 
       // Send FCM notification to invitee if they have an FCM token
@@ -141,6 +143,7 @@ export class CatalogShareController {
       const user = req.user!;
       const { catalogId, shareId } = req.params;
       const body = updateCollaboratorSchema.parse(req.body);
+      const { role, action } = body;
 
       const catalog = await catalogModel.findById(catalogId);
       if (!catalog) {
@@ -159,10 +162,11 @@ export class CatalogShareController {
 
       let updatedShare: typeof share | null = share;
 
-      if (body.action === 'revoke') {
+      if (action === 'revoke') {
         updatedShare = await catalogShareModel.revokeInvitation(shareObjectId);
-      } else if (body.role) {
-        updatedShare = await catalogShareModel.updateRole(shareObjectId, body.role);
+      } else if (role) {
+        const normalizedRole: CatalogShareRole = role;
+        updatedShare = await catalogShareModel.updateRole(shareObjectId, normalizedRole);
       }
 
       if (!updatedShare) {

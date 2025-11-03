@@ -1,17 +1,22 @@
 import multer from 'multer';
+import type { Request } from 'express';
 import path from 'path';
+
 import { UPLOADS_ROOT } from './config/paths';
 
 // Disk storage for file system (keeps both file and buffer available)
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+const diskStorageOptions: multer.DiskStorageOptions = {
+  destination: (_req: Request, _file, cb) => {
     cb(null, UPLOADS_ROOT);
   },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
+  filename: (_req: Request, file, cb) => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const extension = path.extname(file.originalname);
+    cb(null, `${uniqueSuffix}${extension}`);
   },
-});
+};
+
+const storage = multer.diskStorage(diskStorageOptions);
 
 // Memory storage for keeping image data in buffer (used for DB storage)
 const memoryStorage = multer.memoryStorage();

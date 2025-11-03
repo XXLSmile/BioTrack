@@ -1,19 +1,28 @@
 // ADMIN CONTROLLER - For development/testing
 import { Request, Response } from 'express';
+import { z } from 'zod';
+
 import { userModel } from '../user/user.model';
 import logger from '../logger.util';
+import { GoogleUserInfo } from '../user/user.types';
+
+const createTestUserSchema = z.object({
+  googleId: z.string().min(1, 'googleId is required'),
+  email: z.string().email('Valid email is required'),
+  name: z.string().min(1, 'Name is required'),
+  username: z
+    .string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(30, 'Username must be at most 30 characters')
+    .regex(/^[a-z0-9_]+$/, 'Username must be lowercase letters, numbers, and underscores'),
+});
 
 export class AdminController {
   // Create a test user manually (DEV ONLY)
   async createTestUser(req: Request, res: Response) {
     try {
-      const { googleId, email, name, username } = req.body;
-
-      if (!googleId || !email || !name || !username) {
-        return res.status(400).json({
-          message: 'googleId, email, name, and username are required',
-        });
-      }
+      const { googleId, email, name, username } = createTestUserSchema.parse(req.body);
+      const normalizedUsername = username.toLowerCase();
 
       // Check if user already exists
       const existing = await userModel.findByGoogleId(googleId);
@@ -24,23 +33,24 @@ export class AdminController {
       }
 
       // Check username availability
-      const isAvailable = await userModel.isUsernameAvailable(username);
+      const isAvailable = await userModel.isUsernameAvailable(normalizedUsername);
       if (!isAvailable) {
         return res.status(409).json({
           message: 'Username already taken',
         });
       }
 
-      // Create user (cast to any to bypass GoogleUserInfo type)
-      const user = await userModel.create({
+      const userPayload: GoogleUserInfo = {
         googleId,
         email,
         name,
         profilePicture: 'https://via.placeholder.com/150',
-      } as any);
+      };
+
+      const user = await userModel.create(userPayload);
       
       // Update username separately
-      await userModel.update(user._id, { username: username.toLowerCase() });
+      await userModel.update(user._id, { username: normalizedUsername });
 
       logger.info(`Test user created: ${email}`);
 
@@ -58,4 +68,3 @@ export class AdminController {
 }
 
 export const adminController = new AdminController();
-

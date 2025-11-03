@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import type { NextFunction } from 'express';
+import mongoose from 'mongoose';
 import { userModel } from '../user/user.model';
 import { adminController } from './admin.controller';
 
@@ -26,7 +27,6 @@ const wrapController = <T extends (req: any, res: any, next: NextFunction) => an
  */
 const listUsers = wrapController(async (req: Request, res: Response, _next: NextFunction) => {
   try {
-    const mongoose = require('mongoose');
     const User = mongoose.model('User');
     const users = await User.find({}).limit(50).select('-googleId');
 
@@ -49,7 +49,8 @@ const listUsers = wrapController(async (req: Request, res: Response, _next: Next
  */
 const getUser = wrapController(async (req: Request, res: Response, _next: NextFunction) => {
   try {
-    const user = await userModel.findById(new (require('mongoose').Types.ObjectId)(req.params.userId));
+    const userId = new mongoose.Types.ObjectId(req.params.userId);
+    const user = await userModel.findById(userId);
 
     if (!user) {
       res.status(404).json({ message: 'User not found' });
@@ -74,8 +75,6 @@ const getUser = wrapController(async (req: Request, res: Response, _next: NextFu
  */
 const getStats = wrapController(async (req: Request, res: Response, _next: NextFunction) => {
   try {
-    const mongoose = require('mongoose');
-
     const userCount = await mongoose.model('User').countDocuments();
 
     res.json({

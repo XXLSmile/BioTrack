@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { NextFunction } from 'express';
+import type { NextFunction, RequestHandler } from 'express';
 import { recognitionController } from './recognition.controller';
 import { uploadMemory } from '../storage';
 import { authenticateToken } from '../auth/auth.middleware';
@@ -18,6 +18,8 @@ const wrapController = <T extends (req: any, res: any, next: NextFunction) => an
   };
 };
 
+const uploadSingleImage: RequestHandler = uploadMemory.single('image');
+
 const recognizeImage = wrapController(recognitionController.recognizeImage.bind(recognitionController));
 const recognizeAndSave = wrapController(recognitionController.recognizeAndSave.bind(recognitionController));
 const getUserCatalog = wrapController(recognitionController.getUserCatalog.bind(recognitionController));
@@ -31,7 +33,7 @@ const deleteEntry = wrapController(recognitionController.deleteEntry.bind(recogn
  */
 router.post(
   '/',
-  uploadMemory.single('image'),
+  uploadSingleImage,
   recognizeImage
 );
 
@@ -42,7 +44,7 @@ router.post(
 router.post(
   '/save',
   authenticateToken,
-  uploadMemory.single('image'),
+  uploadSingleImage,
   recognizeAndSave
 );
 
