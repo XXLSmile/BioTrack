@@ -44,6 +44,8 @@ data class Entry(
     val imageMimeType: String? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
+    val city: String? = null,
+    val province: String? = null,
     val notes: String? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null

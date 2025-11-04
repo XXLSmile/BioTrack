@@ -39,6 +39,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.FileOutputStream
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.cpen321.usermanagement.data.remote.dto.SaveRecognitionRequest
+import com.cpen321.usermanagement.data.remote.dto.ScanData
 import com.cpen321.usermanagement.data.remote.dto.ScanResponse
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
@@ -187,7 +189,7 @@ fun CameraScreen(
                             val (message, response) = recognizeImage(context, uri, locationToUse)
                             resultText = message
                             recognitionResult = response
-                            showCatalogDialog = response != null
+                            showCatalogDialog = response?.data?.imagePath?.isNotBlank() == true
                         }
                     }
                 },
@@ -224,9 +226,13 @@ fun CameraScreen(
             isSaving = isSaving,
             onSave = { catalogId ->
                 if (isSaving) return@AddToCatalogDialog
-                val uriToSave = imageUri
-                if (uriToSave == null) {
-                    resultText = "⚠️ Select an image before saving."
+                val pendingRecognition = recognitionResult
+                if (pendingRecognition == null) {
+                    resultText = "⚠️ Run recognition before saving."
+                    return@AddToCatalogDialog
+                }
+                if (pendingRecognition.data.imagePath.isNullOrBlank()) {
+                    resultText = "⚠️ Unable to save because the image reference is missing."
                     return@AddToCatalogDialog
                 }
                 isSaving = true
@@ -240,8 +246,7 @@ fun CameraScreen(
                     }
 
                     val (success, message) = saveRecognitionToCatalog(
-                        context,
-                        uriToSave,
+                        pendingRecognition,
                         catalogId,
                         locationToUse
                     )
@@ -292,8 +297,17 @@ private suspend fun recognizeImage(
 
         if (response.isSuccessful) {
             val body = response.body()
-            if (body?.data?.species != null) {
-                formatRecognitionMessage(body) to body
+            val payload = body?.data
+            val recognitionData = payload?.recognition
+            if (recognitionData != null) {
+                val message = formatRecognitionMessage(recognitionData)
+                val saveHint = if (payload.imagePath.isNullOrBlank()) {
+                    "\n⚠️ Unable to save this recognition because the image reference is missing."
+                } else {
+                    null
+                }
+                val finalMessage = saveHint?.let { "$message$it" } ?: message
+                finalMessage to body
             } else {
                 "⚠️ No species identified. Try again!" to null
             }
@@ -309,32 +323,34 @@ private suspend fun recognizeImage(
 }
 
 private suspend fun saveRecognitionToCatalog(
-    context: Context,
-    uri: Uri,
+    recognitionResponse: ScanResponse,
     catalogId: String,
     location: Location?
 ): Pair<Boolean, String> {
-    var tempFile: File? = null
-    return try {
-        val (imagePart, file) = createImagePart(context, uri)
-        tempFile = file
-        val catalogIdBody = catalogId.toRequestBody("text/plain".toMediaTypeOrNull())
-        val latitudeBody = location?.latitude?.toTextRequestBody()
-        val longitudeBody = location?.longitude?.toTextRequestBody()
+    val imagePath = recognitionResponse.data.imagePath
+    if (imagePath.isNullOrBlank()) {
+        return false to "⚠️ Cannot save this observation because the image reference is missing."
+    }
 
+    val request = SaveRecognitionRequest(
+        imagePath = imagePath,
+        recognition = recognitionResponse.data.recognition,
+        catalogId = catalogId,
+        latitude = location?.latitude,
+        longitude = location?.longitude
+    )
+
+    return try {
         val response = withContext(Dispatchers.IO) {
-            RetrofitClient.wildlifeApi.recognizeAndSave(
-                imagePart,
-                catalogIdBody,
-                latitudeBody,
-                longitudeBody
-            )
+            RetrofitClient.wildlifeApi.recognizeAndSave(request)
         }
 
         if (response.isSuccessful) {
             val body = response.body()
             if (body?.data?.entry?._id != null) {
                 val speciesName = body.data.recognition?.species?.let {
+                    it.commonName ?: it.scientificName
+                } ?: recognitionResponse.data.recognition.species.let {
                     it.commonName ?: it.scientificName
                 }
                 val message = speciesName?.let { "✅ Saved $it to catalog." }
@@ -349,8 +365,6 @@ private suspend fun saveRecognitionToCatalog(
         }
     } catch (e: Exception) {
         false to ("⚠️ Save failed: ${e.localizedMessage ?: "Unknown error"}")
-    } finally {
-        tempFile?.delete()
     }
 }
 
@@ -371,15 +385,18 @@ private suspend fun createImagePart(
     MultipartBody.Part.createFormData("image", tempFile.name, requestFile) to tempFile
 }
 
-private fun formatRecognitionMessage(response: ScanResponse): String {
-    val species = response.data.species
-    return if (species != null) {
-        val displayName = species.commonName ?: species.scientificName
-        val confidencePercent = String.format("%.2f", response.data.confidence * 100)
-        "✅ $displayName\n(${species.scientificName})\nConfidence: $confidencePercent%"
-    } else {
-        "⚠️ No species identified. Try again!"
+private fun formatRecognitionMessage(data: ScanData): String {
+    val species = data.species
+    val displayName = species?.commonName ?: species?.scientificName ?: "Unknown species"
+    val scientificLabel = species?.scientificName
+    val confidencePercent = String.format("%.2f", data.confidence * 100)
+
+    val builder = StringBuilder("✅ $displayName")
+    if (!scientificLabel.isNullOrBlank() && !scientificLabel.equals(displayName, ignoreCase = true)) {
+        builder.append("\n(").append(scientificLabel).append(")")
     }
+    builder.append("\nConfidence: $confidencePercent%")
+    return builder.toString()
 }
 
 private fun hasLocationPermission(context: Context): Boolean {

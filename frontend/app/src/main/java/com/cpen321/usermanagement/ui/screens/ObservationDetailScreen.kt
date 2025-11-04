@@ -94,7 +94,7 @@ fun ObservationDetailScreen(
 }
 
 @Composable
-private fun ObservationDetailContent(
+fun ObservationDetailContent(
     observation: RecentObservation,
     modifier: Modifier = Modifier
 ) {
@@ -245,7 +245,9 @@ private fun SpeciesInfoSection(observation: RecentObservation) {
                 text = observation.title,
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
             )
-            observation.speciesScientificName?.takeIf { it.isNotBlank() }?.let { scientificName ->
+            observation.speciesScientificName
+                ?.takeIf { it.isNotBlank() && !it.equals(observation.title, ignoreCase = true) }
+                ?.let { scientificName ->
                 Text(
                     text = scientificName,
                     style = MaterialTheme.typography.bodyMedium,

@@ -22,7 +22,6 @@ router.post(
 router.post(
   '/save',
   authenticateToken,
-  uploadMemory.single('image'),
   recognitionController.recognizeAndSave
 );
 

@@ -2,7 +2,15 @@ package com.cpen321.usermanagement.data.remote.dto
 
 data class ScanResponse(
     val message: String,
-    val data: ScanData
+    val data: ScanPayload
+)
+
+data class ScanPayload(
+    val recognition: ScanData,
+    val imagePath: String?,
+    val absoluteImageUrl: String?,
+    val latitude: Double?,
+    val longitude: Double?
 )
 
 data class ScanData(
