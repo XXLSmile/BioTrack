@@ -3,7 +3,7 @@ import { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import type { ParamsDictionary } from 'express-serve-static-core';
 
-import { GetProfileResponse, UpdateProfileRequest, updateProfileSchema } from '../user/user.types';
+import { GetProfileResponse, UpdateProfileRequest, IUser, updateProfileSchema } from '../user/user.types';
 import logger from '../logger.util';
 import { userModel } from '../user/user.model';
 import { friendshipModel } from '../friends/friend.model';
@@ -44,7 +44,30 @@ export class UserController {
           });
         }
       }
-      const updatedUser = await userModel.update(user._id, updatePayload);
+      const updateData: Partial<IUser> = {};
+      if (typeof updatePayload.name === 'string') {
+        updateData.name = updatePayload.name;
+      }
+      if (typeof updatePayload.username === 'string') {
+        updateData.username = updatePayload.username;
+      }
+      if (typeof updatePayload.location === 'string') {
+        updateData.location = updatePayload.location;
+      }
+      if (typeof updatePayload.region === 'string') {
+        updateData.region = updatePayload.region;
+      }
+      if (typeof updatePayload.isPublicProfile === 'boolean') {
+        updateData.isPublicProfile = updatePayload.isPublicProfile;
+      }
+      if (Array.isArray(updatePayload.favoriteSpecies)) {
+        updateData.favoriteSpecies = updatePayload.favoriteSpecies;
+      }
+      if (typeof updatePayload.fcmToken === 'string' || updatePayload.fcmToken === null) {
+        updateData.fcmToken = updatePayload.fcmToken;
+      }
+
+      const updatedUser = await userModel.update(user._id, updateData);
 
       if (!updatedUser) {
         return res.status(404).json({

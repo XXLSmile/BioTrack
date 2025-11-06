@@ -35,7 +35,10 @@ export class CatalogController {
       }
 
       const createPayload = createCatalogSchema.parse(req.body) as CreateCatalogRequest;
-      const catalog = await catalogModel.createCatalog(user._id, createPayload);
+      const catalog = await catalogModel.createCatalog(user._id, {
+        name: createPayload.name,
+        description: createPayload.description,
+      });
 
       res.status(201).json({
         message: 'Catalog created successfully',
