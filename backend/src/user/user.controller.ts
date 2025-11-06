@@ -31,11 +31,11 @@ export class UserController {
       if (!user) {
         return res.status(401).json({ message: 'Authentication required' });
       }
-      const updatePayload = updateProfileSchema.parse(req.body);
+      const updatePayload: UpdateProfileRequest = updateProfileSchema.parse(req.body);
       const { username } = updatePayload;
 
       // Check if username is being changed and if it's available
-      if (username && username !== user.username) {
+      if (typeof username === 'string' && username !== user.username) {
         const isAvailable = await userModel.isUsernameAvailable(username);
         if (!isAvailable) {
           return res.status(409).json({
@@ -43,7 +43,6 @@ export class UserController {
           });
         }
       }
-
       const updatedUser = await userModel.update(user._id, updatePayload);
 
       if (!updatedUser) {

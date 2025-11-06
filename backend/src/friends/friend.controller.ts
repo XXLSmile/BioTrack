@@ -561,7 +561,8 @@ export class FriendController {
         res.status(401).json({ message: 'Authentication required' });
         return;
       }
-      const { targetUserId } = createFriendRequestSchema.parse(req.body);
+      const friendRequestPayload: CreateFriendRequest = createFriendRequestSchema.parse(req.body);
+      const { targetUserId } = friendRequestPayload;
       const targetId = new mongoose.Types.ObjectId(targetUserId);
 
       if (targetId.equals(user._id)) {

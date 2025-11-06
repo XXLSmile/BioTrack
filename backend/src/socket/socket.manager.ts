@@ -211,6 +211,8 @@ export const initializeSocketServer = (
       return;
     }
 
+    const authenticatedUserId: string = userId;
+
     logger.info('Socket connected', { socketId: socket.id, userId });
 
     socket.on('catalog:join', async (catalogId: string, ack?: (response: CatalogSocketAck) => void) => {
@@ -225,7 +227,7 @@ export const initializeSocketServer = (
           return;
         }
 
-        const hasAccess = await userHasCatalogAccess(userId, catalogId);
+        const hasAccess = await userHasCatalogAccess(authenticatedUserId, catalogId);
         if (!hasAccess) {
           ack?.({ ok: false, error: 'Access denied' });
           return;

@@ -59,7 +59,8 @@ const saveUploadedFile = (
   const directory = resolveWithinRoot(UPLOADS_ROOT, sanitizedSubDir);
   const safeDirectory = ensureDirectoryExists(directory);
 
-  const originalName = typeof file.originalname === 'string' ? file.originalname : '';
+  const originalName: string =
+    typeof file.originalname === 'string' ? file.originalname : '';
   const rawExtension = path.extname(originalName).toLowerCase();
   const extension = rawExtension || '.jpg';
   const randomSuffix = crypto.randomBytes(16).toString('hex');
