@@ -414,7 +414,7 @@ export class FriendController {
             !regionMatch &&
             normalizedUserLocation &&
             normalize(doc.location) === normalizedUserLocation;
-          data.locationMatch = Boolean(regionMatch || locationMatch);
+          data.locationMatch = Boolean(regionMatch ?? locationMatch);
         }
 
         const sharedSpecies = Array.from(data.sharedSpecies);
@@ -694,7 +694,7 @@ export class FriendController {
               token: requesterUser.fcmToken,
               notification: {
                 title: 'Friend Request Accepted ✅',
-                body: `${addresseeUser?.name || addresseeUser?.username} accepted your friend request!`,
+                body: `${addresseeUser?.name ?? addresseeUser?.username} accepted your friend request!`,
               },
               data: {
                 type: 'FRIEND_REQUEST_ACCEPTED',

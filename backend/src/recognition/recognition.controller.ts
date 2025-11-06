@@ -653,7 +653,7 @@ export class RecognitionController {
       }
 
       // Set appropriate content type
-      const contentType = entry.imageMimeType || 'image/jpeg';
+      const contentType = entry.imageMimeType ?? 'image/jpeg';
       res.set('Content-Type', contentType);
       res.set('Content-Length', entry.imageData.length.toString());
 
