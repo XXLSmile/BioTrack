@@ -41,15 +41,6 @@ router.get(
   recognitionController.getRecentEntries
 );
 
-/**
- * GET /api/recognition/image/:entryId
- * Get image from database by catalog entry ID
- */
-router.get(
-  '/image/:entryId',
-  recognitionController.getImageFromDatabase
-);
-
 router.delete(
   '/entry/:entryId',
   authenticateToken,

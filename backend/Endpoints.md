@@ -120,7 +120,6 @@ All responses follow:
 | POST | `/save` | Yes | Same form-data | Recognize, persist catalog entry (stores image, metadata). |
 | GET | `/catalog` | Yes | — | Shortcut to fetch the authenticated user’s catalog entries. |
 | GET | `/recent` | Yes | `?limit=10` | Latest observations for the current user (sorted by `createdAt` desc). |
-| GET | `/image/:entryId` | Yes | — | Streams stored image buffer for a catalog entry. |
 
 **Recognition success response**
 ```json

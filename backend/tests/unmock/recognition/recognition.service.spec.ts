@@ -18,6 +18,12 @@ describe('RecognitionService (live Zyla API)', () => {
       ? 'recognizes raccoon from hosted image'
       : 'recognizes raccoon from hosted image (set RUN_ZYLA_LIVE_TESTS=true to exercise)',
     async () => {
+      // API: RecognitionService.recognizeFromUrl (live Zyla call)
+      // Input: hosted raccoon image URL served from project test endpoint
+      // Expected status code: n/a (service method), expectation is successful RecognitionResult with raccoon label
+      // Expected behavior: externally hits Zyla API, returns non-zero confidence and raccoon naming
+      // Expected output: result.confidence > 0, species names contain "raco"
+      // Mock behavior: speciesRepository.findOrCreate stubbed to prevent actual DB writes; test skipped unless RUN_ZYLA_LIVE_TESTS=true
       if (!runLiveSuite) {
         console.warn('RUN_ZYLA_LIVE_TESTS not enabled, skipping live API call.');
         return;
