@@ -18,6 +18,23 @@ interface CatalogSocketAck {
   error?: string;
 }
 
+type ClientToServerEvents = {
+  'catalog:join': (catalogId: string, ack?: (response: CatalogSocketAck) => void) => void;
+  'catalog:leave': (catalogId: string) => void;
+};
+
+type ServerToClientEvents = {
+  'catalog:entries-updated': (payload: CatalogEntriesEventPayload) => void;
+  'catalog:metadata-updated': (payload: CatalogUpdatedEventPayload) => void;
+  'catalog:deleted': (payload: CatalogDeletedEventPayload) => void;
+};
+
+type InterServerEvents = Record<string, never>;
+
+interface ServerSocketData {
+  user?: SocketUserData;
+}
+
 export interface CatalogEntriesEventPayload {
   catalogId: string;
   entries: unknown[];
@@ -38,7 +55,7 @@ export interface CatalogDeletedEventPayload {
   timestamp: string;
 }
 
-let io: Server | null = null;
+let io: Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, ServerSocketData> | null = null;
 
 const buildCatalogRoom = (catalogId: string): string => `catalog:${catalogId}`;
 
@@ -56,7 +73,9 @@ const getCorsOrigins = (): string[] | string => {
   return origins.length > 0 ? origins : '*';
 };
 
-const extractToken = (socket: Socket): string | undefined => {
+const extractToken = (
+  socket: Socket<ClientToServerEvents, ServerToClientEvents, InterServerEvents, ServerSocketData>
+): string | undefined => {
   const authToken = socket.handshake.auth?.token;
   if (typeof authToken === 'string' && authToken.trim().length > 0) {
     return authToken.trim();
@@ -96,12 +115,14 @@ const userHasCatalogAccess = async (userId: string, catalogId: string): Promise<
   return !!share;
 };
 
-export const initializeSocketServer = (server: http.Server): Server => {
+export const initializeSocketServer = (
+  server: http.Server
+): Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, ServerSocketData> => {
   if (io) {
     return io;
   }
 
-  io = new Server(server, {
+  io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, ServerSocketData>(server, {
     cors: {
       origin: getCorsOrigins(),
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
@@ -117,7 +138,7 @@ export const initializeSocketServer = (server: http.Server): Server => {
         if (fallbackUserId && mongoose.Types.ObjectId.isValid(fallbackUserId)) {
           socket.data.user = {
             userId: fallbackUserId,
-          } satisfies SocketUserData;
+          };
           return next();
         }
 
@@ -162,7 +183,7 @@ export const initializeSocketServer = (server: http.Server): Server => {
 
       socket.data.user = {
         userId: user._id.toString(),
-      } satisfies SocketUserData;
+      };
 
       next();
     } catch (error) {
@@ -172,7 +193,7 @@ export const initializeSocketServer = (server: http.Server): Server => {
   });
 
   io.on('connection', socket => {
-    const userData = socket.data.user as SocketUserData | undefined;
+    const userData = socket.data.user;
     const userId = userData?.userId;
 
     if (!userId) {
@@ -228,9 +249,15 @@ export const initializeSocketServer = (server: http.Server): Server => {
   return io;
 };
 
-const getServer = (): Server | null => io;
+const getServer = ():
+  | Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, ServerSocketData>
+  | null => io;
 
-const emitToCatalogRoom = (catalogId: mongoose.Types.ObjectId | string, event: string, payload: unknown): void => {
+const emitToCatalogRoom = <TEvent extends keyof ServerToClientEvents>(
+  catalogId: mongoose.Types.ObjectId | string,
+  event: TEvent,
+  payload: Parameters<ServerToClientEvents[TEvent]>[0]
+): void => {
   const server = getServer();
   if (!server) {
     logger.warn('Socket.IO server not initialized. Skipping emit.', {
@@ -240,7 +267,8 @@ const emitToCatalogRoom = (catalogId: mongoose.Types.ObjectId | string, event: s
     return;
   }
 
-  server.to(buildCatalogRoom(catalogId.toString())).emit(event, payload);
+  const args = [payload] as Parameters<ServerToClientEvents[TEvent]>;
+  server.to(buildCatalogRoom(catalogId.toString())).emit(event, ...args);
 };
 
 export const emitCatalogEntriesUpdated = (
