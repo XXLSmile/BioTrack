@@ -16,6 +16,7 @@ import { catalogShareModel } from '../catalog/catalogShare.model';
 import { buildCatalogEntriesResponse, resolveImageUrl } from '../catalog/catalog.helpers';
 import { emitCatalogEntriesUpdated } from '../socket/socket.manager';
 import { geocodingService } from '../location/geocoding.service';
+import { ensurePathWithinRoot, resolveWithinRoot } from '../utils/pathSafe';
 
 const parseCoordinate = (value: unknown): number | undefined => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -35,12 +36,14 @@ const parseCoordinate = (value: unknown): number | undefined => {
   return undefined;
 };
 
-const UPLOADS_ROOT = path.join(__dirname, '../../uploads');
+const UPLOADS_ROOT = path.resolve(path.join(__dirname, '../../uploads'));
 
-const ensureDirectoryExists = (directory: string): void => {
-  if (!fs.existsSync(directory)) {
-    fs.mkdirSync(directory, { recursive: true });
+const ensureDirectoryExists = (directory: string): string => {
+  const safeDirectory = ensurePathWithinRoot(UPLOADS_ROOT, directory);
+  if (!fs.existsSync(safeDirectory)) {
+    fs.mkdirSync(safeDirectory, { recursive: true });
   }
+  return safeDirectory;
 };
 
 const saveUploadedFile = (
@@ -48,12 +51,12 @@ const saveUploadedFile = (
   subDirectory: string
 ): { fullPath: string; relativePath: string; filename: string } => {
   const sanitizedSubDir = subDirectory.replace(/^\//, '');
-  const directory = path.join(UPLOADS_ROOT, sanitizedSubDir);
-  ensureDirectoryExists(directory);
+  const directory = resolveWithinRoot(UPLOADS_ROOT, sanitizedSubDir);
+  const safeDirectory = ensureDirectoryExists(directory);
 
   const extension = path.extname(file.originalname || '').toLowerCase() || '.jpg';
   const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extension}`;
-  const fullPath = path.join(directory, filename);
+  const fullPath = ensurePathWithinRoot(UPLOADS_ROOT, path.join(safeDirectory, filename));
   fs.writeFileSync(fullPath, file.buffer);
 
   const relativePath = `/uploads/${sanitizedSubDir}/${filename}`;
@@ -114,17 +117,21 @@ const normalizeUploadsPath = (
 };
 
 const generateUniqueFilename = (directory: string, filename: string): string => {
-  let candidate = filename;
-  const extension = path.extname(filename);
-  const baseName = path.basename(filename, extension);
+  const safeDirectory = ensurePathWithinRoot(UPLOADS_ROOT, directory);
+  let candidate = path.basename(filename);
+  const extension = path.extname(candidate);
+  const baseName = path.basename(candidate, extension);
   let counter = 1;
 
-  while (fs.existsSync(path.join(directory, candidate))) {
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const candidatePath = ensurePathWithinRoot(safeDirectory, path.join(safeDirectory, candidate));
+    if (!fs.existsSync(candidatePath)) {
+      return candidate;
+    }
     candidate = `${baseName}-${counter}${extension}`;
     counter += 1;
   }
-
-  return candidate;
 };
 
 const guessMimeType = (filename: string): string => {
@@ -354,7 +361,7 @@ export class RecognitionController {
       };
 
       const uploadsInfo = normalizeUploadsPath(imagePath);
-      const currentFullPath = path.join(UPLOADS_ROOT, uploadsInfo.relativePath);
+      const currentFullPath = resolveWithinRoot(UPLOADS_ROOT, uploadsInfo.relativePath);
 
       if (!fs.existsSync(currentFullPath)) {
         return res.status(404).json({
@@ -390,13 +397,15 @@ export class RecognitionController {
       let persistedCatalogEntry: ICatalogEntry;
 
       if (!catalogEntry) {
-        const imagesDir = path.join(UPLOADS_ROOT, 'images');
-        ensureDirectoryExists(imagesDir);
+        const imagesDir = ensureDirectoryExists(resolveWithinRoot(UPLOADS_ROOT, 'images'));
 
         let targetFilename = uploadsInfo.filename;
         if (!uploadsInfo.relativePath.startsWith('images/')) {
           targetFilename = generateUniqueFilename(imagesDir, uploadsInfo.filename);
-          const destinationPath = path.join(imagesDir, targetFilename);
+          const destinationPath = ensurePathWithinRoot(
+            UPLOADS_ROOT,
+            path.join(imagesDir, targetFilename)
+          );
           fs.renameSync(currentFullPath, destinationPath);
           finalRelativePath = path.posix.join('/uploads/images', targetFilename);
         }
@@ -423,10 +432,12 @@ export class RecognitionController {
         persistedCatalogEntry = catalogEntry;
 
         if (!uploadsInfo.relativePath.startsWith('images/')) {
-          const imagesDir = path.join(UPLOADS_ROOT, 'images');
-          ensureDirectoryExists(imagesDir);
+          const imagesDir = ensureDirectoryExists(resolveWithinRoot(UPLOADS_ROOT, 'images'));
           const targetFilename = generateUniqueFilename(imagesDir, uploadsInfo.filename);
-          const destinationPath = path.join(imagesDir, targetFilename);
+          const destinationPath = ensurePathWithinRoot(
+            UPLOADS_ROOT,
+            path.join(imagesDir, targetFilename)
+          );
           fs.renameSync(currentFullPath, destinationPath);
         }
       }

@@ -5,6 +5,7 @@ import path from 'path';
 import { catalogEntryLinkModel } from '../catalog/catalogEntryLink.model';
 import logger from '../logger.util';
 import { userModel } from '../user/user.model';
+import { ensurePathWithinRoot, resolveWithinRoot } from '../utils/pathSafe';
 
 // Catalog entry interface (represents a user's saved wildlife sighting)
 export interface ICatalogEntry extends Document {
@@ -94,6 +95,9 @@ catalogSchema.index({ userId: 1, imageHash: 1 }, { unique: true });
 export const CatalogModel = mongoose.model<ICatalogEntry>('CatalogEntry', catalogSchema);
 
 // Catalog Repository
+const UPLOADS_ROOT = path.resolve(path.join(__dirname, '../../uploads'));
+const IMAGES_ROOT = resolveWithinRoot(UPLOADS_ROOT, 'images');
+
 export class CatalogRepository {
   async create(data: {
     userId: string;
@@ -175,9 +179,8 @@ export class CatalogRepository {
       await catalogEntryLinkModel.removeEntryFromAllCatalogs(entry._id);
 
       if (entry.imageUrl) {
-        const uploadsDir = path.join(__dirname, '../../uploads/images');
         const filename = path.basename(entry.imageUrl);
-        const filepath = path.join(uploadsDir, filename);
+        const filepath = ensurePathWithinRoot(IMAGES_ROOT, path.join(IMAGES_ROOT, filename));
         if (fs.existsSync(filepath)) {
           fs.unlinkSync(filepath);
         }
