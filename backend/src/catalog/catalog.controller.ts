@@ -34,7 +34,7 @@ export class CatalogController {
         return res.status(401).json({ message: 'Authentication required' });
       }
 
-      const createPayload: CreateCatalogRequest = createCatalogSchema.parse(req.body);
+      const createPayload = createCatalogSchema.parse(req.body) as CreateCatalogRequest;
       const catalog = await catalogModel.createCatalog(user._id, createPayload);
 
       res.status(201).json({

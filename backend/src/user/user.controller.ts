@@ -31,12 +31,13 @@ export class UserController {
       if (!user) {
         return res.status(401).json({ message: 'Authentication required' });
       }
-      const updatePayload: UpdateProfileRequest = updateProfileSchema.parse(req.body);
-      const { username } = updatePayload;
+      const updatePayload = updateProfileSchema.parse(req.body) as UpdateProfileRequest;
+      const username = updatePayload.username;
 
       // Check if username is being changed and if it's available
       if (typeof username === 'string' && username !== user.username) {
-        const isAvailable = await userModel.isUsernameAvailable(username);
+        const candidateUsername: string = username;
+        const isAvailable = await userModel.isUsernameAvailable(candidateUsername);
         if (!isAvailable) {
           return res.status(409).json({
             message: 'Username already taken. Please choose a different username.',

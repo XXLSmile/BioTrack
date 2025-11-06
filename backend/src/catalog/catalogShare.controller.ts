@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import {
+  CatalogShareRole,
   InviteCollaboratorRequest,
   inviteCollaboratorSchema,
   RespondToInvitationRequest,
@@ -59,8 +60,9 @@ export class CatalogShareController {
         return res.status(401).json({ message: 'Authentication required' });
       }
       const { catalogId } = req.params;
-      const invitePayload: InviteCollaboratorRequest = inviteCollaboratorSchema.parse(req.body);
-      const { inviteeId, role } = invitePayload;
+      const invitePayload = inviteCollaboratorSchema.parse(req.body) as InviteCollaboratorRequest;
+      const inviteeId: string = invitePayload.inviteeId;
+      const role: CatalogShareRole = invitePayload.role;
 
       const catalog = await catalogModel.findById(catalogId);
       if (!catalog) {
@@ -150,7 +152,7 @@ export class CatalogShareController {
         return res.status(401).json({ message: 'Authentication required' });
       }
       const { catalogId, shareId } = req.params;
-      const updatePayload: UpdateCollaboratorRequest = updateCollaboratorSchema.parse(req.body);
+      const updatePayload = updateCollaboratorSchema.parse(req.body) as UpdateCollaboratorRequest;
 
       const catalog = await catalogModel.findById(catalogId);
       if (!catalog) {
@@ -172,7 +174,8 @@ export class CatalogShareController {
       if (updatePayload.action === 'revoke') {
         updatedShare = await catalogShareModel.revokeInvitation(shareObjectId);
       } else if (updatePayload.role) {
-        updatedShare = await catalogShareModel.updateRole(shareObjectId, updatePayload.role);
+        const nextRole: CatalogShareRole = updatePayload.role;
+        updatedShare = await catalogShareModel.updateRole(shareObjectId, nextRole);
       }
 
       if (!updatedShare) {
