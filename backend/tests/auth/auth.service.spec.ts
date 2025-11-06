@@ -1,29 +1,30 @@
-import type { LoginTicket } from 'google-auth-library';
+import type { LoginTicket, TokenPayload } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { AuthService } from '../../src/auth/auth.service';
 
-let verifyIdTokenMock: jest.Mock;
-let findByGoogleIdMock: jest.Mock;
-let createUserMock: jest.Mock;
-
 jest.mock('google-auth-library', () => {
-  verifyIdTokenMock = jest.fn();
+  const verifyIdTokenMock = jest.fn();
   return {
+    __esModule: true,
     OAuth2Client: jest.fn(() => ({
       verifyIdToken: verifyIdTokenMock,
     })),
+    verifyIdTokenMock,
   };
 });
 
 jest.mock('../../src/user/user.model', () => {
-  findByGoogleIdMock = jest.fn();
-  createUserMock = jest.fn();
+  const findByGoogleIdMock = jest.fn();
+  const createUserMock = jest.fn();
   return {
+    __esModule: true,
     userModel: {
       findByGoogleId: findByGoogleIdMock,
       create: createUserMock,
       findById: jest.fn(),
     },
+    findByGoogleIdMock,
+    createUserMock,
   };
 });
 
@@ -33,12 +34,24 @@ jest.mock('jsonwebtoken', () => ({
 
 import { userModel } from '../../src/user/user.model';
 
+const { verifyIdTokenMock } = jest.requireMock('google-auth-library') as {
+  verifyIdTokenMock: jest.Mock;
+};
+
+const {
+  findByGoogleIdMock,
+  createUserMock,
+} = jest.requireMock('../../src/user/user.model') as {
+  findByGoogleIdMock: jest.Mock;
+  createUserMock: jest.Mock;
+};
+
 const signMock = jwt.sign as jest.Mock;
 
 const createLoginTicket = (
-  payload: Record<string, unknown>
+  payload: Partial<TokenPayload>
 ): Pick<LoginTicket, 'getPayload'> => ({
-  getPayload: () => payload,
+  getPayload: () => payload as TokenPayload,
 });
 
 describe('Mocked: AuthService', () => {

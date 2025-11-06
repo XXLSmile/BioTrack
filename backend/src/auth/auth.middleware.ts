@@ -3,11 +3,11 @@ import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import { userModel } from '../user/user.model';
 
-export const authenticateToken: RequestHandler = async (
+const authenticateTokenImpl = async (
   req: Request,
   res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {
   try {
     // DEVELOPMENT BYPASS: Skip authentication if DISABLE_AUTH is set to 'true'
     if (process.env.DISABLE_AUTH === 'true') {
@@ -66,14 +66,6 @@ export const authenticateToken: RequestHandler = async (
 
     next();
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
-      res.status(401).json({
-        error: 'Invalid token',
-        message: 'Token is malformed or expired',
-      });
-      return;
-    }
-
     if (error instanceof jwt.TokenExpiredError) {
       res.status(401).json({
         error: 'Token expired',
@@ -82,6 +74,18 @@ export const authenticateToken: RequestHandler = async (
       return;
     }
 
+    if (error instanceof jwt.JsonWebTokenError) {
+      res.status(401).json({
+        error: 'Invalid token',
+        message: 'Token is malformed or expired',
+      });
+      return;
+    }
+
     next(error);
   }
+};
+
+export const authenticateToken: RequestHandler = (req, res, next) => {
+  void authenticateTokenImpl(req, res, next).catch(next);
 };

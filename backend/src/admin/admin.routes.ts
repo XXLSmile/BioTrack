@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { userModel } from '../user/user.model';
 import { adminController } from './admin.controller';
+import { asyncHandler } from '../utils/asyncHandler';
 
 const router = Router();
 
@@ -11,11 +13,16 @@ const router = Router();
  * GET /admin/users
  * List all users (for testing only)
  */
-router.get('/users', async (req: Request, res: Response) => {
+router.get('/users', asyncHandler(async (_req: Request, res: Response) => {
   try {
-    const mongoose = require('mongoose');
     const User = mongoose.model('User');
-    const users = await User.find({}).limit(50).select('-googleId');
+    let queryResult: any = User.find({});
+
+    if (typeof queryResult.limit === 'function') {
+      queryResult = queryResult.limit(50).select('-googleId');
+    }
+
+    const users = await queryResult;
     
     res.json({
       message: 'Users fetched successfully',
@@ -28,15 +35,15 @@ router.get('/users', async (req: Request, res: Response) => {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
-});
+}));
 
 /**
  * GET /admin/users/:userId
  * Get specific user details
  */
-router.get('/users/:userId', async (req: Request, res: Response) => {
+router.get('/users/:userId', asyncHandler(async (req: Request, res: Response) => {
   try {
-    const user = await userModel.findById(new (require('mongoose').Types.ObjectId)(req.params.userId));
+    const user = await userModel.findById(new mongoose.Types.ObjectId(req.params.userId));
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -52,16 +59,14 @@ router.get('/users/:userId', async (req: Request, res: Response) => {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
-});
+}));
 
 /**
  * GET /admin/stats
  * Get database statistics
  */
-router.get('/stats', async (req: Request, res: Response) => {
+router.get('/stats', asyncHandler(async (_req: Request, res: Response) => {
   try {
-    const mongoose = require('mongoose');
-    
     const userCount = await mongoose.model('User').countDocuments();
     
     res.json({
@@ -78,13 +83,12 @@ router.get('/stats', async (req: Request, res: Response) => {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
-});
+}));
 
 /**
  * POST /admin/create-user
  * Manually create a test user (DEV ONLY)
  */
-router.post('/create-user', adminController.createTestUser);
+router.post('/create-user', asyncHandler(adminController.createTestUser.bind(adminController)));
 
 export default router;
-

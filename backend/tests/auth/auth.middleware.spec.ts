@@ -3,16 +3,17 @@ import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import { authenticateToken } from '../../src/auth/auth.middleware';
 
-let findByIdMock: jest.Mock;
+jest.mock('../../src/user/user.model', () => ({
+  userModel: {
+    findById: jest.fn(),
+  },
+}));
 
-jest.mock('../../src/user/user.model', () => {
-  findByIdMock = jest.fn();
-  return {
-    userModel: {
-      findById: findByIdMock,
-    },
-  };
-});
+const { userModel } = jest.requireMock('../../src/user/user.model') as {
+  userModel: { findById: jest.Mock };
+};
+
+const findByIdMock = userModel.findById;
 
 jest.mock('jsonwebtoken', () => {
   const actual = jest.requireActual('jsonwebtoken');
