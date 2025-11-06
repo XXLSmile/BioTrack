@@ -12,6 +12,10 @@ interface ImageContext {
   host?: string | null;
 }
 
+const isExpressRequest = (value: unknown): value is Request => {
+  return Boolean(value) && typeof value === 'object' && 'get' in (value as Record<string, unknown>);
+};
+
 const buildBaseUrl = (context?: ImageContext): string | undefined => {
   if (process.env.MEDIA_BASE_URL) {
     const trimmed = process.env.MEDIA_BASE_URL.trim();
@@ -129,12 +133,12 @@ export const buildCatalogEntriesResponse = (
   fallbackUserId: mongoose.Types.ObjectId,
   reqOrContext?: Request | ImageContext
 ): CatalogEntryLinkResponse[] => {
-  const context = reqOrContext instanceof Object && 'get' in reqOrContext
+  const context: ImageContext | undefined = isExpressRequest(reqOrContext)
     ? {
-        protocol: (reqOrContext as Request).protocol,
-        host: (reqOrContext as Request).get('host'),
+        protocol: reqOrContext.protocol,
+        host: reqOrContext.get('host'),
       }
-    : (reqOrContext as ImageContext | undefined);
+    : reqOrContext;
 
   const serialized = serializeCatalogLinks(links, fallbackUserId);
 

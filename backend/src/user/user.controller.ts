@@ -72,7 +72,7 @@ export class UserController {
     try {
       const user = req.user!;
 
-      const userId = user._id as mongoose.Types.ObjectId;
+      const userId = user._id;
 
       const connectedFriendIds = await friendshipModel.deleteAllForUser(userId);
       await Promise.all(

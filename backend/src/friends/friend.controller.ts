@@ -116,7 +116,7 @@ export class FriendController {
       const friendDetails = new Map<string, { _id: mongoose.Types.ObjectId; name?: string | null; username?: string | null }>();
 
       for (const friendship of friends) {
-        const isRequester = (friendship.requester as mongoose.Types.ObjectId).equals(user._id);
+        const isRequester = friendship.requester.equals(user._id);
         const friendDoc = (isRequester ? friendship.addressee : friendship.requester) as unknown as IUser;
         if (!friendDoc?._id) {
           continue;
@@ -135,8 +135,8 @@ export class FriendController {
       const excludedIds = new Set<string>([userIdStr]);
 
       for (const relationship of relationships) {
-        const requesterId = (relationship.requester as mongoose.Types.ObjectId).toString();
-        const addresseeId = (relationship.addressee as mongoose.Types.ObjectId).toString();
+        const requesterId = relationship.requester.toString();
+        const addresseeId = relationship.addressee.toString();
         const otherId = requesterId === userIdStr ? addresseeId : requesterId;
 
         excludedIds.add(otherId);
@@ -216,8 +216,8 @@ export class FriendController {
         const networkFriendships = await friendshipModel.getAcceptedFriendshipsForUsers(friendObjectIds);
 
         for (const relation of networkFriendships) {
-          const requesterId = (relation.requester as mongoose.Types.ObjectId).toString();
-          const addresseeId = (relation.addressee as mongoose.Types.ObjectId).toString();
+          const requesterId = relation.requester.toString();
+          const addresseeId = relation.addressee.toString();
 
           let mutualFriendId: string | null = null;
           let candidateId: string | null = null;
@@ -245,7 +245,7 @@ export class FriendController {
       }
 
       const userFavorites = Array.isArray(currentUser.favoriteSpecies)
-        ? currentUser.favoriteSpecies.filter(Boolean) as string[]
+        ? currentUser.favoriteSpecies.filter(Boolean)
         : [];
 
       const excludedObjectIds = toObjectIds(excludedIds);
@@ -624,8 +624,8 @@ export class FriendController {
       }
 
       if (newStatus === 'accepted') {
-        const requesterId = request.requester as mongoose.Types.ObjectId;
-        const addresseeId = request.addressee as mongoose.Types.ObjectId;
+        const requesterId = request.requester;
+        const addresseeId = request.addressee;
         await userModel.incrementFriendCount(requesterId);
         await userModel.incrementFriendCount(addresseeId);
 
@@ -740,8 +740,8 @@ export class FriendController {
         });
       }
 
-      const requesterId = friendship.requester as mongoose.Types.ObjectId;
-      const addresseeId = friendship.addressee as mongoose.Types.ObjectId;
+      const requesterId = friendship.requester;
+      const addresseeId = friendship.addressee;
 
       const otherUserId = requesterId.equals(user._id)
         ? addresseeId

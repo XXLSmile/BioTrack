@@ -161,10 +161,10 @@ export class FriendshipModel {
 
       const acceptedFriendIds = friendships
         .filter((friendship) => friendship.status === 'accepted')
-        .map((friendship) =>
+        .map(friendship =>
           friendship.requester.equals(userId)
-            ? (friendship.addressee as mongoose.Types.ObjectId)
-            : (friendship.requester as mongoose.Types.ObjectId)
+            ? friendship.addressee
+            : friendship.requester
         );
 
       await this.friendship.deleteMany({
