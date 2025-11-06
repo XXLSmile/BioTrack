@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from 'express';
-import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
@@ -17,6 +16,13 @@ import { buildCatalogEntriesResponse, resolveImageUrl } from '../catalog/catalog
 import { emitCatalogEntriesUpdated } from '../socket/socket.manager';
 import { geocodingService } from '../location/geocoding.service';
 import { ensurePathWithinRoot, resolveWithinRoot } from '../utils/pathSafe';
+import {
+  ensureDirSync,
+  existsSync as safeExistsSync,
+  readFileBufferSync,
+  writeFileSync as safeWriteFileSync,
+  renameSync as safeRenameSync,
+} from '../utils/safeFs';
 
 const parseCoordinate = (value: unknown): number | undefined => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -40,9 +46,7 @@ const UPLOADS_ROOT = path.resolve(path.join(__dirname, '../../uploads'));
 
 const ensureDirectoryExists = (directory: string): string => {
   const safeDirectory = ensurePathWithinRoot(UPLOADS_ROOT, directory);
-  if (!fs.existsSync(safeDirectory)) {
-    fs.mkdirSync(safeDirectory, { recursive: true });
-  }
+  ensureDirSync(safeDirectory);
   return safeDirectory;
 };
 
@@ -57,7 +61,7 @@ const saveUploadedFile = (
   const extension = path.extname(file.originalname || '').toLowerCase() || '.jpg';
   const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extension}`;
   const fullPath = ensurePathWithinRoot(UPLOADS_ROOT, path.join(safeDirectory, filename));
-  fs.writeFileSync(fullPath, file.buffer);
+  safeWriteFileSync(fullPath, file.buffer);
 
   const relativePath = `/uploads/${sanitizedSubDir}/${filename}`;
   return { fullPath, relativePath, filename };
@@ -123,15 +127,16 @@ const generateUniqueFilename = (directory: string, filename: string): string => 
   const baseName = path.basename(candidate, extension);
   let counter = 1;
 
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const candidatePath = ensurePathWithinRoot(safeDirectory, path.join(safeDirectory, candidate));
-    if (!fs.existsSync(candidatePath)) {
-      return candidate;
-    }
+  while (
+    safeExistsSync(
+      ensurePathWithinRoot(UPLOADS_ROOT, path.join(safeDirectory, candidate))
+    )
+  ) {
     candidate = `${baseName}-${counter}${extension}`;
     counter += 1;
   }
+
+  return candidate;
 };
 
 const guessMimeType = (filename: string): string => {
@@ -363,13 +368,13 @@ export class RecognitionController {
       const uploadsInfo = normalizeUploadsPath(imagePath);
       const currentFullPath = resolveWithinRoot(UPLOADS_ROOT, uploadsInfo.relativePath);
 
-      if (!fs.existsSync(currentFullPath)) {
+      if (!safeExistsSync(currentFullPath)) {
         return res.status(404).json({
           message: 'Uploaded image could not be found. Please run recognition again.',
         });
       }
 
-      const imageBuffer = fs.readFileSync(currentFullPath);
+      const imageBuffer = readFileBufferSync(currentFullPath);
       const imageHash = crypto.createHash('sha256').update(imageBuffer).digest('hex');
 
       const species = await speciesRepository.findOrCreate({
@@ -406,7 +411,7 @@ export class RecognitionController {
             UPLOADS_ROOT,
             path.join(imagesDir, targetFilename)
           );
-          fs.renameSync(currentFullPath, destinationPath);
+          safeRenameSync(currentFullPath, destinationPath);
           finalRelativePath = path.posix.join('/uploads/images', targetFilename);
         }
 
@@ -438,7 +443,7 @@ export class RecognitionController {
             UPLOADS_ROOT,
             path.join(imagesDir, targetFilename)
           );
-          fs.renameSync(currentFullPath, destinationPath);
+          safeRenameSync(currentFullPath, destinationPath);
         }
       }
 

@@ -1,11 +1,11 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import fs from 'fs';
 import path from 'path';
 
 import { catalogEntryLinkModel } from '../catalog/catalogEntryLink.model';
 import logger from '../logger.util';
 import { userModel } from '../user/user.model';
 import { ensurePathWithinRoot, resolveWithinRoot } from '../utils/pathSafe';
+import { unlinkSync as safeUnlinkSync } from '../utils/safeFs';
 
 // Catalog entry interface (represents a user's saved wildlife sighting)
 export interface ICatalogEntry extends Document {
@@ -181,8 +181,13 @@ export class CatalogRepository {
       if (entry.imageUrl) {
         const filename = path.basename(entry.imageUrl);
         const filepath = ensurePathWithinRoot(IMAGES_ROOT, path.join(IMAGES_ROOT, filename));
-        if (fs.existsSync(filepath)) {
-          fs.unlinkSync(filepath);
+        try {
+          safeUnlinkSync(filepath);
+        } catch (error) {
+          const nodeError = error as NodeJS.ErrnoException;
+          if (nodeError.code !== 'ENOENT') {
+            throw error;
+          }
         }
       }
 
