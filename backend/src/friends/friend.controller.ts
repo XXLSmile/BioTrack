@@ -585,7 +585,8 @@ export class FriendController {
       // Send FCM notification to target user if they have an FCM token
       if (targetUser.fcmToken) {
         try {
-          console.log(`Try sending FCM notification to ${targetUser.username}, token: ${targetUser.fcmToken}`);
+          const debugContext = `username=${targetUser.username ?? 'unknown'} token=${targetUser.fcmToken ?? 'missing'}`;
+          logger.debug('Try sending FCM notification', debugContext);
 
           await messaging.send({
             token: targetUser.fcmToken,

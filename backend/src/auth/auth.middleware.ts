@@ -2,6 +2,7 @@ import { NextFunction, Request, RequestHandler, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import { userModel } from '../user/user.model';
+import logger from '../logger.util';
 
 const authenticateTokenImpl = async (
   req: Request,
@@ -24,7 +25,7 @@ const authenticateTokenImpl = async (
       }
       
       // If no test user found, just proceed without user (will fail on endpoints that need req.user)
-      console.warn('⚠️ AUTHENTICATION DISABLED - No test user set. Set TEST_USER_ID in .env');
+      logger.warn('⚠️ AUTHENTICATION DISABLED - No test user set. Set TEST_USER_ID in .env');
       next();
       return;
     }
