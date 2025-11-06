@@ -350,7 +350,7 @@ private suspend fun saveRecognitionToCatalog(
             if (body?.data?.entry?._id != null) {
                 val speciesName = body.data.recognition?.species?.let {
                     it.commonName ?: it.scientificName
-                } ?: recognitionResponse.data.recognition.species.let {
+                } ?: recognitionResponse.data.recognition.species?.let {
                     it.commonName ?: it.scientificName
                 }
                 val message = speciesName?.let { "✅ Saved $it to catalog." }
