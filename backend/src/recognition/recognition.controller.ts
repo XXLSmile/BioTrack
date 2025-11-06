@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 
 import { recognitionService } from './recognition.service';
-import { catalogRepository } from './catalog.model';
+import { catalogRepository, ICatalogEntry } from './catalog.model';
 import { speciesRepository } from './species.model';
 import { userModel } from '../user/user.model';
 import logger from '../logger.util';
@@ -387,6 +387,7 @@ export class RecognitionController {
 
       let isNewEntry = false;
       let finalRelativePath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+      let persistedCatalogEntry: ICatalogEntry;
 
       if (!catalogEntry) {
         const imagesDir = path.join(UPLOADS_ROOT, 'images');
@@ -402,7 +403,7 @@ export class RecognitionController {
 
         const imageMimeType = guessMimeType(targetFilename);
 
-        catalogEntry = await catalogRepository.create({
+        persistedCatalogEntry = await catalogRepository.create({
           userId: user._id.toString(),
           speciesId: species._id.toString(),
           imageUrl: finalRelativePath,
@@ -418,23 +419,16 @@ export class RecognitionController {
         });
 
         isNewEntry = true;
-      } else if (!uploadsInfo.relativePath.startsWith('images/')) {
-        const imagesDir = path.join(UPLOADS_ROOT, 'images');
-        ensureDirectoryExists(imagesDir);
-        const targetFilename = generateUniqueFilename(imagesDir, uploadsInfo.filename);
-        const destinationPath = path.join(imagesDir, targetFilename);
-        fs.renameSync(currentFullPath, destinationPath);
-      }
+      } else {
+        persistedCatalogEntry = catalogEntry;
 
-      if (!catalogEntry) {
-        logger.error('Catalog entry could not be created or retrieved for hash', {
-          userId: user._id.toString(),
-          imageHash,
-        });
-
-        return res.status(500).json({
-          message: 'Failed to save catalog entry',
-        });
+        if (!uploadsInfo.relativePath.startsWith('images/')) {
+          const imagesDir = path.join(UPLOADS_ROOT, 'images');
+          ensureDirectoryExists(imagesDir);
+          const targetFilename = generateUniqueFilename(imagesDir, uploadsInfo.filename);
+          const destinationPath = path.join(imagesDir, targetFilename);
+          fs.renameSync(currentFullPath, destinationPath);
+        }
       }
 
       let catalogToLink: { _id: mongoose.Types.ObjectId } | null = null;
@@ -471,13 +465,13 @@ export class RecognitionController {
       if (catalogToLink) {
         const alreadyLinked = await catalogEntryLinkModel.isEntryLinked(
           catalogToLink._id,
-          catalogEntry._id
+          persistedCatalogEntry._id
         );
 
         if (!alreadyLinked) {
           await catalogEntryLinkModel.linkEntry(
             catalogToLink._id,
-            catalogEntry._id,
+            persistedCatalogEntry._id,
             user._id
           );
 
@@ -488,7 +482,7 @@ export class RecognitionController {
           } catch (broadcastError) {
             logger.warn('Failed to broadcast catalog update after recognition save', {
               catalogId: catalogToLink._id.toString(),
-              entryId: catalogEntry._id.toString(),
+              entryId: persistedCatalogEntry._id.toString(),
               error: broadcastError,
             });
           }
@@ -497,21 +491,21 @@ export class RecognitionController {
         linkedCatalogId = catalogToLink._id;
       }
 
-      if (catalogEntry && locationInfo) {
+      if (locationInfo) {
         let shouldSave = false;
 
-        if (!catalogEntry.city && locationInfo.city) {
-          catalogEntry.city = locationInfo.city;
+        if (!persistedCatalogEntry.city && locationInfo.city) {
+          persistedCatalogEntry.city = locationInfo.city;
           shouldSave = true;
         }
 
-        if (!catalogEntry.province && locationInfo.province) {
-          catalogEntry.province = locationInfo.province;
+        if (!persistedCatalogEntry.province && locationInfo.province) {
+          persistedCatalogEntry.province = locationInfo.province;
           shouldSave = true;
         }
 
         if (shouldSave) {
-          await catalogEntry.save();
+          await persistedCatalogEntry.save();
         }
       }
 
@@ -533,12 +527,12 @@ export class RecognitionController {
         }
       }
 
-      logger.info(`Observation entry saved: ${catalogEntry._id}`);
+      logger.info(`Observation entry saved: ${persistedCatalogEntry._id}`);
 
       return res.status(201).json({
         message: 'Species recognized and saved successfully',
         data: {
-          entry: catalogEntry,
+          entry: persistedCatalogEntry,
           recognition: recognitionResult,
           linkedCatalogId,
         },

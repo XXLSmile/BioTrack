@@ -41,6 +41,12 @@ const haversineDistanceKm = (a: Coordinates, b: Coordinates): number => {
 
 const LOCATION_DISTANCE_THRESHOLD_KM = 30;
 
+const isPopulatedUser = (value: unknown): value is IUser & { _id: mongoose.Types.ObjectId } =>
+  typeof value === 'object' &&
+  value !== null &&
+  '_id' in value &&
+  (value as { _id: unknown })._id instanceof mongoose.Types.ObjectId;
+
 export class FriendController {
   async listFriends(req: Request, res: Response, next: NextFunction) {
     try {
@@ -117,17 +123,26 @@ export class FriendController {
 
       for (const friendship of friends) {
         const isRequester = friendship.requester.equals(user._id);
-        const friendDoc = (isRequester ? friendship.addressee : friendship.requester) as unknown as IUser;
-        if (!friendDoc?._id) {
+        const friendCandidate = isRequester ? friendship.addressee : friendship.requester;
+        const friendshipId =
+          friendship._id instanceof mongoose.Types.ObjectId
+            ? friendship._id
+            : new mongoose.Types.ObjectId(String(friendship._id));
+
+        if (!isPopulatedUser(friendCandidate)) {
+          logger.warn('Friendship missing populated user data', {
+            friendshipId: friendshipId.toString(),
+          });
           continue;
         }
 
+        const friendDoc = friendCandidate;
         const friendIdStr = friendDoc._id.toString();
         friendIds.add(friendIdStr);
         friendDetails.set(friendIdStr, {
           _id: friendDoc._id,
-          name: friendDoc.name ?? null,
-          username: friendDoc.username ?? null,
+          name: typeof friendDoc.name === 'string' ? friendDoc.name : null,
+          username: typeof friendDoc.username === 'string' ? friendDoc.username : null,
         });
       }
 
@@ -360,6 +375,10 @@ export class FriendController {
       const normalizedUserRegion = normalize(currentUser.region);
       const normalizedUserLocation = normalize(currentUser.location);
 
+      const isPopulatedFriend = (
+        value: { _id: mongoose.Types.ObjectId; name?: string | null; username?: string | null } | undefined
+      ): value is { _id: mongoose.Types.ObjectId; name?: string | null; username?: string | null } => Boolean(value);
+
       const recommendations: FriendRecommendation[] = [];
 
       for (const [candidateId, data] of candidateData) {
@@ -382,12 +401,12 @@ export class FriendController {
         const sharedSpecies = Array.from(data.sharedSpecies);
         const mutualFriends = Array.from(data.mutualFriendIds)
           .map(friendId => friendDetails.get(friendId))
-          .filter(Boolean)
+          .filter(isPopulatedFriend)
           .slice(0, 5)
           .map(detail => ({
-            _id: detail!._id,
-            name: detail!.name ?? null,
-            username: detail!.username ?? null,
+            _id: detail._id,
+            name: typeof detail.name === 'string' ? detail.name : null,
+            username: typeof detail.username === 'string' ? detail.username : null,
           }));
 
         let distanceKm: number | undefined;
@@ -420,11 +439,11 @@ export class FriendController {
         recommendations.push({
           user: {
             _id: doc._id,
-            name: doc.name ?? null,
-            username: doc.username ?? null,
-            profilePicture: doc.profilePicture ?? null,
-            location: doc.location ?? null,
-            region: doc.region ?? null,
+            name: typeof doc.name === 'string' ? doc.name : null,
+            username: typeof doc.username === 'string' ? doc.username : null,
+            profilePicture: typeof doc.profilePicture === 'string' ? doc.profilePicture : null,
+            location: typeof doc.location === 'string' ? doc.location : null,
+            region: typeof doc.region === 'string' ? doc.region : null,
             favoriteSpecies: favoriteSpeciesSample,
           },
           mutualFriends,

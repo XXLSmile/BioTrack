@@ -109,7 +109,7 @@ class GeocodingService {
   async forwardGeocode(address: string): Promise<ForwardGeocodeResult | undefined> {
     this.loadApiKey();
 
-    const query = address?.trim();
+    const query = address.trim();
     if (!this.apiKey || !query) {
       return undefined;
     }

@@ -9,10 +9,6 @@ import { catalogModel } from '../catalog/catalog.model';
 import { catalogShareModel } from '../catalog/catalogShare.model';
 import { CatalogEntryLinkResponse, ICatalog } from '../catalog/catalog.types';
 
-interface SocketAuthPayload {
-  id: string;
-}
-
 interface SocketUserData {
   userId: string;
 }
@@ -140,12 +136,26 @@ export const initializeSocketServer = (server: http.Server): Server => {
         return next(new Error('Unauthorized'));
       }
 
-      const decoded = jwt.verify(token, secret) as SocketAuthPayload;
-      if (!decoded?.id || !mongoose.Types.ObjectId.isValid(decoded.id)) {
+      const decoded = jwt.verify(token, secret);
+      const rawId =
+        typeof decoded === 'object' && decoded !== null && 'id' in decoded
+          ? (decoded as { id: unknown }).id
+          : undefined;
+
+      let userObjectId: mongoose.Types.ObjectId | undefined;
+
+      if (typeof rawId === 'string') {
+        if (!mongoose.Types.ObjectId.isValid(rawId)) {
+          return next(new Error('Unauthorized'));
+        }
+        userObjectId = new mongoose.Types.ObjectId(rawId);
+      } else if (rawId instanceof mongoose.Types.ObjectId) {
+        userObjectId = rawId;
+      } else {
         return next(new Error('Unauthorized'));
       }
 
-      const user = await userModel.findById(new mongoose.Types.ObjectId(decoded.id));
+      const user = await userModel.findById(userObjectId);
       if (!user) {
         return next(new Error('Unauthorized'));
       }

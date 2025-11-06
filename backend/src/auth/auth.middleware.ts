@@ -40,11 +40,27 @@ const authenticateTokenImpl = async (
       return;
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-      id: mongoose.Types.ObjectId;
-    };
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
 
-    if (!decoded || !decoded.id) {
+    const rawId =
+      typeof decoded === 'object' && decoded !== null && 'id' in decoded
+        ? (decoded as { id: unknown }).id
+        : undefined;
+
+    let userObjectId: mongoose.Types.ObjectId | undefined;
+
+    if (typeof rawId === 'string') {
+      if (!mongoose.Types.ObjectId.isValid(rawId)) {
+        res.status(401).json({
+          error: 'Invalid token',
+          message: 'Token verification failed',
+        });
+        return;
+      }
+      userObjectId = new mongoose.Types.ObjectId(rawId);
+    } else if (rawId instanceof mongoose.Types.ObjectId) {
+      userObjectId = rawId;
+    } else {
       res.status(401).json({
         error: 'Invalid token',
         message: 'Token verification failed',
@@ -52,7 +68,7 @@ const authenticateTokenImpl = async (
       return;
     }
 
-    const user = await userModel.findById(decoded.id);
+    const user = await userModel.findById(userObjectId);
 
     if (!user) {
       res.status(401).json({
