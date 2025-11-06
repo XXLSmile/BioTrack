@@ -313,17 +313,23 @@ export class FriendController {
         }
       }
 
-      const escapeRegex = (value: string) =>
-        value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
       const normalizedRegion = currentUser.region?.trim();
       if (normalizedRegion) {
-        const regionRegex = new RegExp(`^${escapeRegex(normalizedRegion)}$`, 'i');
+        const normalizedRegionLower = normalizedRegion.toLowerCase();
         const regionMatches = await userModel.findMany(
           {
             _id: { $nin: excludedObjectIds },
             isPublicProfile: true,
-            region: regionRegex,
+            $expr: {
+              $eq: [
+                {
+                  $toLower: {
+                    $ifNull: ['$region', ''],
+                  },
+                },
+                normalizedRegionLower,
+              ],
+            },
           },
           {
             name: 1,
@@ -384,6 +390,9 @@ export class FriendController {
 
       const normalizedUserRegion = normalize(currentUser.region);
       const normalizedUserLocation = normalize(currentUser.location);
+
+      const toNullableString = (value: unknown): string | null =>
+        typeof value === 'string' ? value : null;
 
       const isPopulatedFriend = (
         value: { _id: mongoose.Types.ObjectId; name?: string | null; username?: string | null } | undefined
@@ -485,17 +494,19 @@ export class FriendController {
           recommendations: limited.map(rec => ({
             user: {
               _id: rec.user._id.toString(),
-              name: rec.user.name ?? null,
-              username: rec.user.username ?? null,
-              profilePicture: rec.user.profilePicture ?? null,
-              location: rec.user.location ?? null,
-              region: rec.user.region ?? null,
-              favoriteSpecies: rec.user.favoriteSpecies ?? [],
+              name: toNullableString(rec.user.name),
+              username: toNullableString(rec.user.username),
+              profilePicture: toNullableString(rec.user.profilePicture),
+              location: toNullableString(rec.user.location),
+              region: toNullableString(rec.user.region),
+              favoriteSpecies: Array.isArray(rec.user.favoriteSpecies)
+                ? rec.user.favoriteSpecies
+                : [],
             },
             mutualFriends: rec.mutualFriends.map(mutual => ({
               _id: mutual._id.toString(),
-              name: mutual.name ?? null,
-              username: mutual.username ?? null,
+              name: toNullableString(mutual.name),
+              username: toNullableString(mutual.username),
             })),
             sharedSpecies: rec.sharedSpecies,
             locationMatch: rec.locationMatch,
@@ -585,8 +596,11 @@ export class FriendController {
       // Send FCM notification to target user if they have an FCM token
       if (targetUser.fcmToken) {
         try {
-          const debugContext = `username=${targetUser.username ?? 'unknown'} token=${targetUser.fcmToken ?? 'missing'}`;
-          logger.debug('Try sending FCM notification', debugContext);
+          const debugUsername =
+            typeof targetUser.username === 'string' ? targetUser.username : 'unknown';
+          const debugToken =
+            typeof targetUser.fcmToken === 'string' ? targetUser.fcmToken : 'missing';
+          logger.debug('Try sending FCM notification', `username=${debugUsername} token=${debugToken}`);
 
           await messaging.send({
             token: targetUser.fcmToken,

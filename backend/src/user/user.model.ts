@@ -266,7 +266,7 @@ export class UserModel {
       // Case-insensitive partial match using regex
       const sanitizedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const filter: Record<string, unknown> = {
-        name: new RegExp(sanitizedQuery, 'i')
+        name: { $regex: sanitizedQuery, $options: 'i' },
       };
 
       if (excludeUserId) {
