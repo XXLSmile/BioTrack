@@ -266,7 +266,7 @@ export class RecognitionController {
         });
       }
 
-      type RawSpecies = {
+      interface RawSpecies {
         id?: unknown;
         scientificName?: unknown;
         commonName?: unknown;
@@ -274,7 +274,7 @@ export class RecognitionController {
         taxonomy?: unknown;
         wikipediaUrl?: unknown;
         imageUrl?: unknown;
-      };
+      }
 
       const recognitionPayload = recognition as {
         species?: RawSpecies;

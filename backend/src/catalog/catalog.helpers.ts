@@ -7,10 +7,10 @@ import { ICatalogEntry } from '../recognition/catalog.model';
 import { ISpecies } from '../recognition/species.model';
 import { ICatalogEntryLink } from './catalogEntryLink.model';
 
-type ImageContext = {
+interface ImageContext {
   protocol?: string | null;
   host?: string | null;
-};
+}
 
 const buildBaseUrl = (context?: ImageContext): string | undefined => {
   if (process.env.MEDIA_BASE_URL) {
@@ -146,4 +146,3 @@ export const buildCatalogEntriesResponse = (
     } as unknown as ICatalogEntry,
   }));
 };
-

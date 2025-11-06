@@ -14,10 +14,10 @@ import { messaging } from "../firebase";
 import { IUser } from '../user/user.types';
 import { geocodingService } from '../location/geocoding.service';
 
-type Coordinates = {
+interface Coordinates {
   latitude: number;
   longitude: number;
-};
+}
 
 const toRadians = (value: number) => (value * Math.PI) / 180;
 
@@ -147,13 +147,13 @@ export class FriendController {
       const toObjectIds = (ids: Iterable<string>) =>
         Array.from(ids).map(id => new mongoose.Types.ObjectId(id));
 
-      type CandidateAggregate = {
+      interface CandidateAggregate {
         mutualFriendIds: Set<string>;
         sharedSpecies: Set<string>;
         locationMatch: boolean;
         distanceKm?: number;
         doc?: IUser;
-      };
+      }
 
       const coordinateCache = new Map<string, Coordinates | null>();
       const buildAddressQuery = (doc: IUser): string | null => {

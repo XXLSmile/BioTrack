@@ -9,38 +9,38 @@ import { catalogModel } from '../catalog/catalog.model';
 import { catalogShareModel } from '../catalog/catalogShare.model';
 import { CatalogEntryLinkResponse, ICatalog } from '../catalog/catalog.types';
 
-type SocketAuthPayload = {
+interface SocketAuthPayload {
   id: string;
-};
+}
 
-type SocketUserData = {
+interface SocketUserData {
   userId: string;
-};
+}
 
-type CatalogSocketAck = {
+interface CatalogSocketAck {
   ok: boolean;
   error?: string;
-};
+}
 
-export type CatalogEntriesEventPayload = {
+export interface CatalogEntriesEventPayload {
   catalogId: string;
   entries: unknown[];
   triggeredBy: string;
   updatedAt: string;
-};
+}
 
-export type CatalogUpdatedEventPayload = {
+export interface CatalogUpdatedEventPayload {
   catalogId: string;
   catalog: Record<string, unknown>;
   triggeredBy: string;
   updatedAt: string;
-};
+}
 
-export type CatalogDeletedEventPayload = {
+export interface CatalogDeletedEventPayload {
   catalogId: string;
   triggeredBy: string;
   timestamp: string;
-};
+}
 
 let io: Server | null = null;
 

@@ -45,23 +45,23 @@ export const updateCatalogSchema = z
 export type CreateCatalogRequest = z.infer<typeof createCatalogSchema>;
 export type UpdateCatalogRequest = z.infer<typeof updateCatalogSchema>;
 
-export type CatalogResponse = {
+export interface CatalogResponse {
   message: string;
   data?: {
     catalog: ICatalog;
     entries?: CatalogEntryLinkResponse[];
   };
-};
+}
 
-export type CatalogListResponse = {
+export interface CatalogListResponse {
   message: string;
   data?: {
     catalogs: ICatalog[];
   };
-};
+}
 
-export type CatalogEntryLinkResponse = {
+export interface CatalogEntryLinkResponse {
   entry: ICatalogEntry;
   linkedAt: Date;
   addedBy: mongoose.Types.ObjectId;
-};
+}
