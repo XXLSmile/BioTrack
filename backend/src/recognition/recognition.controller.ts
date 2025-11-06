@@ -59,7 +59,8 @@ const saveUploadedFile = (
   const safeDirectory = ensureDirectoryExists(directory);
 
   const extension = path.extname(file.originalname || '').toLowerCase() || '.jpg';
-  const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extension}`;
+  const randomSuffix = crypto.randomBytes(16).toString('hex');
+  const filename = `${randomSuffix}${extension}`;
   const fullPath = ensurePathWithinRoot(UPLOADS_ROOT, path.join(safeDirectory, filename));
   safeWriteFileSync(fullPath, file.buffer);
 
