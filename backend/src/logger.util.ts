@@ -30,10 +30,18 @@ const writeLog = (level: LogLevel, message: string, args: unknown[]): void => {
 };
 
 const logger = {
-  info: (message: string, ...args: unknown[]) => writeLog('INFO', message, args),
-  error: (message: string, ...args: unknown[]) => writeLog('ERROR', message, args),
-  warn: (message: string, ...args: unknown[]) => writeLog('WARN', message, args),
-  debug: (message: string, ...args: unknown[]) => writeLog('DEBUG', message, args),
+  info: (message: string, ...args: unknown[]) => {
+    writeLog('INFO', message, args);
+  },
+  error: (message: string, ...args: unknown[]) => {
+    writeLog('ERROR', message, args);
+  },
+  warn: (message: string, ...args: unknown[]) => {
+    writeLog('WARN', message, args);
+  },
+  debug: (message: string, ...args: unknown[]) => {
+    writeLog('DEBUG', message, args);
+  },
 };
 
 export default logger;
