@@ -4,7 +4,7 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
-| _Nothing to show_ |
+| 2025-02-14 | Section 2 (Back-end Test Specification) | Documented Jest-based API testing setup and execution flow. |
 
 ---
 
@@ -16,29 +16,45 @@
 
 | **Interface**                 | **Describe Group Location, No Mocks**                | **Describe Group Location, With Mocks**            | **Mocked Components**              |
 | ----------------------------- | ---------------------------------------------------- | -------------------------------------------------- | ---------------------------------- |
-| **POST /user/login**          | [`tests/unmocked/authenticationLogin.test.js#L1`](#) | [`tests/mocked/authenticationLogin.test.js#L1`](#) | Google Authentication API, User DB |
-| **POST /study-groups/create** | ...                                                  | ...                                                | Study Group DB                     |
-| ...                           | ...                                                  | ...                                                | ...                                |
-| ...                           | ...                                                  | ...                                                | ...                                |
+| **Auth API** | [`backend/tests/auth/auth.routes.spec.ts`](../backend/tests/auth/auth.routes.spec.ts#L36) | [`backend/tests/auth/auth.routes.spec.ts`](../backend/tests/auth/auth.routes.spec.ts#L49) | `authService.*` |
+| **User API** | [`backend/tests/user/user.routes.spec.ts`](../backend/tests/user/user.routes.spec.ts#L21) | [`backend/tests/user/user.routes.spec.ts`](../backend/tests/user/user.routes.spec.ts#L48) | `userModel.*` |
+| **Friends API** | [`backend/tests/friends/friend.routes.spec.ts`](../backend/tests/friends/friend.routes.spec.ts#L18) | [`backend/tests/friends/friend.routes.spec.ts`](../backend/tests/friends/friend.routes.spec.ts#L39) | `friendshipModel.*` |
+| **Catalog API** | [`backend/tests/catalog/catalog.routes.spec.ts`](../backend/tests/catalog/catalog.routes.spec.ts#L25) | [`backend/tests/catalog/catalog.routes.spec.ts`](../backend/tests/catalog/catalog.routes.spec.ts#L57) | `catalogModel`, `catalogShareModel`, `catalogEntryLinkModel`, socket events |
+| **Recognition API** | [`backend/tests/recognition/recognition.routes.spec.ts`](../backend/tests/recognition/recognition.routes.spec.ts#L52) | [`backend/tests/recognition/recognition.routes.spec.ts`](../backend/tests/recognition/recognition.routes.spec.ts#L73) | `recognitionService`, fs helpers |
+| **Admin API** | [`backend/tests/admin/admin.routes.spec.ts`](../backend/tests/admin/admin.routes.spec.ts#L17) | [`backend/tests/admin/admin.routes.spec.ts`](../backend/tests/admin/admin.routes.spec.ts#L33) | `userModel`, `mongoose.Model` |
 
 #### 2.1.2. Commit Hash Where Tests Run
 
-`[Insert Commit SHA here]`
+The first successful run with the current suite has not yet been recorded. After executing the tests locally (requires MongoDB binaries for `mongodb-memory-server`), capture the SHA via `git rev-parse HEAD` and record it here.
 
 #### 2.1.3. Explanation on How to Run the Tests
 
-1. **Clone the Repository**:
+1. **Install dependencies**
+   ```bash
+   cd backend
+   npm install
+   ```
+2. **Run the full Jest suite**
+ ```bash
+  npm run test
+  ```
+   Uses an in-memory MongoDB instance (`mongodb-memory-server`) and the shared Express app factory, so no external services are required.
+   > _Offline note:_ the first run downloads a MongoDB binary. If your environment blocks outbound network access, pre-provision the binary or execute the suite on a machine with internet connectivity.
+3. **Watch mode (optional)**
+   ```bash
+   npm run test:watch
+   ```
+4. **Generate coverage**
+   ```bash
+   npm run test:coverage
+   ```
+   Coverage artefacts are written to `backend/coverage/`. Open `backend/coverage/lcov-report/index.html` in a browser for the detailed report.
 
-   - Open your terminal and run:
-     ```
-     git clone https://github.com/example/your-project.git
-     ```
+### 2.2. Jest Configuration Location
 
-2. **...**
+`backend/jest.config.ts`
 
-### 2.2. GitHub Actions Configuration Location
-
-`~/.github/workflows/backend-tests.yml`
+> _Note:_ CI automation for backend tests is not yet committed. When a GitHub Actions workflow is added, document its path here as well.
 
 ### 2.3. Jest Coverage Report Screenshots for Tests Without Mocking
 
