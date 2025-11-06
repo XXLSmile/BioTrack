@@ -1,19 +1,32 @@
-import type { NextFunction, Request, Response, RequestHandler } from 'express';
-type HandlerResult = Response<any, any> | void;
+import type { NextFunction, Request, RequestHandler, Response } from 'express';
+import type { ParamsDictionary } from 'express-serve-static-core';
+import type { ParsedQs } from 'qs';
 
-type AsyncRouteHandler = (
-  req: Request<any, any, any, any>,
-  res: Response<any, any>,
+type AsyncRouteHandler<
+  P extends ParamsDictionary = ParamsDictionary,
+  ResBody = unknown,
+  ReqBody = unknown,
+  ReqQuery = ParsedQs
+> = (
+  req: Request<P, ResBody, ReqBody, ReqQuery>,
+  res: Response<ResBody>,
   next: NextFunction
-) => HandlerResult | Promise<HandlerResult>;
+) => HandlerResult<ResBody> | Promise<HandlerResult<ResBody>>;
+
+type HandlerResult<ResBody> = Response<ResBody> | void;
 
 /**
  * Wraps an async route handler so unhandled rejections are forwarded to Express.
  */
-export const asyncHandler = (handler: AsyncRouteHandler): RequestHandler => {
+export const asyncHandler = <
+  P extends ParamsDictionary = ParamsDictionary,
+  ResBody = unknown,
+  ReqBody = unknown,
+  ReqQuery = ParsedQs
+>(
+  handler: AsyncRouteHandler<P, ResBody, ReqBody, ReqQuery>
+): RequestHandler<P, ResBody, ReqBody, ReqQuery> => {
   return (req, res, next) => {
-    Promise.resolve(
-      handler(req, res, next)
-    ).catch(next);
+    Promise.resolve(handler(req, res, next)).catch(next);
   };
 };

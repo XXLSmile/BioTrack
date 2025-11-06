@@ -55,7 +55,9 @@ export interface CatalogDeletedEventPayload {
   timestamp: string;
 }
 
-let io: Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, ServerSocketData> | null = null;
+type SocketServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, ServerSocketData>;
+
+let io: SocketServer | null = null;
 
 const buildCatalogRoom = (catalogId: string): string => `catalog:${catalogId}`;
 
@@ -139,22 +141,26 @@ export const initializeSocketServer = (
           socket.data.user = {
             userId: fallbackUserId,
           };
-          return next();
+          next();
+          return;
         }
 
         logger.warn('Socket authentication disabled but TEST_USER_ID is not configured. Connection denied.');
-        return next(new Error('Unauthorized'));
+        next(new Error('Unauthorized'));
+        return;
       }
 
       const token = extractToken(socket);
       if (!token) {
-        return next(new Error('Unauthorized'));
+        next(new Error('Unauthorized'));
+        return;
       }
 
       const secret = process.env.JWT_SECRET;
       if (!secret) {
         logger.error('JWT_SECRET is not configured. Socket authentication cannot proceed.');
-        return next(new Error('Unauthorized'));
+        next(new Error('Unauthorized'));
+        return;
       }
 
       const decoded = jwt.verify(token, secret);
@@ -167,18 +173,21 @@ export const initializeSocketServer = (
 
       if (typeof rawId === 'string') {
         if (!mongoose.Types.ObjectId.isValid(rawId)) {
-          return next(new Error('Unauthorized'));
+          next(new Error('Unauthorized'));
+          return;
         }
         userObjectId = new mongoose.Types.ObjectId(rawId);
       } else if (rawId instanceof mongoose.Types.ObjectId) {
         userObjectId = rawId;
       } else {
-        return next(new Error('Unauthorized'));
+        next(new Error('Unauthorized'));
+        return;
       }
 
       const user = await userModel.findById(userObjectId);
       if (!user) {
-        return next(new Error('Unauthorized'));
+        next(new Error('Unauthorized'));
+        return;
       }
 
       socket.data.user = {
@@ -249,9 +258,7 @@ export const initializeSocketServer = (
   return io;
 };
 
-const getServer = ():
-  | Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, ServerSocketData>
-  | null => io;
+const getServer = (): SocketServer | null => io;
 
 const emitToCatalogRoom = <TEvent extends keyof ServerToClientEvents>(
   catalogId: mongoose.Types.ObjectId | string,

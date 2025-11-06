@@ -38,9 +38,13 @@ export const updateCatalogSchema = z
       .max(500, 'Description must be at most 500 characters')
       .optional(),
   })
-  .refine(data => Object.keys(data).length > 0, {
-    message: 'At least one field must be provided to update the catalog',
-  });
+  .refine(
+    (data: { name?: string; description?: string }) =>
+      typeof data.name !== 'undefined' || typeof data.description !== 'undefined',
+    {
+      message: 'At least one field must be provided to update the catalog',
+    }
+  );
 
 export type CreateCatalogRequest = z.infer<typeof createCatalogSchema>;
 export type UpdateCatalogRequest = z.infer<typeof updateCatalogSchema>;

@@ -7,9 +7,19 @@ export class AdminController {
   // Create a test user manually (DEV ONLY)
   async createTestUser(req: Request, res: Response) {
     try {
-      const { googleId, email, name, username } = req.body;
+      const { googleId, email, name, username } = req.body as {
+        googleId?: unknown;
+        email?: unknown;
+        name?: unknown;
+        username?: unknown;
+      };
 
-      if (!googleId || !email || !name || !username) {
+      if (
+        typeof googleId !== 'string' ||
+        typeof email !== 'string' ||
+        typeof name !== 'string' ||
+        typeof username !== 'string'
+      ) {
         return res.status(400).json({
           message: 'googleId, email, name, and username are required',
         });

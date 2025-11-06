@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
+import { Buffer } from 'node:buffer';
 
 import { recognitionService } from './recognition.service';
 import { catalogRepository, ICatalogEntry } from './catalog.model';
@@ -58,10 +59,15 @@ const saveUploadedFile = (
   const directory = resolveWithinRoot(UPLOADS_ROOT, sanitizedSubDir);
   const safeDirectory = ensureDirectoryExists(directory);
 
-  const extension = path.extname(file.originalname || '').toLowerCase() || '.jpg';
+  const originalName = typeof file.originalname === 'string' ? file.originalname : '';
+  const rawExtension = path.extname(originalName).toLowerCase();
+  const extension = rawExtension || '.jpg';
   const randomSuffix = crypto.randomBytes(16).toString('hex');
   const filename = `${randomSuffix}${extension}`;
   const fullPath = ensurePathWithinRoot(UPLOADS_ROOT, path.join(safeDirectory, filename));
+  if (!Buffer.isBuffer(file.buffer)) {
+    throw new Error('Uploaded file buffer is not available.');
+  }
   safeWriteFileSync(fullPath, file.buffer);
 
   const relativePath = `/uploads/${sanitizedSubDir}/${filename}`;

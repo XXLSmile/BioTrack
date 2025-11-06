@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 
 import mongoose from 'mongoose';
+import type { ParamsDictionary } from 'express-serve-static-core';
 
 import { GetProfileResponse, UpdateProfileRequest } from '../user/user.types';
 import logger from '../logger.util';
@@ -21,7 +22,7 @@ export class UserController {
   }
 
   async updateProfile(
-    req: Request<unknown, unknown, UpdateProfileRequest>,
+    req: Request<ParamsDictionary, GetProfileResponse, UpdateProfileRequest>,
     res: Response<GetProfileResponse>,
     next: NextFunction
   ) {
@@ -210,7 +211,7 @@ export class UserController {
     try {
       const { userId } = req.params;
 
-      const user = await userModel.findById(new (require('mongoose').Types.ObjectId)(userId));
+      const user = await userModel.findById(new mongoose.Types.ObjectId(userId));
 
       if (!user) {
         return res.status(404).json({
@@ -335,15 +336,15 @@ export class UserController {
       if (!user) {
         return res.status(401).json({ message: 'Authentication required' });
       }
-      const { speciesName } = req.body;
+      const { speciesName } = req.body as { speciesName?: unknown };
 
-      if (!speciesName) {
+      if (typeof speciesName !== 'string' || speciesName.trim().length === 0) {
         return res.status(400).json({
           message: 'Species name is required',
         });
       }
 
-      await userModel.addFavoriteSpecies(user._id, speciesName);
+      await userModel.addFavoriteSpecies(user._id, speciesName.trim());
 
       res.status(200).json({
         message: 'Favorite species added successfully',
@@ -360,15 +361,15 @@ export class UserController {
       if (!user) {
         return res.status(401).json({ message: 'Authentication required' });
       }
-      const { speciesName } = req.body;
+      const { speciesName } = req.body as { speciesName?: unknown };
 
-      if (!speciesName) {
+      if (typeof speciesName !== 'string' || speciesName.trim().length === 0) {
         return res.status(400).json({
           message: 'Species name is required',
         });
       }
 
-      await userModel.removeFavoriteSpecies(user._id, speciesName);
+      await userModel.removeFavoriteSpecies(user._id, speciesName.trim());
 
       res.status(200).json({
         message: 'Favorite species removed successfully',

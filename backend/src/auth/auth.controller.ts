@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
+import type { ParamsDictionary } from 'express-serve-static-core';
 
 import { authService } from './auth.service';
 import {
@@ -9,12 +10,18 @@ import logger from '../logger.util';
 
 export class AuthController {
   async signUp(
-    req: Request<unknown, unknown, AuthenticateUserRequest>,
+    req: Request<ParamsDictionary, AuthenticateUserResponse, AuthenticateUserRequest>,
     res: Response<AuthenticateUserResponse>,
     next: NextFunction
   ) {
     try {
       const { idToken } = req.body;
+
+      if (typeof idToken !== 'string' || idToken.length === 0) {
+        return res.status(400).json({
+          message: 'Google token is required',
+        });
+      }
 
       const data = await authService.signUpWithGoogle(idToken);
 
@@ -50,12 +57,18 @@ export class AuthController {
   }
 
   async signIn(
-    req: Request<unknown, unknown, AuthenticateUserRequest>,
+    req: Request<ParamsDictionary, AuthenticateUserResponse, AuthenticateUserRequest>,
     res: Response<AuthenticateUserResponse>,
     next: NextFunction
   ) {
     try {
       const { idToken } = req.body;
+
+      if (typeof idToken !== 'string' || idToken.length === 0) {
+        return res.status(400).json({
+          message: 'Google token is required',
+        });
+      }
 
       const data = await authService.signInWithGoogle(idToken);
 

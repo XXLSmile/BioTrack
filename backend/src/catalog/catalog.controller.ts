@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
+import type { ParamsDictionary } from 'express-serve-static-core';
 import mongoose from 'mongoose';
 
 import logger from '../logger.util';
@@ -22,7 +23,7 @@ import {
 
 export class CatalogController {
   async createCatalog(
-    req: Request<unknown, unknown, CreateCatalogRequest>,
+    req: Request<ParamsDictionary, CatalogResponse, CreateCatalogRequest>,
     res: Response<CatalogResponse>,
     next: NextFunction
   ) {
@@ -58,7 +59,7 @@ export class CatalogController {
   }
 
   async listCatalogs(
-    req: Request,
+    req: Request<ParamsDictionary, CatalogListResponse>,
     res: Response<CatalogListResponse>,
     next: NextFunction
   ) {
@@ -131,7 +132,7 @@ export class CatalogController {
   }
 
   async updateCatalog(
-    req: Request<{ catalogId: string }, unknown, UpdateCatalogRequest>,
+    req: Request<{ catalogId: string }, CatalogResponse, UpdateCatalogRequest>,
     res: Response<CatalogResponse>,
     next: NextFunction
   ) {

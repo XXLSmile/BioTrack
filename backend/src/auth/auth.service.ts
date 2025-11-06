@@ -47,9 +47,11 @@ export class AuthService {
       throw new Error('JWT secret is not configured');
     }
 
-    return jwt.sign({ id: user._id }, secret, {
+    const token: string = jwt.sign({ id: user._id }, secret, {
       expiresIn: '19h',
     });
+
+    return token;
   }
 
   async signUpWithGoogle(idToken: string): Promise<AuthResult> {
