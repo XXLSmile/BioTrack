@@ -222,8 +222,11 @@ export class UserModel {
   async findByName(name: string): Promise<IUser | null> {
     try {
       // Case-insensitive search
-      const user = await this.user.findOne({ 
-        name: new RegExp(`^${name}$`, 'i')
+      const normalizedName = name.trim().toLowerCase();
+      const user = await this.user.findOne({
+        $expr: {
+          $eq: [{ $toLower: '$name' }, normalizedName],
+        },
       });
 
       if (!user) {
@@ -260,9 +263,10 @@ export class UserModel {
     excludeUserId?: mongoose.Types.ObjectId
   ): Promise<IUser[]> {
     try {
-      // Case-insensitive partial match
+      // Case-insensitive partial match using regex
+      const sanitizedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const filter: Record<string, unknown> = {
-        name: new RegExp(query, 'i')
+        name: new RegExp(sanitizedQuery, 'i')
       };
 
       if (excludeUserId) {
