@@ -676,24 +676,21 @@ export class FriendController {
         // Send FCM notification to requester if they have an FCM token
         if (requesterUser?.fcmToken) {
           try {
-            let message : any = {
+            await messaging.send({
               token: requesterUser.fcmToken,
               notification: {
-                title: "Friend Request Accepted ✅",
+                title: 'Friend Request Accepted ✅',
                 body: `${addresseeUser?.name || addresseeUser?.username} accepted your friend request!`,
               },
               data: {
-                type: "FRIEND_REQUEST_ACCEPTED",
+                type: 'FRIEND_REQUEST_ACCEPTED',
                 friendId: addresseeId.toString(),
               },
-            };
+            });
 
-            // console.log(`${message.toString()}`);
-            
-            await messaging.send(message);
             logger.info(`Sent acceptance notification to ${requesterUser.username}`);
           } catch (err) {
-            logger.warn(`Failed to send FCM acceptance notification:`, err);
+            logger.warn('Failed to send FCM acceptance notification:', err);
           }
         }
       }

@@ -15,14 +15,12 @@ const router = Router();
  */
 router.get('/users', asyncHandler(async (_req: Request, res: Response) => {
   try {
-    const User = mongoose.model('User');
-    let queryResult: any = User.find({});
+    const userModelRef = mongoose.model('User');
+    const queryResult = userModelRef.find({});
 
-    if (typeof queryResult.limit === 'function') {
-      queryResult = queryResult.limit(50).select('-googleId');
-    }
-
-    const users = await queryResult;
+    const users = queryResult instanceof mongoose.Query
+      ? await queryResult.limit(50).select('-googleId')
+      : await queryResult;
     
     res.json({
       message: 'Users fetched successfully',
