@@ -714,7 +714,7 @@ export class RecognitionController {
         });
       }
 
-      if (result === 'deleted' && affectedCatalogIds.length > 0) {
+      if (affectedCatalogIds.length > 0) {
         for (const catalogId of affectedCatalogIds) {
           try {
             const links = await catalogEntryLinkModel.listEntriesWithDetails(catalogId);

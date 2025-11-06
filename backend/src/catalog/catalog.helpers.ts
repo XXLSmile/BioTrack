@@ -128,7 +128,7 @@ const serializeCatalogLinks = (
 
     if (addedByDoc instanceof mongoose.Types.ObjectId) {
       addedBy = addedByDoc;
-    } else if (addedByDoc && addedByDoc._id instanceof mongoose.Types.ObjectId) {
+    } else if (addedByDoc._id instanceof mongoose.Types.ObjectId) {
       addedBy = addedByDoc._id;
     } else {
       addedBy = fallbackUserId;
