@@ -68,7 +68,8 @@ const saveUploadedFile = (
   if (!Buffer.isBuffer(file.buffer)) {
     throw new Error('Uploaded file buffer is not available.');
   }
-  safeWriteFileSync(fullPath, file.buffer);
+  const fileBuffer: Buffer = file.buffer;
+  safeWriteFileSync(fullPath, fileBuffer);
 
   const relativePath = `/uploads/${sanitizedSubDir}/${filename}`;
   return { fullPath, relativePath, filename };

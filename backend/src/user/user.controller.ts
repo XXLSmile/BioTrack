@@ -3,7 +3,7 @@ import { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import type { ParamsDictionary } from 'express-serve-static-core';
 
-import { GetProfileResponse, UpdateProfileRequest } from '../user/user.types';
+import { GetProfileResponse, UpdateProfileRequest, updateProfileSchema } from '../user/user.types';
 import logger from '../logger.util';
 import { userModel } from '../user/user.model';
 import { friendshipModel } from '../friends/friend.model';
@@ -31,7 +31,8 @@ export class UserController {
       if (!user) {
         return res.status(401).json({ message: 'Authentication required' });
       }
-      const { username } = req.body;
+      const updatePayload = updateProfileSchema.parse(req.body);
+      const { username } = updatePayload;
 
       // Check if username is being changed and if it's available
       if (username && username !== user.username) {
@@ -43,7 +44,7 @@ export class UserController {
         }
       }
 
-      const updatedUser = await userModel.update(user._id, req.body);
+      const updatedUser = await userModel.update(user._id, updatePayload);
 
       if (!updatedUser) {
         return res.status(404).json({

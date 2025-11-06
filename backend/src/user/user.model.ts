@@ -139,14 +139,13 @@ export class UserModel {
   ): Promise<IUser | null> {
     try {
       const validatedData = updateProfileSchema.parse(user);
+      const updateDocument: mongoose.UpdateQuery<IUser> = {
+        $set: validatedData,
+      };
 
-      const updatedUser = await this.user.findByIdAndUpdate(
-        userId,
-        validatedData,
-        {
-          new: true,
-        }
-      );
+      const updatedUser = await this.user.findByIdAndUpdate(userId, updateDocument, {
+        new: true,
+      });
       return updatedUser;
     } catch (error) {
       logger.error('Error updating user:', error);

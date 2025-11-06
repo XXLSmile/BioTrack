@@ -1,10 +1,12 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { recognitionController } from './recognition.controller';
 import { uploadMemory } from '../storage';
 import { authenticateToken } from '../auth/auth.middleware';
 import { asyncHandler } from '../utils/asyncHandler';
 
 const router = Router();
+const uploadRecognitionImage: RequestHandler = (req, res, next) =>
+  uploadMemory.single('image')(req, res, next);
 
 /**
  * POST /api/recognition
@@ -12,7 +14,7 @@ const router = Router();
  */
 router.post(
   '/',
-  uploadMemory.single('image'),
+  uploadRecognitionImage,
   asyncHandler(recognitionController.recognizeImage.bind(recognitionController))
 );
 

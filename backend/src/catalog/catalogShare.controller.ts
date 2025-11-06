@@ -59,7 +59,8 @@ export class CatalogShareController {
         return res.status(401).json({ message: 'Authentication required' });
       }
       const { catalogId } = req.params;
-      const { inviteeId, role } = inviteCollaboratorSchema.parse(req.body);
+      const invitePayload = inviteCollaboratorSchema.parse(req.body);
+      const { inviteeId, role } = invitePayload;
 
       const catalog = await catalogModel.findById(catalogId);
       if (!catalog) {
@@ -149,7 +150,7 @@ export class CatalogShareController {
         return res.status(401).json({ message: 'Authentication required' });
       }
       const { catalogId, shareId } = req.params;
-      const body = updateCollaboratorSchema.parse(req.body);
+      const updatePayload = updateCollaboratorSchema.parse(req.body);
 
       const catalog = await catalogModel.findById(catalogId);
       if (!catalog) {
@@ -168,10 +169,10 @@ export class CatalogShareController {
 
       let updatedShare: typeof share | null = share;
 
-      if (body.action === 'revoke') {
+      if (updatePayload.action === 'revoke') {
         updatedShare = await catalogShareModel.revokeInvitation(shareObjectId);
-      } else if (body.role) {
-        updatedShare = await catalogShareModel.updateRole(shareObjectId, body.role);
+      } else if (updatePayload.role) {
+        updatedShare = await catalogShareModel.updateRole(shareObjectId, updatePayload.role);
       }
 
       if (!updatedShare) {

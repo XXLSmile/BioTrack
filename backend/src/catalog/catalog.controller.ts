@@ -8,6 +8,7 @@ import {
   CatalogListResponse,
   CatalogResponse,
   CreateCatalogRequest,
+  createCatalogSchema,
   UpdateCatalogRequest,
 } from './catalog.types';
 import { catalogModel } from './catalog.model';
@@ -33,7 +34,8 @@ export class CatalogController {
         return res.status(401).json({ message: 'Authentication required' });
       }
 
-      const catalog = await catalogModel.createCatalog(user._id, req.body);
+      const createPayload = createCatalogSchema.parse(req.body);
+      const catalog = await catalogModel.createCatalog(user._id, createPayload);
 
       res.status(201).json({
         message: 'Catalog created successfully',
