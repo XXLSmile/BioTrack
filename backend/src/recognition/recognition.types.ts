@@ -17,9 +17,24 @@ export interface RecognitionResult {
   }[];
 }
 
-// Request/response types
+export interface RecognitionImagePayload {
+  recognition: RecognitionResult;
+  imagePath?: string;
+  absoluteImageUrl?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
 export interface RecognitionImageResponse {
   message: string;
-  data?: RecognitionResult | unknown;
-  available?: boolean;
+  data?: RecognitionImagePayload;
+}
+
+export interface SaveRecognitionRequestBody {
+  imagePath: string;
+  recognition: RecognitionResult;
+  catalogId?: string;
+  notes?: string;
+  latitude?: number;
+  longitude?: number;
 }

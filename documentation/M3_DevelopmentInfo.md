@@ -4,7 +4,7 @@
 - **Public IP / Domain**: http://4.206.208.211:80
 
 ## MVP Reference
-- **Main Branch Commit Hash**: `__MVP_COMMIT_HASH__`
+- **Main Branch Commit Hash**: 1df5e51
 
 ## Scope Alignment
 - **External API integration** – The backend forwards recognition requests to the Zyla Labs Animal Recognition service, fulfilling the external-API requirement. Each photo submission returns a species label, confidence score, and top alternatives that the app shows to the user so they can decide which observation to catalog or share. Google’s Geocoding API turns captured latitude/longitude into human-readable city/province labels, and the Android client embeds Google Maps tiles to display observation locations and navigation routes.

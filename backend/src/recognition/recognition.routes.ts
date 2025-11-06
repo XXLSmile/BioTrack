@@ -43,8 +43,7 @@ router.post(
 router.post(
   '/save',
   authenticateToken,
-  uploadSingleImage,
-  recognizeAndSave
+  recognitionController.recognizeAndSave
 );
 
 /**
