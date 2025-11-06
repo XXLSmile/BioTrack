@@ -21,7 +21,10 @@ export class CatalogShareController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const { catalogId } = req.params;
 
       const catalog = await catalogModel.findById(catalogId);
@@ -51,7 +54,10 @@ export class CatalogShareController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const { catalogId } = req.params;
       const { inviteeId, role } = inviteCollaboratorSchema.parse(req.body);
 
@@ -138,7 +144,10 @@ export class CatalogShareController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const { catalogId, shareId } = req.params;
       const body = updateCollaboratorSchema.parse(req.body);
 
@@ -185,7 +194,10 @@ export class CatalogShareController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const { shareId } = req.params;
       const { action } = respondToInvitationSchema.parse(req.body);
 
@@ -263,7 +275,10 @@ export class CatalogShareController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const invitations = await catalogShareModel.listPendingInvitations(user._id);
 
       res.status(200).json({
@@ -282,7 +297,10 @@ export class CatalogShareController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const shares = await catalogShareModel.listSharedWithUser(user._id);
 
       res.status(200).json({

@@ -50,7 +50,11 @@ const isPopulatedUser = (value: unknown): value is IUser & { _id: mongoose.Types
 export class FriendController {
   async listFriends(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
       const friendships = await friendshipModel.getFriendsForUser(user._id);
 
       const friends = friendships
@@ -105,7 +109,11 @@ export class FriendController {
 
   async getRecommendations(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
       const limit = req.query.limit ? Math.min(Math.max(parseInt(req.query.limit as string, 10) || 10, 1), 50) : 10;
 
       const currentUser = await userModel.findById(user._id);
@@ -255,7 +263,9 @@ export class FriendController {
             continue;
           }
 
-          ensureCandidate(candidateId).mutualFriendIds.add(mutualFriendId!);
+          if (mutualFriendId) {
+            ensureCandidate(candidateId).mutualFriendIds.add(mutualFriendId);
+          }
         }
       }
 
@@ -503,7 +513,11 @@ export class FriendController {
 
   async listRequests(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
       const { type } = req.query;
 
       if (type === 'outgoing') {
@@ -531,7 +545,11 @@ export class FriendController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
       const body = createFriendRequestSchema.parse(req.body);
       const targetId = new mongoose.Types.ObjectId(body.targetUserId);
 
@@ -604,7 +622,11 @@ export class FriendController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
       const { requestId } = req.params;
       const { action } = respondFriendRequestSchema.parse(req.body);
 
@@ -697,7 +719,11 @@ export class FriendController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
       const { requestId } = req.params;
       const requestObjectId = new mongoose.Types.ObjectId(requestId);
 
@@ -738,7 +764,11 @@ export class FriendController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
       const { friendshipId } = req.params;
       const friendshipObjectId = new mongoose.Types.ObjectId(friendshipId);
 

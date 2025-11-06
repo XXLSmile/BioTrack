@@ -253,7 +253,10 @@ export class RecognitionController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const {
         imagePath,
         recognition,
@@ -569,7 +572,10 @@ export class RecognitionController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
 
       const catalogEntries = await catalogRepository.findByUserId(user._id.toString(), limit);
@@ -593,7 +599,10 @@ export class RecognitionController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
 
       const entries = await catalogRepository.findRecentByUserId(user._id.toString(), limit);
@@ -661,7 +670,10 @@ export class RecognitionController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const { entryId } = req.params;
 
       if (!entryId) {

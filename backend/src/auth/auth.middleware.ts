@@ -40,7 +40,16 @@ const authenticateTokenImpl = async (
       return;
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      res.status(500).json({
+        error: 'Server misconfiguration',
+        message: 'JWT secret is not configured',
+      });
+      return;
+    }
+
+    const decoded = jwt.verify(token, secret);
 
     const rawId =
       typeof decoded === 'object' && decoded !== null && 'id' in decoded
