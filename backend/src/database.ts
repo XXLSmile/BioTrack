@@ -28,7 +28,7 @@ export const connectDB = async (): Promise<void> => {
           logger.info('MongoDB connection closed through app termination');
           process.exitCode = 0;
         })
-        .catch(error => {
+        .catch((error: unknown) => {
           logger.error('❌ Error closing MongoDB connection:', error);
           process.exitCode = 1;
         });

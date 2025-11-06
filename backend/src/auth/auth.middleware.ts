@@ -113,5 +113,5 @@ const authenticateTokenImpl = async (
 };
 
 export const authenticateToken: RequestHandler = (req, res, next) => {
-  void authenticateTokenImpl(req, res, next).catch(next);
+  void authenticateTokenImpl(req, res, next).catch((error: unknown) => next(error));
 };
