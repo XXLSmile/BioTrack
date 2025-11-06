@@ -57,7 +57,8 @@ export interface CatalogDeletedEventPayload {
 
 type SocketServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, ServerSocketData>;
 
-let io: SocketServer | undefined;
+let io: SocketServer;
+let isServerInitialized = false;
 
 const buildCatalogRoom = (catalogId: string): string => `catalog:${catalogId}`;
 
@@ -120,7 +121,7 @@ const userHasCatalogAccess = async (userId: string, catalogId: string): Promise<
 export const initializeSocketServer = (
   server: http.Server
 ): Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, ServerSocketData> => {
-  if (io) {
+  if (isServerInitialized) {
     return io;
   }
 
@@ -257,18 +258,23 @@ export const initializeSocketServer = (
     });
   });
 
+  isServerInitialized = true;
   return io;
 };
 
-const getServer = (): SocketServer | undefined => io;
+const getServer = (): SocketServer => {
+  if (!isServerInitialized) {
+    throw new Error('Socket.IO server has not been initialized.');
+  }
+  return io;
+};
 
 const emitToCatalogRoom = <TEvent extends keyof ServerToClientEvents>(
   catalogId: mongoose.Types.ObjectId | string,
   event: TEvent,
   payload: Parameters<ServerToClientEvents[TEvent]>[0]
 ): void => {
-  const server = getServer();
-  if (!server) {
+  if (!isServerInitialized) {
     logger.warn('Socket.IO server not initialized. Skipping emit.', {
       event,
       catalogId: catalogId.toString(),
@@ -276,6 +282,7 @@ const emitToCatalogRoom = <TEvent extends keyof ServerToClientEvents>(
     return;
   }
 
+  const server = getServer();
   const args = [payload] as Parameters<ServerToClientEvents[TEvent]>;
   server.to(buildCatalogRoom(catalogId.toString())).emit(event, ...args);
 };
