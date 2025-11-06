@@ -328,21 +328,6 @@ PATCH /api/catalogs/share/665fb1bf2f5eab3c6a02d920/respond
 
 Accepted collaborators with the `editor` role can add/update/remove entries; `viewer` can only read. Only the catalog owner can rename/delete the catalog or modify collaborator roles.
 
----
-
-## Admin (Dev-Only) Routes (`/api/admin`)
-
-> These endpoints are intended for local testing and should be disabled in production.
-
-| Method | Path | Description |
-| --- | --- | --- |
-| GET | `/users` | List first 50 users (strips Google IDs). |
-| GET | `/users/:userId` | Fetch a single user by ID. |
-| GET | `/stats` | Basic database statistics. |
-| POST | `/create-user` | Create a test user (see controller for payload). |
-
----
-
 ## Error Responses
 
 Errors use standard HTTP codes with a JSON payload:
