@@ -259,7 +259,7 @@ export class UserModel {
 
   async searchByName(
     query: string,
-    limit: number = 10,
+    limit = 10,
     excludeUserId?: mongoose.Types.ObjectId
   ): Promise<IUser[]> {
     try {

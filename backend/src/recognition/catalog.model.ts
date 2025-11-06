@@ -131,14 +131,14 @@ export class CatalogRepository {
     return await CatalogModel.findById(entryId).populate('speciesId');
   }
 
-  async findByUserId(userId: string, limit: number = 50): Promise<ICatalogEntry[]> {
+  async findByUserId(userId: string, limit = 50): Promise<ICatalogEntry[]> {
     return await CatalogModel.find({ userId })
       .sort({ createdAt: -1 })
       .limit(limit)
       .populate('speciesId');
   }
 
-  async findRecentByUserId(userId: string, limit: number = 10): Promise<ICatalogEntry[]> {
+  async findRecentByUserId(userId: string, limit = 10): Promise<ICatalogEntry[]> {
     return CatalogModel.find({ userId })
       .sort({ createdAt: -1 })
       .limit(limit)
