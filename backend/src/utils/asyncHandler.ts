@@ -27,6 +27,8 @@ export const asyncHandler = <
   handler: AsyncRouteHandler<P, ResBody, ReqBody, ReqQuery>
 ): RequestHandler<P, ResBody, ReqBody, ReqQuery> => {
   return (req, res, next) => {
-    Promise.resolve(handler(req, res, next)).catch((error: unknown) => next(error));
+    Promise.resolve(handler(req, res, next)).catch((error: unknown) => {
+      next(error);
+    });
   };
 };
