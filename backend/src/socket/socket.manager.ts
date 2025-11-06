@@ -18,16 +18,16 @@ interface CatalogSocketAck {
   error?: string;
 }
 
-type ClientToServerEvents = {
+interface ClientToServerEvents {
   'catalog:join': (catalogId: string, ack?: (response: CatalogSocketAck) => void) => void;
   'catalog:leave': (catalogId: string) => void;
-};
+}
 
-type ServerToClientEvents = {
+interface ServerToClientEvents {
   'catalog:entries-updated': (payload: CatalogEntriesEventPayload) => void;
   'catalog:metadata-updated': (payload: CatalogUpdatedEventPayload) => void;
   'catalog:deleted': (payload: CatalogDeletedEventPayload) => void;
-};
+}
 
 type InterServerEvents = Record<string, never>;
 
