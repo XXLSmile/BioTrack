@@ -165,7 +165,7 @@ export class CatalogShareController {
 
       const shareObjectId = new mongoose.Types.ObjectId(shareId);
       const share = await catalogShareModel.findById(shareObjectId);
-      if (!share || !share.catalog.equals(catalog._id)) {
+      if (!share?.catalog.equals(catalog._id)) {
         return res.status(404).json({ message: 'Invitation not found' });
       }
 
