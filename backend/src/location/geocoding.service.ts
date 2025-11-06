@@ -62,11 +62,11 @@ class GeocodingService {
         return undefined;
       }
 
-      const components: Array<{
+      const components: {
         long_name: string;
         short_name: string;
         types: string[];
-      }> = response.data.results?.[0]?.address_components ?? [];
+      }[] = response.data.results?.[0]?.address_components ?? [];
 
       if (!components.length) {
         return undefined;

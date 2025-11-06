@@ -27,7 +27,7 @@ export class RecognitionService {
         }
       );
 
-      const outputs: Array<{ label: string; score?: number }> = response.data?.output ?? [];
+      const outputs: { label: string; score?: number }[] = response.data?.output ?? [];
 
       if (!response.data?.success || outputs.length === 0) {
         throw new Error('No species recognized from image');
