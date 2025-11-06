@@ -11,7 +11,7 @@ type AsyncRouteHandler<
   req: Request<P, ResBody, ReqBody, ReqQuery>,
   res: Response<ResBody>,
   next: NextFunction
-) => unknown | Promise<unknown>;
+) => void | Response<ResBody> | Promise<void | Response<ResBody>>;
 
 /**
  * Wraps an async route handler so unhandled rejections are forwarded to Express.

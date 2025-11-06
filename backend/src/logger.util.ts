@@ -1,31 +1,39 @@
 import { sanitizeArgs, sanitizeInput } from './sanitizeInput.util';
 
-const formatLogMessage = (level: string, message: string, args: unknown[]): string => {
-  const safeMessage = sanitizeInput(message);
-  const safeArgs = sanitizeArgs(args).map(value => String(value));
-  const segments = [safeMessage, ...safeArgs].filter(segment => segment.length > 0);
-  const body = segments.length > 0 ? ` ${segments.join(' ')}` : '';
-  return `[${level}]${body}`;
-};
+type LogLevel = 'INFO' | 'ERROR' | 'WARN' | 'DEBUG';
 
-const writeLog = (stream: NodeJS.WriteStream, level: string, message: string, args: unknown[]): void => {
-  const output = formatLogMessage(level, message, args);
-  stream.write(`${output}\n`);
+const writeLog = (level: LogLevel, message: string, args: unknown[]): void => {
+  const safeMessage = sanitizeInput(message);
+  const safeArgs = sanitizeArgs(args)
+    .map(value => {
+      if (typeof value === 'string') {
+        return value;
+      }
+      if (value instanceof Error) {
+        return value.stack ?? value.message;
+      }
+      return JSON.stringify(value);
+    })
+    .filter(Boolean);
+
+  const body = [safeMessage, ...safeArgs].join(' ');
+  const output = `[${level}]${body ? ` ${body}` : ''}`;
+
+  switch (level) {
+    case 'ERROR':
+    case 'WARN':
+      process.stderr.write(`${output}\n`);
+      break;
+    default:
+      process.stdout.write(`${output}\n`);
+  }
 };
 
 const logger = {
-  info: (message: string, ...args: unknown[]) => {
-    writeLog(process.stdout, 'INFO', message, args);
-  },
-  error: (message: string, ...args: unknown[]) => {
-    writeLog(process.stderr, 'ERROR', message, args);
-  },
-  warn: (message: string, ...args: unknown[]) => {
-    writeLog(process.stderr, 'WARN', message, args);
-  },
-  debug: (message: string, ...args: unknown[]) => {
-    writeLog(process.stdout, 'DEBUG', message, args);
-  },
+  info: (message: string, ...args: unknown[]) => writeLog('INFO', message, args),
+  error: (message: string, ...args: unknown[]) => writeLog('ERROR', message, args),
+  warn: (message: string, ...args: unknown[]) => writeLog('WARN', message, args),
+  debug: (message: string, ...args: unknown[]) => writeLog('DEBUG', message, args),
 };
 
 export default logger;
