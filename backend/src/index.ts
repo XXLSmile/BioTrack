@@ -11,7 +11,7 @@ const PORT = process.env.PORT ?? 3000;
 const server = http.createServer(app);
 initializeSocketServer(server);
 
-connectDB();
+void connectDB();
 
 server.listen(PORT, () => {
   logger.info('🚀 Server running on port', String(PORT));

@@ -556,7 +556,7 @@ export class RecognitionController {
         }
       }
 
-      logger.info(`Observation entry saved: ${persistedCatalogEntry._id}`);
+      logger.info(`Observation entry saved: ${persistedCatalogEntry._id.toString()}`);
 
       return res.status(201).json({
         message: 'Species recognized and saved successfully',

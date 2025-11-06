@@ -13,27 +13,31 @@ const router = Router();
  * GET /admin/users
  * List all users (for testing only)
  */
-router.get('/users', asyncHandler(async (_req: Request, res: Response) => {
-  try {
-    const userModelRef = mongoose.model('User');
-    const queryResult = userModelRef.find({});
+router.get(
+  '/users',
+  asyncHandler(async (_req: Request, res: Response) => {
+    try {
+      const userModelRef = mongoose.model('User');
+      const queryResult = userModelRef.find({});
 
-    const users = queryResult instanceof mongoose.Query
-      ? await queryResult.limit(50).select('-googleId')
-      : await queryResult;
-    
-    res.json({
-      message: 'Users fetched successfully',
-      count: users.length,
-      data: users,
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: 'Failed to fetch users',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-}));
+      const users =
+        queryResult instanceof mongoose.Query
+          ? await queryResult.limit(50).select('-googleId')
+          : await Promise.resolve(queryResult);
+
+      res.json({
+        message: 'Users fetched successfully',
+        count: users.length,
+        data: users,
+      });
+    } catch (error) {
+      res.status(500).json({
+        message: 'Failed to fetch users',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  })
+);
 
 /**
  * GET /admin/users/:userId

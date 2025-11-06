@@ -5,8 +5,7 @@ import { authenticateToken } from '../auth/auth.middleware';
 import { asyncHandler } from '../utils/asyncHandler';
 
 const router = Router();
-const uploadRecognitionImage: RequestHandler = (req, res, next) =>
-  uploadMemory.single('image')(req, res, next);
+const uploadRecognitionImage: RequestHandler = uploadMemory.single('image');
 
 /**
  * POST /api/recognition

@@ -7,6 +7,8 @@ import { userModel } from '../user/user.model';
 import { ensurePathWithinRoot, resolveWithinRoot } from '../utils/pathSafe';
 import { unlinkSync as safeUnlinkSync } from '../utils/safeFs';
 
+type FileSystemError = Error & { code?: string };
+
 // Catalog entry interface (represents a user's saved wildlife sighting)
 export interface ICatalogEntry extends Document {
   _id: mongoose.Types.ObjectId;
@@ -184,7 +186,7 @@ export class CatalogRepository {
         try {
           safeUnlinkSync(filepath);
         } catch (error) {
-          const nodeError = error as NodeJS.ErrnoException;
+          const nodeError = error as FileSystemError;
           if (nodeError.code !== 'ENOENT') {
             throw error;
           }

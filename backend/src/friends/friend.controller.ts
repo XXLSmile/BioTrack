@@ -400,7 +400,7 @@ export class FriendController {
 
       const recommendations: FriendRecommendation[] = [];
 
-      for (const [candidateId, data] of candidateData) {
+      for (const data of candidateData.values()) {
         const doc = data.doc;
         if (!doc) {
           continue;
