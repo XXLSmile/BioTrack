@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import type { Express } from 'express-serve-static-core';
 import path from 'path';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
