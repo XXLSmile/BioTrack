@@ -57,7 +57,7 @@ export interface CatalogDeletedEventPayload {
 
 type SocketServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, ServerSocketData>;
 
-let io: SocketServer | null = null;
+let io: SocketServer | undefined;
 
 const buildCatalogRoom = (catalogId: string): string => `catalog:${catalogId}`;
 
@@ -260,7 +260,7 @@ export const initializeSocketServer = (
   return io;
 };
 
-const getServer = (): SocketServer | null => io;
+const getServer = (): SocketServer | undefined => io;
 
 const emitToCatalogRoom = <TEvent extends keyof ServerToClientEvents>(
   catalogId: mongoose.Types.ObjectId | string,
