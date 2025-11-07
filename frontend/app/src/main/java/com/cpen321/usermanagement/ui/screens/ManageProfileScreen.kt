@@ -48,6 +48,7 @@ import com.cpen321.usermanagement.data.remote.dto.User
 import com.cpen321.usermanagement.ui.components.MessageSnackbar
 import com.cpen321.usermanagement.ui.components.MessageSnackbarState
 import com.cpen321.usermanagement.ui.theme.LocalSpacing
+import com.cpen321.usermanagement.ui.theme.Spacing
 import com.cpen321.usermanagement.ui.viewmodels.ProfileUiState
 import com.cpen321.usermanagement.ui.viewmodels.ProfileViewModel
 
@@ -472,61 +473,90 @@ private fun FavoriteSpeciesEditor(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(spacing.medium),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = formState.newFavoriteSpecies,
-                    onValueChange = { onFormChange(formState.copy(newFavoriteSpecies = it)) },
-                    label = { Text(stringResource(R.string.profile_add_favorite_placeholder)) },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-
-                Button(
-                    fullWidth = false,
-                    onClick = {
-                        val trimmed = formState.newFavoriteSpecies.trim()
-                        if (trimmed.isNotEmpty() && !formState.favoriteSpecies.contains(trimmed, ignoreCase = true)) {
-                            onFormChange(
-                                formState.copy(
-                                    favoriteSpecies = formState.favoriteSpecies + trimmed,
-                                    newFavoriteSpecies = ""
-                                )
-                            )
-                        }
-                    },
-                    enabled = formState.newFavoriteSpecies.isNotBlank()
-                ) {
-                    Text(stringResource(R.string.profile_add_favorite_action))
-                }
-            }
-
-            if (formState.favoriteSpecies.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.profile_no_favorites),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
-                    formState.favoriteSpecies.forEach { species ->
-                        FavoriteSpeciesItem(
-                            species = species,
-                            onRemove = {
-                                onFormChange(
-                                    formState.copy(
-                                        favoriteSpecies = formState.favoriteSpecies.filterNot { it.equals(species, ignoreCase = true) }
-                                    )
-                                )
-                            }
+            FavoriteSpeciesInputRow(formState = formState, onFormChange = onFormChange)
+            FavoriteSpeciesList(
+                species = formState.favoriteSpecies,
+                spacing = spacing,
+                onRemove = { species ->
+                    onFormChange(
+                        formState.copy(
+                            favoriteSpecies = formState.favoriteSpecies.filterNot { it.equals(species, ignoreCase = true) }
                         )
-                    }
+                    )
                 }
-            }
+            )
         }
     }
+}
+
+@Composable
+private fun FavoriteSpeciesInputRow(
+    formState: ProfileFormState,
+    onFormChange: (ProfileFormState) -> Unit
+) {
+    val spacing = LocalSpacing.current
+    val canAdd = formState.newFavoriteSpecies.isNotBlank()
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(spacing.medium),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedTextField(
+            value = formState.newFavoriteSpecies,
+            onValueChange = { onFormChange(formState.copy(newFavoriteSpecies = it)) },
+            label = { Text(stringResource(R.string.profile_add_favorite_placeholder)) },
+            singleLine = true,
+            modifier = Modifier.weight(1f)
+        )
+
+        Button(
+            fullWidth = false,
+            onClick = {
+                val updated = formState.tryAddFavorite()
+                if (updated != null) {
+                    onFormChange(updated)
+                }
+            },
+            enabled = canAdd
+        ) {
+            Text(stringResource(R.string.profile_add_favorite_action))
+        }
+    }
+}
+
+@Composable
+private fun FavoriteSpeciesList(
+    species: List<String>,
+    spacing: Spacing,
+    onRemove: (String) -> Unit
+) {
+    if (species.isEmpty()) {
+        Text(
+            text = stringResource(R.string.profile_no_favorites),
+            style = MaterialTheme.typography.bodyMedium
+        )
+        return
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
+        species.forEach { item ->
+            FavoriteSpeciesItem(
+                species = item,
+                onRemove = { onRemove(item) }
+            )
+        }
+    }
+}
+
+private fun ProfileFormState.tryAddFavorite(): ProfileFormState? {
+    val trimmed = newFavoriteSpecies.trim()
+    if (trimmed.isEmpty()) return null
+    val alreadyExists = favoriteSpecies.any { it.equals(trimmed, ignoreCase = true) }
+    if (alreadyExists) return null
+    return copy(
+        favoriteSpecies = favoriteSpecies + trimmed,
+        newFavoriteSpecies = ""
+    )
 }
 
 private fun List<String>.contains(value: String, ignoreCase: Boolean): Boolean {

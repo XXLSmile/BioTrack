@@ -6,6 +6,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
+import com.cpen321.usermanagement.data.model.Catalog
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
 
 
@@ -25,78 +26,111 @@ fun AddToCatalogDialog(
 ) {
     val catalogs by viewModel.catalogs.collectAsState()
     val combinedCatalogs = remember(catalogs, additionalCatalogs, excludeCatalogId) {
-        val base = catalogs.map { CatalogOption(it._id, it.name) }
-            .filter { it.id != excludeCatalogId }
-        val extras = additionalCatalogs.filter { option ->
-            option.id != excludeCatalogId && base.none { it.id == option.id }
-        }
-        (base + extras).distinctBy { it.id }
+        buildCatalogOptions(catalogs, additionalCatalogs, excludeCatalogId)
     }
     var selectedCatalogId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(combinedCatalogs) {
-        if (selectedCatalogId == null && combinedCatalogs.isNotEmpty()) {
-            selectedCatalogId = combinedCatalogs.first().id
-        } else if (selectedCatalogId != null && combinedCatalogs.none { it.id == selectedCatalogId }) {
-            selectedCatalogId = combinedCatalogs.firstOrNull()?.id
-        }
+        selectedCatalogId = resolveInitialSelection(selectedCatalogId, combinedCatalogs)
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            TextButton(
-                onClick = {
-                    selectedCatalogId?.let { onSave(it) }
-                },
-                enabled = selectedCatalogId != null && !isSaving
-            ) {
-                if (isSaving) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp
-                        )
-                        Text("Saving…")
-                    }
-                } else {
-                    Text("Save")
-                }
-            }
+            AddCatalogConfirmButton(
+                isSaving = isSaving,
+                canSave = selectedCatalogId != null,
+                onConfirm = { selectedCatalogId?.let(onSave) }
+            )
         },
         dismissButton = {
-            TextButton(
-                onClick = {
-                    if (!isSaving) {
-                        onDismiss()
-                    }
-                },
-                enabled = !isSaving
-            ) { Text("Cancel") }
+            TextButton(onClick = { if (!isSaving) onDismiss() }, enabled = !isSaving) {
+                Text("Cancel")
+            }
         },
         title = { Text("Save to Catalog") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (combinedCatalogs.isEmpty()) {
-                    Text("No available catalogs. Create a new one first!")
-                } else {
-                    combinedCatalogs.forEach { catalog ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            RadioButton(
-                                selected = selectedCatalogId == catalog.id,
-                                onClick = { selectedCatalogId = catalog.id }
-                            )
-                            Text(catalog.name)
-                        }
-                    }
-                }
-            }
+            CatalogOptionsList(
+                catalogs = combinedCatalogs,
+                selectedId = selectedCatalogId,
+                onSelect = { selectedCatalogId = it }
+            )
         }
     )
+}
+
+@Composable
+private fun AddCatalogConfirmButton(
+    isSaving: Boolean,
+    canSave: Boolean,
+    onConfirm: () -> Unit
+) {
+    TextButton(onClick = onConfirm, enabled = canSave && !isSaving) {
+        if (isSaving) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp
+                )
+                Text("Saving…")
+            }
+        } else {
+            Text("Save")
+        }
+    }
+}
+
+@Composable
+private fun CatalogOptionsList(
+    catalogs: List<CatalogOption>,
+    selectedId: String?,
+    onSelect: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (catalogs.isEmpty()) {
+            Text("No available catalogs. Create a new one first!")
+            return
+        }
+        catalogs.forEach { catalog ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                RadioButton(
+                    selected = selectedId == catalog.id,
+                    onClick = { onSelect(catalog.id) }
+                )
+                Text(catalog.name)
+            }
+        }
+    }
+}
+
+private fun buildCatalogOptions(
+    baseCatalogs: List<Catalog>,
+    additionalCatalogs: List<CatalogOption>,
+    excludeCatalogId: String?
+): List<CatalogOption> {
+    val base = baseCatalogs
+        .map { CatalogOption(it._id, it.name) }
+        .filter { it.id != excludeCatalogId }
+    val extras = additionalCatalogs.filter { option ->
+        option.id != excludeCatalogId && base.none { it.id == option.id }
+    }
+    return (base + extras).distinctBy { it.id }
+}
+
+private fun resolveInitialSelection(
+    currentSelection: String?,
+    catalogs: List<CatalogOption>
+): String? {
+    return when {
+        catalogs.isEmpty() -> null
+        currentSelection == null -> catalogs.first().id
+        catalogs.none { it.id == currentSelection } -> catalogs.firstOrNull()?.id
+        else -> currentSelection
+    }
 }

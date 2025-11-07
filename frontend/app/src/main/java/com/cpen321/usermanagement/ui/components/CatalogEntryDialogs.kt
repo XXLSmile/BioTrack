@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextAlign
 import com.cpen321.usermanagement.BuildConfig
@@ -46,6 +47,12 @@ fun EntryDetailDialog(
 ) {
     val observation = entry.toRecentObservation()
     val linkedAt = entry.linkedAt?.let(::formatIsoToPrettyDate)
+    val actions = rememberActionsList(
+        canRemoveFromCatalog = canRemoveFromCatalog,
+        onAddToCatalog = onAddToCatalog,
+        onRemoveFromCatalog = onRemoveFromCatalog,
+        onDeleteEntry = onDeleteEntry
+    )
 
     AlertDialog(
         onDismissRequest = { if (!isProcessing) onDismiss() },
@@ -62,110 +69,132 @@ fun EntryDetailDialog(
             }
         },
         text = {
-            val scrollState = rememberScrollState()
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(scrollState),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                ObservationDetailContent(
-                    observation = observation,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                linkedAt?.let {
-                    Text(
-                        text = "Linked: $it",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                if (!errorMessage.isNullOrBlank()) {
-                    Text(
-                        text = errorMessage,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center
-                    )
-                }
-
-                HorizontalDivider()
-
-                val actions = remember(onAddToCatalog, onRemoveFromCatalog, onDeleteEntry) {
-                    listOfNotNull(
-                        onAddToCatalog?.let { "add" to it },
-                        if (canRemoveFromCatalog) onRemoveFromCatalog?.let { "remove" to it } else null,
-                        onDeleteEntry?.let { "delete" to it }
-                    )
-                }
-
-                if (actions.isNotEmpty()) {
-                    var actionsExpanded by remember { mutableStateOf(false) }
-                    LaunchedEffect(isProcessing) {
-                        if (isProcessing) {
-                            actionsExpanded = false
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        TextButton(
-                            onClick = { actionsExpanded = true },
-                            enabled = !isProcessing
-                        ) {
-                            Text("More actions")
-                        }
-
-                        DropdownMenu(
-                            expanded = actionsExpanded,
-                            onDismissRequest = { actionsExpanded = false }
-                        ) {
-                            actions.forEach { (key, action) ->
-                                when (key) {
-                                    "add" -> DropdownMenuItem(
-                                        text = { Text("Add to another catalog") },
-                                        onClick = {
-                                            actionsExpanded = false
-                                            action()
-                                        },
-                                        enabled = !isProcessing
-                                    )
-
-                                    "remove" -> DropdownMenuItem(
-                                        text = { Text("Remove from this catalog") },
-                                        onClick = {
-                                            actionsExpanded = false
-                                            action()
-                                        },
-                                        enabled = !isProcessing
-                                    )
-
-                                    "delete" -> DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                text = "Delete observation",
-                                                color = MaterialTheme.colorScheme.error
-                                            )
-                                        },
-                                        onClick = {
-                                            actionsExpanded = false
-                                            action()
-                                        },
-                                        enabled = !isProcessing
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            EntryDetailDialogContent(
+                observation = observation,
+                linkedAt = linkedAt,
+                errorMessage = errorMessage,
+                actions = actions,
+                isProcessing = isProcessing
+            )
         }
     )
+}
+
+@Composable
+private fun EntryDetailDialogContent(
+    observation: RecentObservation,
+    linkedAt: String?,
+    errorMessage: String?,
+    actions: List<EntryDialogAction>,
+    isProcessing: Boolean
+) {
+    val scrollState = rememberScrollState()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(scrollState),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        ObservationDetailContent(
+            observation = observation,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        linkedAt?.let {
+            Text(
+                text = "Linked: $it",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        if (!errorMessage.isNullOrBlank()) {
+            Text(
+                text = errorMessage,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center
+            )
+        }
+
+        HorizontalDivider()
+        EntryDetailDialogActions(actions = actions, isProcessing = isProcessing)
+    }
+}
+
+@Composable
+private fun EntryDetailDialogActions(
+    actions: List<EntryDialogAction>,
+    isProcessing: Boolean
+) {
+    if (actions.isEmpty()) return
+
+    var actionsExpanded by remember { mutableStateOf(false) }
+    LaunchedEffect(isProcessing) {
+        if (isProcessing) {
+            actionsExpanded = false
+        }
+    }
+
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center
+    ) {
+        TextButton(
+            onClick = { actionsExpanded = true },
+            enabled = !isProcessing
+        ) {
+            Text("More actions")
+        }
+
+        DropdownMenu(
+            expanded = actionsExpanded,
+            onDismissRequest = { actionsExpanded = false }
+        ) {
+            actions.forEach { action ->
+                DropdownMenuItem(
+                    text = { Text(action.label, color = action.color ?: MaterialTheme.colorScheme.onSurfaceVariant) },
+                    onClick = {
+                        actionsExpanded = false
+                        action.onClick()
+                    },
+                    enabled = !isProcessing
+                )
+            }
+        }
+    }
+}
+
+private data class EntryDialogAction(
+    val label: String,
+    val onClick: () -> Unit,
+    val color: Color? = null
+)
+
+@Composable
+private fun rememberActionsList(
+    canRemoveFromCatalog: Boolean,
+    onAddToCatalog: (() -> Unit)?,
+    onRemoveFromCatalog: (() -> Unit)?,
+    onDeleteEntry: (() -> Unit)?
+): List<EntryDialogAction> {
+    val errorColor = MaterialTheme.colorScheme.error
+    return remember(canRemoveFromCatalog, onAddToCatalog, onRemoveFromCatalog, onDeleteEntry, errorColor) {
+        buildList {
+            onAddToCatalog?.let {
+                add(EntryDialogAction("Add to another catalog", it))
+            }
+            if (canRemoveFromCatalog) {
+                onRemoveFromCatalog?.let {
+                    add(EntryDialogAction("Remove from this catalog", it))
+                }
+            }
+            onDeleteEntry?.let {
+                add(EntryDialogAction(label = "Delete observation", onClick = it, color = errorColor))
+            }
+        }
+    }
 }
 
 @Composable

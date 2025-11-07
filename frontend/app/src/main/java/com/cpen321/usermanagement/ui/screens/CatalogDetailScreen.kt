@@ -61,72 +61,51 @@ fun CatalogDetailScreen(
     viewModel: CatalogViewModel,
     navController: NavController
 ) {
-    val catalogDetailState by viewModel.catalogDetail.collectAsState()
-    val catalogShareViewModel: CatalogShareViewModel = hiltViewModel()
-    val shareUiState by catalogShareViewModel.uiState.collectAsState()
-    val profileViewModel: ProfileViewModel = hiltViewModel()
-    val profileUiState by profileViewModel.uiState.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
-    val coroutineScope = rememberCoroutineScope()
-    val dialogState = rememberCatalogEntryDialogState()
-    var showShareDialog by remember { mutableStateOf(false) }
+    val state = rememberCatalogDetailScreenState(catalogId, viewModel)
+    CatalogDetailScreenContent(state = state, navController = navController)
+}
 
-    val detailUi = rememberCatalogDetailUi(
-        detailState = catalogDetailState,
-        shareUiState = shareUiState,
-        profileUiState = profileUiState
-    )
-    val permissions = remember(detailUi) {
-        CatalogEntryPermissions(
-            canAddToOtherCatalog = detailUi.isOwner,
-            canRemoveFromCatalog = detailUi.isOwner || detailUi.userRole == "editor",
-            canDeleteEntry = detailUi.isOwner,
-            currentCatalogId = detailUi.currentCatalogId,
-            additionalCatalogs = if (detailUi.isOwner) emptyList() else detailUi.editorCatalogOptions
-        )
-    }
-
-    CatalogDetailSideEffects(
-        catalogId = catalogId,
-        isOwner = detailUi.isOwner,
-        profileUiState = profileUiState,
-        profileViewModel = profileViewModel,
-        viewModel = viewModel,
-        catalogShareViewModel = catalogShareViewModel,
-        dialogState = dialogState,
-        showShareDialog = showShareDialog,
-        shareUiState = shareUiState,
-        snackbarHostState = snackbarHostState
-    )
+@Composable
+private fun CatalogDetailScreenContent(
+    state: CatalogDetailScreenState,
+    navController: NavController
+) {
+    CatalogDetailSideEffects(state)
 
     CatalogDetailLayout(
-        ui = detailUi,
-        snackbarHostState = snackbarHostState,
+        ui = state.detailUi,
+        snackbarHostState = state.snackbarHostState,
         navController = navController,
-        onEntrySelected = dialogState::showEntry,
-        onShareClick = { showShareDialog = true }
+        onEntrySelected = state.dialogState::showEntry,
+        onShareClick = { state.showShareDialog = true }
     )
 
     CatalogEntryDialogs(
-        dialogState = dialogState,
-        viewModel = viewModel,
-        profileViewModel = profileViewModel,
-        snackbarHostState = snackbarHostState,
-        coroutineScope = coroutineScope,
-        permissions = permissions
+        dialogState = state.dialogState,
+        viewModel = state.catalogViewModel,
+        profileViewModel = state.profileViewModel,
+        snackbarHostState = state.snackbarHostState,
+        coroutineScope = state.coroutineScope,
+        permissions = state.permissions
     )
 
     CatalogShareDialogHost(
-        showDialog = showShareDialog && detailUi.isOwner,
-        catalogName = detailUi.catalog?.name,
-        state = shareUiState,
-        onInvite = { friendId, role -> catalogShareViewModel.inviteCollaborator(catalogId, friendId, role) },
-        onChangeRole = { shareId, role -> catalogShareViewModel.updateCollaboratorRole(catalogId, shareId, role) },
-        onRevoke = { shareId -> catalogShareViewModel.revokeCollaborator(catalogId, shareId) },
+        showDialog = state.showShareDialog && state.detailUi.isOwner,
+        catalogName = state.detailUi.catalog?.name,
+        state = state.shareUiState,
+        onInvite = { friendId, role ->
+            state.catalogShareViewModel.inviteCollaborator(state.catalogId, friendId, role)
+        },
+        onChangeRole = { shareId, role ->
+            state.catalogShareViewModel.updateCollaboratorRole(state.catalogId, shareId, role)
+        },
+        onRevoke = { shareId ->
+            state.catalogShareViewModel.revokeCollaborator(state.catalogId, shareId)
+        },
         onDismiss = {
-            if (!shareUiState.isProcessing) {
-                showShareDialog = false
-                catalogShareViewModel.clearMessages()
+            if (!state.shareUiState.isProcessing) {
+                state.showShareDialog = false
+                state.catalogShareViewModel.clearMessages()
             }
         }
     )
@@ -280,86 +259,115 @@ private fun CatalogEntryDialogs(
     coroutineScope: CoroutineScope,
     permissions: CatalogEntryPermissions
 ) {
-    val entry = dialogState.entry
-    if (dialogState.showAddDialog && entry != null) {
-        AddToCatalogDialog(
-            viewModel = viewModel,
-            isSaving = dialogState.isProcessing,
-            onSave = { targetCatalogId ->
-                handleAddToCatalog(
-                    targetCatalogId = targetCatalogId,
+    AddEntryDialogHost(dialogState, viewModel, snackbarHostState, coroutineScope, permissions)
+    EntryDetailDialogHost(dialogState, permissions)
+    EntryActionConfirmationHost(
+        dialogState = dialogState,
+        viewModel = viewModel,
+        profileViewModel = profileViewModel,
+        snackbarHostState = snackbarHostState,
+        coroutineScope = coroutineScope,
+        permissions = permissions
+    )
+}
+
+@Composable
+private fun AddEntryDialogHost(
+    dialogState: CatalogEntryDialogState,
+    viewModel: CatalogViewModel,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope,
+    permissions: CatalogEntryPermissions
+) {
+    val entry = dialogState.entry ?: return
+    if (!dialogState.showAddDialog) return
+
+    AddToCatalogDialog(
+        viewModel = viewModel,
+        isSaving = dialogState.isProcessing,
+        onSave = { targetCatalogId ->
+            handleAddToCatalog(
+                targetCatalogId = targetCatalogId,
+                viewModel = viewModel,
+                dialogState = dialogState,
+                permissions = permissions,
+                snackbarHostState = snackbarHostState,
+                coroutineScope = coroutineScope
+            )
+        },
+        onDismiss = {
+            if (!dialogState.isProcessing) {
+                dialogState.closeAddDialog()
+            }
+        },
+        excludeCatalogId = permissions.currentCatalogId,
+        additionalCatalogs = permissions.additionalCatalogs
+    )
+}
+
+@Composable
+private fun EntryDetailDialogHost(
+    dialogState: CatalogEntryDialogState,
+    permissions: CatalogEntryPermissions
+) {
+    val entry = dialogState.entry ?: return
+    if (!dialogState.isDetailVisible) return
+
+    EntryDetailDialog(
+        entry = entry,
+        isProcessing = dialogState.isProcessing,
+        errorMessage = dialogState.errorMessage,
+        canRemoveFromCatalog = permissions.canRemoveFromCatalog && permissions.currentCatalogId != null,
+        onDismiss = {
+            if (!dialogState.isProcessing) {
+                dialogState.dismissDetail()
+            }
+        },
+        onAddToCatalog = permissions.takeIf { it.canAddToOtherCatalog }?.let { { dialogState.openAddDialog() } },
+        onRemoveFromCatalog = permissions.takeIf { it.canRemoveFromCatalog }?.let {
+            { dialogState.scheduleAction(EntryAction.Remove(entry)) }
+        },
+        onDeleteEntry = permissions.takeIf { it.canDeleteEntry }?.let {
+            { dialogState.scheduleAction(EntryAction.Delete(entry)) }
+        }
+    )
+}
+
+@Composable
+private fun EntryActionConfirmationHost(
+    dialogState: CatalogEntryDialogState,
+    viewModel: CatalogViewModel,
+    profileViewModel: ProfileViewModel,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope,
+    permissions: CatalogEntryPermissions
+) {
+    val pendingAction = dialogState.pendingAction
+    if (pendingAction == null || dialogState.isProcessing) return
+
+    ConfirmEntryActionDialog(
+        action = pendingAction,
+        onConfirm = {
+            when (pendingAction) {
+                is EntryAction.Remove -> handleRemoveFromCatalog(
                     viewModel = viewModel,
                     dialogState = dialogState,
                     permissions = permissions,
                     snackbarHostState = snackbarHostState,
                     coroutineScope = coroutineScope
                 )
-            },
-            onDismiss = {
-                if (!dialogState.isProcessing) {
-                    dialogState.closeAddDialog()
-                }
-            },
-            excludeCatalogId = permissions.currentCatalogId,
-            additionalCatalogs = permissions.additionalCatalogs
-        )
-    }
-
-    if (dialogState.isDetailVisible && entry != null) {
-        EntryDetailDialog(
-            entry = entry,
-            isProcessing = dialogState.isProcessing,
-            errorMessage = dialogState.errorMessage,
-            canRemoveFromCatalog = permissions.canRemoveFromCatalog && permissions.currentCatalogId != null,
-            onDismiss = {
-                if (!dialogState.isProcessing) {
-                    dialogState.dismissDetail()
-                }
-            },
-            onAddToCatalog = if (permissions.canAddToOtherCatalog) {
-                { dialogState.openAddDialog() }
-            } else {
-                null
-            },
-            onRemoveFromCatalog = if (permissions.canRemoveFromCatalog) {
-                { dialogState.scheduleAction(EntryAction.Remove(entry)) }
-            } else {
-                null
-            },
-            onDeleteEntry = if (permissions.canDeleteEntry) {
-                { dialogState.scheduleAction(EntryAction.Delete(entry)) }
-            } else {
-                null
+                is EntryAction.Delete -> handleDeleteEntry(
+                    viewModel = viewModel,
+                    profileViewModel = profileViewModel,
+                    dialogState = dialogState,
+                    permissions = permissions,
+                    snackbarHostState = snackbarHostState,
+                    coroutineScope = coroutineScope
+                )
             }
-        )
-    }
-
-    val pendingAction = dialogState.pendingAction
-    if (pendingAction != null && !dialogState.isProcessing) {
-        ConfirmEntryActionDialog(
-            action = pendingAction,
-            onConfirm = {
-                when (pendingAction) {
-                    is EntryAction.Remove -> handleRemoveFromCatalog(
-                        viewModel = viewModel,
-                        dialogState = dialogState,
-                        permissions = permissions,
-                        snackbarHostState = snackbarHostState,
-                        coroutineScope = coroutineScope
-                    )
-                    is EntryAction.Delete -> handleDeleteEntry(
-                        viewModel = viewModel,
-                        profileViewModel = profileViewModel,
-                        dialogState = dialogState,
-                        permissions = permissions,
-                        snackbarHostState = snackbarHostState,
-                        coroutineScope = coroutineScope
-                    )
-                }
-            },
-            onDismiss = { dialogState.clearPendingAction() }
-        )
-    }
+        },
+        onDismiss = { dialogState.clearPendingAction() }
+    )
 }
 
 private fun handleAddToCatalog(
@@ -442,54 +450,110 @@ private fun handleDeleteEntry(
 }
 
 @Composable
-private fun CatalogDetailSideEffects(
-    catalogId: String,
-    isOwner: Boolean,
-    profileUiState: ProfileUiState,
-    profileViewModel: ProfileViewModel,
-    viewModel: CatalogViewModel,
-    catalogShareViewModel: CatalogShareViewModel,
-    dialogState: CatalogEntryDialogState,
-    showShareDialog: Boolean,
-    shareUiState: CatalogShareUiState,
-    snackbarHostState: SnackbarHostState
-) {
-    LaunchedEffect(catalogId) {
-        viewModel.loadCatalogDetail(catalogId)
+private fun CatalogDetailSideEffects(state: CatalogDetailScreenState) {
+    LaunchedEffect(state.catalogId) {
+        state.catalogViewModel.loadCatalogDetail(state.catalogId)
     }
 
-    LaunchedEffect(profileUiState.user) {
-        if (profileUiState.user == null) {
-            profileViewModel.loadProfile()
+    LaunchedEffect(state.profileUiState.user) {
+        if (state.profileUiState.user == null) {
+            state.profileViewModel.loadProfile()
         }
     }
 
-    LaunchedEffect(dialogState.showAddDialog) {
-        if (dialogState.showAddDialog) {
-            viewModel.loadCatalogs()
+    LaunchedEffect(state.dialogState.showAddDialog) {
+        if (state.dialogState.showAddDialog) {
+            state.catalogViewModel.loadCatalogs()
         }
     }
 
-    LaunchedEffect(isOwner) {
-        if (!isOwner) {
-            catalogShareViewModel.loadSharedWithMe()
+    LaunchedEffect(state.detailUi.isOwner) {
+        if (!state.detailUi.isOwner) {
+            state.catalogShareViewModel.loadSharedWithMe()
         }
     }
 
-    LaunchedEffect(showShareDialog, isOwner) {
-        if (showShareDialog && isOwner) {
-            catalogShareViewModel.loadCollaborators(catalogId)
-            catalogShareViewModel.loadFriendsIfNeeded()
+    LaunchedEffect(state.showShareDialog, state.detailUi.isOwner) {
+        if (state.showShareDialog && state.detailUi.isOwner) {
+            state.catalogShareViewModel.loadCollaborators(state.catalogId)
+            state.catalogShareViewModel.loadFriendsIfNeeded()
         }
     }
 
-    LaunchedEffect(shareUiState.successMessage, shareUiState.errorMessage) {
-        val message = shareUiState.successMessage ?: shareUiState.errorMessage
+    LaunchedEffect(state.shareUiState.successMessage, state.shareUiState.errorMessage) {
+        val message = state.shareUiState.successMessage ?: state.shareUiState.errorMessage
         if (message != null) {
-            snackbarHostState.showSnackbar(message)
-            catalogShareViewModel.clearMessages()
+            state.snackbarHostState.showSnackbar(message)
+            state.catalogShareViewModel.clearMessages()
         }
     }
+}
+
+@Stable
+private class CatalogDetailScreenState(
+    val catalogId: String,
+    val catalogViewModel: CatalogViewModel,
+    val profileViewModel: ProfileViewModel,
+    val catalogShareViewModel: CatalogShareViewModel,
+    val snackbarHostState: SnackbarHostState,
+    val coroutineScope: CoroutineScope,
+    val dialogState: CatalogEntryDialogState,
+    val detailUi: CatalogDetailUi,
+    val permissions: CatalogEntryPermissions,
+    val shareUiState: CatalogShareUiState,
+    val profileUiState: ProfileUiState,
+    private val shareDialogState: MutableState<Boolean>
+) {
+    var showShareDialog: Boolean
+        get() = shareDialogState.value
+        set(value) {
+            shareDialogState.value = value
+        }
+}
+
+@Composable
+private fun rememberCatalogDetailScreenState(
+    catalogId: String,
+    viewModel: CatalogViewModel
+): CatalogDetailScreenState {
+    val catalogShareViewModel: CatalogShareViewModel = hiltViewModel()
+    val profileViewModel: ProfileViewModel = hiltViewModel()
+    val catalogDetailState by viewModel.catalogDetail.collectAsState()
+    val shareUiState by catalogShareViewModel.uiState.collectAsState()
+    val profileUiState by profileViewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    val dialogState = rememberCatalogEntryDialogState()
+    val detailUi = rememberCatalogDetailUi(
+        detailState = catalogDetailState,
+        shareUiState = shareUiState,
+        profileUiState = profileUiState
+    )
+    val permissions = remember(detailUi) {
+        CatalogEntryPermissions(
+            canAddToOtherCatalog = detailUi.isOwner,
+            canRemoveFromCatalog = detailUi.isOwner || detailUi.userRole == "editor",
+            canDeleteEntry = detailUi.isOwner,
+            currentCatalogId = detailUi.currentCatalogId,
+            additionalCatalogs = if (detailUi.isOwner) emptyList() else detailUi.editorCatalogOptions
+        )
+    }
+    val shareDialogState = remember { mutableStateOf(false) }
+
+    return CatalogDetailScreenState(
+        catalogId = catalogId,
+        catalogViewModel = viewModel,
+        profileViewModel = profileViewModel,
+        catalogShareViewModel = catalogShareViewModel,
+        snackbarHostState = snackbarHostState,
+        coroutineScope = coroutineScope,
+        dialogState = dialogState,
+        detailUi = detailUi,
+        permissions = permissions,
+        shareUiState = shareUiState,
+        profileUiState = profileUiState,
+        shareDialogState = shareDialogState
+    )
 }
 
 @Composable

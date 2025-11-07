@@ -36,92 +36,94 @@ fun ObservationListItem(
     trailingContent: @Composable (() -> Unit)? = null,
     onClick: (() -> Unit)? = null
 ) {
-    val clickableModifier = onClick?.let { action ->
-        Modifier.clickable(onClick = action)
-    } ?: Modifier
-
-    val imageShape = RoundedCornerShape(12.dp)
-
     Row(
         modifier = modifier
-            .then(Modifier.fillMaxWidth())
-            .then(clickableModifier),
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (!observation.imageUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(observation.imageUrl)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(imageShape)
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(imageShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Image,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+        ObservationThumbnail(imageUrl = observation.imageUrl)
+        Box(modifier = Modifier.weight(1f)) {
+            ObservationMetadataContent(observation = observation)
         }
+        ObservationTrailing(trailingContent = trailingContent)
+    }
+}
 
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+@Composable
+private fun ObservationThumbnail(imageUrl: String?) {
+    val shape = RoundedCornerShape(12.dp)
+    if (!imageUrl.isNullOrBlank()) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(imageUrl)
+                .crossfade(true)
+                .build(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(56.dp)
+                .clip(shape)
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = observation.title,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-            )
-            if (observation.subtitle.isNotBlank()) {
-                Text(
-                    text = observation.subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            if (observation.displayLocation.isNotBlank()) {
-                Text(
-                    text = observation.displayLocation,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            observation.createdAt?.let { createdAt ->
-                Text(
-                    text = "Observed ${createdAt.toLocalDate()} at ${createdAt.toLocalTime().withNano(0)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            observation.notes?.takeIf { it.isNotBlank() }?.let { notes ->
-                Text(
-                    text = notes,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        val trailing = trailingContent ?: {
             Icon(
-                imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                imageVector = Icons.Outlined.Image,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        trailing()
     }
+}
+
+@Composable
+private fun ObservationMetadataContent(observation: RecentObservation) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = observation.title,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+        )
+        observation.subtitle.takeIf { it.isNotBlank() }?.let {
+            ObservationMetadataRow(it)
+        }
+        observation.displayLocation.takeIf { it.isNotBlank() }?.let {
+            ObservationMetadataRow(it)
+        }
+        observation.createdAt?.let { createdAt ->
+            ObservationMetadataRow(
+                "Observed ${createdAt.toLocalDate()} at ${createdAt.toLocalTime().withNano(0)}"
+            )
+        }
+        observation.notes?.takeIf { it.isNotBlank() }?.let { notes ->
+            ObservationMetadataRow(notes)
+        }
+    }
+}
+
+@Composable
+private fun ObservationMetadataRow(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+@Composable
+private fun ObservationTrailing(trailingContent: @Composable (() -> Unit)?) {
+    val content = trailingContent ?: {
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+    content()
 }
