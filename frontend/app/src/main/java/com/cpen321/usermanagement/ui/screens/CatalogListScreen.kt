@@ -118,6 +118,32 @@ private fun CatalogListScreenLayout(
     onRespondToInvitation: (String, String) -> Unit,
     onDeleteCatalog: (String) -> Unit
 ) {
+    CatalogListScaffold(
+        snackbarHostState = snackbarHostState,
+        showNavigationIcon = showNavigationIcon,
+        onBack = onBack,
+        onCreateCatalogClick = onCreateCatalogClick
+    ) { paddingValues ->
+        CatalogListBody(
+            paddingValues = paddingValues,
+            catalogs = catalogs,
+            shareUiState = shareUiState,
+            onOpenCatalogEntries = onOpenCatalogEntries,
+            onOpenCatalog = onOpenCatalog,
+            onRespondToInvitation = onRespondToInvitation,
+            onDeleteCatalog = onDeleteCatalog
+        )
+    }
+}
+
+@Composable
+private fun CatalogListScaffold(
+    snackbarHostState: SnackbarHostState,
+    showNavigationIcon: Boolean,
+    onBack: () -> Unit,
+    onCreateCatalogClick: () -> Unit,
+    content: @Composable (PaddingValues) -> Unit
+) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -151,36 +177,47 @@ private fun CatalogListScreenLayout(
                 )
             }
         }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Top
-        ) {
-            ManageAllEntriesCard(onManageAll = onOpenCatalogEntries)
-            Spacer(modifier = Modifier.height(16.dp))
+    ) { paddingValues -> content(paddingValues) }
+}
 
-            CatalogInvitationsSection(
-                invitations = shareUiState.pendingInvitations,
-                isProcessing = shareUiState.isProcessing,
-                onRespond = onRespondToInvitation
+@Composable
+private fun CatalogListBody(
+    paddingValues: PaddingValues,
+    catalogs: List<Catalog>,
+    shareUiState: CatalogShareUiState,
+    onOpenCatalogEntries: () -> Unit,
+    onOpenCatalog: (String) -> Unit,
+    onRespondToInvitation: (String, String) -> Unit,
+    onDeleteCatalog: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.Top
+    ) {
+        ManageAllEntriesCard(onManageAll = onOpenCatalogEntries)
+        Spacer(modifier = Modifier.height(16.dp))
+
+        CatalogInvitationsSection(
+            invitations = shareUiState.pendingInvitations,
+            isProcessing = shareUiState.isProcessing,
+            onRespond = onRespondToInvitation
+        )
+
+        SharedCatalogsSection(
+            shares = shareUiState.sharedCatalogs,
+            onOpenCatalog = onOpenCatalog
+        )
+
+        Box(modifier = Modifier.weight(1f, fill = true)) {
+            CatalogGrid(
+                catalogs = catalogs,
+                onOpenCatalog = onOpenCatalog,
+                onDeleteCatalog = onDeleteCatalog,
+                modifier = Modifier.fillMaxSize()
             )
-
-            SharedCatalogsSection(
-                shares = shareUiState.sharedCatalogs,
-                onOpenCatalog = onOpenCatalog
-            )
-
-            Box(modifier = Modifier.weight(1f, fill = true)) {
-                CatalogGrid(
-                    catalogs = catalogs,
-                    onOpenCatalog = onOpenCatalog,
-                    onDeleteCatalog = onDeleteCatalog,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
         }
     }
 }
