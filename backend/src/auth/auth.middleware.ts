@@ -2,7 +2,6 @@ import { NextFunction, Request, RequestHandler, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import { userModel } from '../user/user.model';
-import logger from '../logger.util';
 
 const authenticateTokenImpl = async (
   req: Request,
