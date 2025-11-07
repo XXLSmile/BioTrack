@@ -173,6 +173,36 @@ describe('Mocked: UserController.updateProfile', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  // Input: payload including favoriteSpecies array and null fcmToken
+  // Expected status code: 200
+  // Expected behavior: controller copies optional fields into update object
+  // Expected output: JSON containing updated user
+  // Mock behavior: userModel.update resolves to updated doc
+  test('updates favoriteSpecies and nullable fcmToken fields', async () => {
+    const user = sampleUser();
+    const updated = { ...user, favoriteSpecies: ['Owl', 'Eagle'], fcmToken: null } as any;
+    mockedUserModel.update.mockResolvedValueOnce(updated);
+
+    const req = {
+      user,
+      body: {
+        favoriteSpecies: ['Owl', 'Eagle'],
+        fcmToken: null,
+      },
+    } as any;
+    const res = createResponse();
+    const next = createNext();
+
+    await controller.updateProfile(req, res as any, next);
+
+    expect(mockedUserModel.update).toHaveBeenCalledWith(user._id, {
+      favoriteSpecies: ['Owl', 'Eagle'],
+      fcmToken: null,
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(next).not.toHaveBeenCalled();
+  });
+
   // Input: payload causing duplicate key error
   // Expected status code: 409
   // Expected behavior: controller maps Mongo duplicate error to conflict
@@ -238,6 +268,23 @@ describe('Mocked: UserController.updateProfile', () => {
 
 // Interface UserController.deleteProfile
 describe('Mocked: UserController.deleteProfile', () => {
+  // Input: request without authenticated user
+  // Expected status code: 401
+  // Expected behavior: controller short-circuits before hitting models
+  // Expected output: message "Authentication required"
+  // Mock behavior: none
+  test('returns 401 when user missing', async () => {
+    const req = { user: undefined } as any;
+    const res = createResponse();
+    const next = createNext();
+
+    await controller.deleteProfile(req, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+    expect(mockedFriendshipModel.deleteAllForUser).not.toHaveBeenCalled();
+  });
+
   // Input: authenticated user with accepted friendships
   // Expected status code: 200
   // Expected behavior: controller deletes friendships, decrements friend counts, deletes user
@@ -295,6 +342,25 @@ describe('Mocked: UserController.deleteProfile', () => {
       message: 'fail',
     });
     expect(next).not.toHaveBeenCalled();
+  });
+
+  // Input: deletion pipeline throws non-Error value
+  // Expected status code: n/a
+  // Expected behavior: controller forwards unknown errors via next()
+  // Expected output: next invoked with provided value
+  // Mock behavior: friendshipModel.deleteAllForUser rejects with string literal
+  test('forwards non-Error deletion failures to next', async () => {
+    const user = sampleUser();
+    mockedFriendshipModel.deleteAllForUser.mockRejectedValueOnce('fatal');
+
+    const req = { user } as any;
+    const res = createResponse();
+    const next = createNext();
+
+    await controller.deleteProfile(req, res as any, next);
+
+    expect(next).toHaveBeenCalledWith('fatal');
+    expect(res.status).not.toHaveBeenCalled();
   });
 });
 
@@ -613,6 +679,33 @@ describe('Mocked: UserController.searchUsers', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  // Input: guest user performing search
+  // Expected status code: 200
+  // Expected behavior: controller returns all public profiles since no exclusion id
+  // Expected output: count equals number of public users
+  // Mock behavior: userModel.searchByName resolves list with mixed visibility
+  test('returns public results for guests without filtering self', async () => {
+    const publicUsers = [
+      { ...sampleUser(), _id: new mongoose.Types.ObjectId(), isPublicProfile: true },
+      { ...sampleUser(), _id: new mongoose.Types.ObjectId(), isPublicProfile: true },
+    ];
+    const privateUser = { ...sampleUser(), _id: new mongoose.Types.ObjectId(), isPublicProfile: false };
+    mockedUserModel.searchByName.mockResolvedValueOnce([...publicUsers, privateUser] as any);
+
+    const req = { query: { query: 'al' }, user: undefined } as any;
+    const res = createResponse();
+    const next = createNext();
+
+    await controller.searchUsers(req, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Search completed successfully',
+      data: expect.objectContaining({ count: 2 }),
+    });
+    expect(next).not.toHaveBeenCalled();
+  });
+
   // Input: valid query with mix of public and private users including self
   // Expected status code: 200
   // Expected behavior: controller filters to public users excluding current user
@@ -669,6 +762,21 @@ describe('Mocked: UserController.searchUsers', () => {
 
 // Interface UserController.getUserStats
 describe('Mocked: UserController.getUserStats', () => {
+  // Input: request without user context
+  // Expected status code: 401
+  // Expected behavior: controller rejects call
+  // Expected output: message "Authentication required"
+  test('returns 401 when user missing', async () => {
+    const req = { user: undefined } as any;
+    const res = createResponse();
+    const next = createNext();
+
+    await controller.getUserStats(req, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+  });
+
   // Input: stats exist for user
   // Expected status code: 200
   // Expected behavior: controller returns stats payload
@@ -739,10 +847,40 @@ describe('Mocked: UserController.getUserStats', () => {
     });
     expect(next).not.toHaveBeenCalled();
   });
+
+  // Input: stats lookup rejects with non-Error value
+  // Expected status code: n/a
+  // Expected behavior: controller forwards value to next()
+  // Expected output: next called with same rejection payload
+  test('forwards non-Error stats failures', async () => {
+    const req = { user: { _id: new mongoose.Types.ObjectId() } } as any;
+    mockedUserModel.getUserStats.mockRejectedValueOnce('explode');
+    const res = createResponse();
+    const next = createNext();
+
+    await controller.getUserStats(req, res as any, next);
+
+    expect(next).toHaveBeenCalledWith('explode');
+  });
 });
 
 // Interface UserController.addFavoriteSpecies
 describe('Mocked: UserController.addFavoriteSpecies', () => {
+  // Input: request without authentication
+  // Expected status code: 401
+  // Expected behavior: controller rejects before validation
+  // Expected output: message 'Authentication required'
+  test('returns 401 when user missing', async () => {
+    const req = { user: undefined, body: { speciesName: 'Owl' } } as any;
+    const res = createResponse();
+    const next = createNext();
+
+    await controller.addFavoriteSpecies(req, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+  });
+
   // Input: request without species name
   // Expected status code: 400
   // Expected behavior: controller rejects request
@@ -806,6 +944,21 @@ describe('Mocked: UserController.addFavoriteSpecies', () => {
 
 // Interface UserController.removeFavoriteSpecies
 describe('Mocked: UserController.removeFavoriteSpecies', () => {
+  // Input: request lacking authentication
+  // Expected status code: 401
+  // Expected behavior: controller rejects request
+  // Expected output: message 'Authentication required'
+  test('returns 401 when user missing', async () => {
+    const req = { user: undefined, body: { speciesName: 'Owl' } } as any;
+    const res = createResponse();
+    const next = createNext();
+
+    await controller.removeFavoriteSpecies(req, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+  });
+
   // Input: request without species name
   // Expected status code: 400
   // Expected behavior: controller rejects request
@@ -982,6 +1135,21 @@ describe('Mocked: UserController.checkUsernameAvailability', () => {
 
 // Interface UserController.updateFcmToken
 describe('Mocked: UserController.updateFcmToken', () => {
+  // Input: request without user
+  // Expected status code: 401
+  // Expected behavior: controller returns auth error
+  // Expected output: message 'Authentication required'
+  test('returns 401 when updating token without authentication', async () => {
+    const req = { user: undefined, body: { token: 'abc123' } } as any;
+    const res = createResponse();
+    const next = createNext();
+
+    await controller.updateFcmToken(req, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+  });
+
   // Input: request without token
   // Expected status code: 400
   // Expected behavior: controller rejects invalid token input
@@ -1041,6 +1209,21 @@ describe('Mocked: UserController.updateFcmToken', () => {
 
 // Interface UserController.clearFcmToken
 describe('Mocked: UserController.clearFcmToken', () => {
+  // Input: request without authentication
+  // Expected status code: 401
+  // Expected behavior: controller denies request
+  // Expected output: message 'Authentication required'
+  test('returns 401 when user missing', async () => {
+    const req = { user: undefined } as any;
+    const res = createResponse();
+    const next = createNext();
+
+    await controller.clearFcmToken(req, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+  });
+
   // Input: authenticated user clearing token
   // Expected status code: 200
   // Expected behavior: controller clears token via model

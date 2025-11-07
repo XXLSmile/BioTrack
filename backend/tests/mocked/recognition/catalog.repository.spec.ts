@@ -384,6 +384,41 @@ describe('Mocked: CatalogRepository core methods', () => {
   });
 
   // Interface CatalogRepository.deleteById
+  test('rethrows when unlink fails with unexpected error', async () => {
+    // API: CatalogRepository.deleteById
+    // Input: entryId owned by userId where unlinkSync throws EPERM
+    // Expected status code: n/a, expectation is error propagates after logger call
+    // Expected behavior: logger.error invoked with context before rejection
+    // Expected output: promise rejects with original error
+    const ownerId = new mongoose.Types.ObjectId();
+    const entryId = new mongoose.Types.ObjectId();
+    const deleteOne = jest.fn();
+    const entry = {
+      _id: entryId,
+      userId: ownerId,
+      imageUrl: 'http://example.com/uploads/images/protected.jpg',
+      deleteOne,
+    };
+    const fsError = Object.assign(new Error('permission denied'), { code: 'EPERM' });
+
+    jest.spyOn(CatalogModel, 'findById').mockResolvedValueOnce(entry as any);
+    catalogEntryLinkModelMock.removeEntryFromAllCatalogs.mockResolvedValueOnce(undefined);
+    safeFsMock.unlinkSync.mockImplementationOnce(() => {
+      throw fsError;
+    });
+
+    await expect(
+      catalogRepository.deleteById(entryId.toString(), ownerId.toString())
+    ).rejects.toThrow('permission denied');
+
+    expect(loggerMock.error).toHaveBeenCalledWith('Failed to delete catalog entry', {
+      entryId: entryId.toString(),
+      error: fsError,
+    });
+    expect(deleteOne).not.toHaveBeenCalled();
+  });
+
+  // Interface CatalogRepository.deleteById
   test('logs and rethrows when removing links fails', async () => {
     // API: CatalogRepository.deleteById
     // Input: entryId owned by userId, removeEntryFromAllCatalogs rejects

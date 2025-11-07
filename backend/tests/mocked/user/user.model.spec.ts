@@ -564,6 +564,25 @@ describe('Mocked: UserModel.searchByName', () => {
       userModel.searchByName('ali', 10)
     ).rejects.toThrow('Failed to search users');
   });
+
+  // Input: query without explicit limit or exclude id
+  // Expected status code: n/a
+  // Expected behavior: method applies default limit of 10
+  // Expected output: resolved array from mocked query
+  // Mock behavior: collection.find returns promise with limit spy
+  test('applies default limit when omitted', async () => {
+    const users = [{ _id: objectId() }];
+    const queryPromise = Promise.resolve(users) as any;
+    queryPromise.limit = jest.fn(() => Promise.resolve(users));
+    setCollection({
+      find: asyncMock().mockReturnValue(queryPromise),
+    });
+
+    const result = await userModel.searchByName('ali');
+
+    expect(queryPromise.limit).toHaveBeenCalledWith(10);
+    expect(result).toEqual(users);
+  });
 });
 
 // Interface UserModel.incrementObservationCount
