@@ -316,6 +316,27 @@ describe('Mocked: FriendshipModel', () => {
   });
 
   // API: FriendshipModel.deleteAllForUser
+  // Input: only accepted friendships where the user is the addressee
+  // Expected behavior: method returns requester ids before deleting records
+  // Expected output: array containing the requester's ObjectId
+  test('deleteAllForUser returns requester ids when user is addressee', async () => {
+    const userId = objectId();
+    const requesterId = objectId();
+    mocks.find.mockImplementationOnce(async () => [
+      {
+        requester: requesterId,
+        addressee: userId,
+        status: 'accepted',
+      },
+    ]);
+    mocks.deleteMany.mockImplementationOnce(async () => undefined);
+
+    const result = await model.deleteAllForUser(userId);
+
+    expect(result).toEqual([requesterId]);
+  });
+
+  // API: FriendshipModel.deleteAllForUser
   // Input: find throws
   // Expected behavior: logs error and rethrows domain message
   // Expected output: Error("Failed to delete friendships for user")

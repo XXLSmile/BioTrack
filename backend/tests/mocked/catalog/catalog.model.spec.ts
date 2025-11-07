@@ -86,6 +86,21 @@ describe('Mocked: CatalogModel', () => {
   });
 
   // Interface CatalogModel.findCatalogById
+  test('returns null and skips query when findCatalogById receives invalid id', async () => {
+    // API: CatalogModel.findCatalogById
+    // Input: catalogId 'invalid', owner ObjectId
+    // Expected status code: n/a (model method), expectation is null result
+    // Expected behavior: guard returns early without touching collection
+    // Expected output: null
+    const owner = new mongoose.Types.ObjectId();
+
+    const result = await model.findCatalogById('invalid', owner);
+
+    expect(result).toBeNull();
+    expect(collectionMock.findOne).not.toHaveBeenCalled();
+  });
+
+  // Interface CatalogModel.findCatalogById
   test('invokes findOne with owner filter when catalog id valid', async () => {
     // API: CatalogModel.findCatalogById
     // Input: catalogId string of valid ObjectId, owner mongoose ObjectId

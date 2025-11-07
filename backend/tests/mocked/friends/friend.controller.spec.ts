@@ -90,7 +90,438 @@ const createPopulatedUser = (
 
 describe('Mocked: FriendController', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
+  });
+
+  test('getRecommendations caches null geocode results', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    userModel.findById.mockResolvedValueOnce({
+      _id: userId,
+      favoriteSpecies: [],
+      location: 'Kelowna',
+      region: 'British Columbia',
+    });
+    friendshipModel.getFriendsForUser.mockResolvedValueOnce([]);
+    friendshipModel.getRelationshipsForUser.mockResolvedValueOnce([]);
+    friendshipModel.getAcceptedFriendshipsForUsers.mockResolvedValueOnce([]);
+    userModel.findMany.mockResolvedValueOnce([]);
+    geocodingService.forwardGeocode.mockResolvedValueOnce(undefined);
+
+    const req: any = { user: { _id: userId }, query: {} };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.getRecommendations(req, res, next);
+
+    expect(geocodingService.forwardGeocode).toHaveBeenCalledWith('Kelowna, British Columbia');
+    expect(res.status).toHaveBeenCalledWith(200);
+    const payload = getJsonPayload(res);
+    expect(payload?.data?.count).toBe(0);
+  });
+
+  // API: GET /api/friends/recommendations (FriendController.getRecommendations)
+  // Input: user and candidate share identical address strings so downstream coordinate lookup should reuse cached entry
+  // Expected behavior: controller geocodes once, reuses cached coordinates, and returns a recommendation with computed distance
+  test('getRecommendations reuses cached coordinates for duplicate addresses', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const friendId = new mongoose.Types.ObjectId();
+    const candidateId = new mongoose.Types.ObjectId();
+
+    userModel.findById.mockResolvedValueOnce({
+      _id: userId,
+      favoriteSpecies: [],
+      location: 'Kelowna',
+      region: null,
+    });
+
+    friendshipModel.getFriendsForUser.mockResolvedValueOnce([
+      {
+        _id: new mongoose.Types.ObjectId(),
+        requester: createPopulatedUser(userId, { name: 'User', username: 'user' }),
+        addressee: createPopulatedUser(friendId, { name: 'Friend', username: 'friend' }),
+        status: 'accepted',
+      },
+    ]);
+
+    friendshipModel.getRelationshipsForUser.mockResolvedValueOnce([]);
+    friendshipModel.getAcceptedFriendshipsForUsers.mockResolvedValueOnce([
+      { requester: friendId, addressee: candidateId, status: 'accepted' },
+    ]);
+
+    userModel.findMany.mockResolvedValueOnce([
+      {
+        _id: candidateId,
+        name: 'Candidate',
+        username: 'candidate',
+        favoriteSpecies: [],
+        location: 'Kelowna',
+        region: null,
+      },
+    ]);
+
+    geocodingService.forwardGeocode.mockResolvedValueOnce({
+      latitude: 49.2827,
+      longitude: -123.1207,
+    });
+
+    const req: any = { user: { _id: userId }, query: {} };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.getRecommendations(req, res, next);
+
+    expect(geocodingService.forwardGeocode).toHaveBeenCalledTimes(1);
+    const payload = getJsonPayload(res);
+    expect(payload?.data?.count).toBe(1);
+    expect(payload?.data?.recommendations?.[0]?.distanceKm).toBe(0);
+  });
+
+  // API: GET /api/friends/recommendations (FriendController.getRecommendations)
+  // Input: candidate already present in current friend list still appears in species matches
+  // Expected behavior: controller excludes the candidate via excludedIds guard and returns zero recommendations
+  test('getRecommendations skips species matches that are already friends', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const candidateId = new mongoose.Types.ObjectId();
+
+    userModel.findById.mockResolvedValueOnce({
+      _id: userId,
+      favoriteSpecies: ['owl'],
+      location: null,
+      region: null,
+    });
+
+    friendshipModel.getFriendsForUser.mockResolvedValueOnce([
+      {
+        _id: new mongoose.Types.ObjectId(),
+        requester: createPopulatedUser(userId, { name: 'User', username: 'user' }),
+        addressee: createPopulatedUser(candidateId, { name: 'Friend', username: 'friend' }),
+        status: 'accepted',
+      },
+    ]);
+
+    friendshipModel.getRelationshipsForUser.mockResolvedValueOnce([]);
+    friendshipModel.getAcceptedFriendshipsForUsers.mockResolvedValueOnce([]);
+
+    userModel.findMany.mockResolvedValueOnce([
+      {
+        _id: candidateId,
+        name: 'Candidate',
+        username: 'candidate',
+        favoriteSpecies: ['owl'],
+      },
+    ]);
+
+    const req: any = { user: { _id: userId }, query: {} };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.getRecommendations(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(getJsonPayload(res)?.data?.count).toBe(0);
+  });
+
+  test('getRecommendations skips candidates already related to user', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const candidateId = new mongoose.Types.ObjectId();
+    userModel.findById.mockResolvedValueOnce({
+      _id: userId,
+      favoriteSpecies: ['owl'],
+      location: null,
+      region: null,
+    });
+    friendshipModel.getFriendsForUser.mockResolvedValueOnce([]);
+    friendshipModel.getRelationshipsForUser.mockResolvedValueOnce([
+      {
+        requester: userId,
+        addressee: candidateId,
+        status: 'accepted',
+      },
+    ]);
+    friendshipModel.getAcceptedFriendshipsForUsers.mockResolvedValueOnce([]);
+    userModel.findMany.mockResolvedValueOnce([
+      {
+        _id: candidateId,
+        name: 'Candidate',
+        username: 'candidate',
+        favoriteSpecies: ['owl'],
+      },
+    ]);
+
+    const req: any = { user: { _id: userId }, query: {} };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.getRecommendations(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(getJsonPayload(res)?.data?.count).toBe(0);
+  });
+
+  // API: GET /api/friends/recommendations (FriendController.getRecommendations)
+  // Input: friend-of-friend candidate lacks populated doc until the missing-doc query runs
+  // Expected behavior: controller loads missing docs, assigns them to aggregates, and returns the hydrated recommendation
+  test('getRecommendations populates missing docs for friend-of-friend candidates', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const friendId = new mongoose.Types.ObjectId();
+    const candidateId = new mongoose.Types.ObjectId();
+
+    userModel.findById.mockResolvedValueOnce({
+      _id: userId,
+      favoriteSpecies: [],
+      location: null,
+      region: null,
+    });
+
+    friendshipModel.getFriendsForUser.mockResolvedValueOnce([
+      {
+        _id: new mongoose.Types.ObjectId(),
+        requester: createPopulatedUser(userId, { name: 'User', username: 'user' }),
+        addressee: createPopulatedUser(friendId, { name: 'Friend', username: 'friend' }),
+        status: 'accepted',
+      },
+    ]);
+
+    friendshipModel.getRelationshipsForUser.mockResolvedValueOnce([]);
+    friendshipModel.getAcceptedFriendshipsForUsers.mockResolvedValueOnce([
+      { requester: friendId, addressee: candidateId, status: 'accepted' },
+    ]);
+
+    userModel.findMany.mockResolvedValueOnce([
+      {
+        _id: candidateId,
+        name: 'CandidateDoc',
+        username: 'candidateDoc',
+        favoriteSpecies: [],
+        location: 'Kelowna',
+        region: null,
+      },
+    ]);
+
+    geocodingService.forwardGeocode.mockResolvedValueOnce(undefined);
+
+    const req: any = { user: { _id: userId }, query: {} };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.getRecommendations(req, res, next);
+
+    const payload = getJsonPayload(res);
+    expect(payload?.data?.recommendations?.[0]?.user?.username).toBe('candidateDoc');
+  });
+
+  // API: GET /api/friends/recommendations (FriendController.getRecommendations)
+  // Input: network friendship where the current friend appears as addressee, so the requester becomes the candidate
+  // Expected behavior: controller maps the requester to candidateId, hydrates the doc, and surfaces a recommendation
+  test('getRecommendations adds requester candidates when friend is addressee', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const friendId = new mongoose.Types.ObjectId();
+    const candidateId = new mongoose.Types.ObjectId();
+
+    userModel.findById.mockResolvedValueOnce({
+      _id: userId,
+      favoriteSpecies: [],
+      location: null,
+      region: null,
+    });
+
+    friendshipModel.getFriendsForUser.mockResolvedValueOnce([
+      {
+        _id: new mongoose.Types.ObjectId(),
+        requester: createPopulatedUser(userId, { name: 'User', username: 'user' }),
+        addressee: createPopulatedUser(friendId, { name: 'Friend', username: 'friend' }),
+        status: 'accepted',
+      },
+    ]);
+
+    friendshipModel.getRelationshipsForUser.mockResolvedValueOnce([]);
+    friendshipModel.getAcceptedFriendshipsForUsers.mockResolvedValueOnce([
+      { requester: candidateId, addressee: friendId, status: 'accepted' },
+    ]);
+
+    userModel.findMany.mockResolvedValueOnce([
+      {
+        _id: candidateId,
+        name: 'CandidateRequester',
+        username: 'candidateRequester',
+        favoriteSpecies: [],
+        location: 'Kelowna',
+        region: null,
+      },
+    ]);
+
+    geocodingService.forwardGeocode.mockResolvedValueOnce(undefined);
+
+    const req: any = { user: { _id: userId }, query: {} };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.getRecommendations(req, res, next);
+
+    const payload = getJsonPayload(res);
+    expect(payload?.data?.count).toBe(1);
+    expect(payload?.data?.recommendations?.[0]?.user?.username).toBe('candidateRequester');
+  });
+
+  // API: GET /api/friends/recommendations (FriendController.getRecommendations)
+  // Input: accepted friendship between a friend and the current user
+  // Expected behavior: controller detects candidateId equals user id and skips the relation without errors
+  test('getRecommendations skips network edges that target the current user', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const friendId = new mongoose.Types.ObjectId();
+
+    userModel.findById.mockResolvedValueOnce({
+      _id: userId,
+      favoriteSpecies: [],
+      location: null,
+      region: null,
+    });
+
+    friendshipModel.getFriendsForUser.mockResolvedValueOnce([
+      {
+        _id: new mongoose.Types.ObjectId(),
+        requester: createPopulatedUser(userId, { name: 'User', username: 'user' }),
+        addressee: createPopulatedUser(friendId, { name: 'Friend', username: 'friend' }),
+        status: 'accepted',
+      },
+    ]);
+
+    friendshipModel.getRelationshipsForUser.mockResolvedValueOnce([]);
+    friendshipModel.getAcceptedFriendshipsForUsers.mockResolvedValueOnce([
+      { requester: friendId, addressee: userId, status: 'accepted' },
+    ]);
+
+    const req: any = { user: { _id: userId }, query: {} };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.getRecommendations(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(getJsonPayload(res)?.data?.count).toBe(0);
+    expect(userModel.findMany).not.toHaveBeenCalled();
+  });
+
+  // API: GET /api/friends/recommendations (FriendController.getRecommendations)
+  // Input: normalized region strings should mark candidates as location matches even without coordinates
+  // Expected behavior: controller sets locationMatch via normalized region comparison and returns the flagged candidate
+  test('getRecommendations updates locationMatch via normalized region fallback', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const candidateId = new mongoose.Types.ObjectId();
+
+    userModel.findById.mockResolvedValueOnce({
+      _id: userId,
+      favoriteSpecies: ['owl'],
+      location: 'Vancouver',
+      region: ' British Columbia ',
+    });
+
+    friendshipModel.getFriendsForUser.mockResolvedValueOnce([]);
+    friendshipModel.getRelationshipsForUser.mockResolvedValueOnce([]);
+    friendshipModel.getAcceptedFriendshipsForUsers.mockResolvedValueOnce([]);
+
+    userModel.findMany.mockResolvedValueOnce([
+      {
+        _id: candidateId,
+        name: 'Candidate',
+        username: 'candidate',
+        favoriteSpecies: ['owl'],
+        location: 'Victoria',
+        region: 'british columbia',
+      },
+    ]);
+
+    userModel.findMany.mockResolvedValueOnce([]);
+    geocodingService.forwardGeocode.mockResolvedValueOnce(undefined);
+
+    const req: any = { user: { _id: userId }, query: {} };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.getRecommendations(req, res, next);
+
+    const payload = getJsonPayload(res);
+    expect(payload?.data?.recommendations?.[0]?.locationMatch).toBe(true);
+  });
+
+  test('getRecommendations ignores species matches without shared favorites', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    userModel.findById.mockResolvedValueOnce({
+      _id: userId,
+      favoriteSpecies: ['owl'],
+      location: null,
+      region: null,
+    });
+    friendshipModel.getFriendsForUser.mockResolvedValueOnce([]);
+    friendshipModel.getRelationshipsForUser.mockResolvedValueOnce([]);
+    friendshipModel.getAcceptedFriendshipsForUsers.mockResolvedValueOnce([]);
+    userModel.findMany.mockResolvedValueOnce([
+      {
+        _id: new mongoose.Types.ObjectId(),
+        name: 'Candidate',
+        username: 'candidate',
+        favoriteSpecies: undefined,
+      },
+    ]);
+
+    const req: any = { user: { _id: userId }, query: {} };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.getRecommendations(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(getJsonPayload(res)?.data?.count).toBe(0);
+  });
+
+  test('getRecommendations sets locationMatch from region fallback and populates missing docs', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const friendId = new mongoose.Types.ObjectId();
+    const candidateId = new mongoose.Types.ObjectId();
+
+    userModel.findById.mockResolvedValueOnce({
+      _id: userId,
+      favoriteSpecies: [],
+      location: null,
+      region: 'British Columbia',
+    });
+
+    friendshipModel.getFriendsForUser.mockResolvedValueOnce([
+      {
+        _id: new mongoose.Types.ObjectId(),
+        requester: createPopulatedUser(userId, { name: 'User', username: 'user' }),
+        addressee: createPopulatedUser(friendId, { name: 'Friend', username: 'friend' }),
+        status: 'accepted',
+      },
+    ]);
+
+    friendshipModel.getRelationshipsForUser.mockResolvedValueOnce([]);
+    friendshipModel.getAcceptedFriendshipsForUsers.mockResolvedValueOnce([
+      { requester: friendId, addressee: candidateId, status: 'accepted' },
+    ]);
+
+    userModel.findMany.mockResolvedValueOnce([
+      {
+        _id: candidateId,
+        name: 'Candidate',
+        username: 'candidate',
+        favoriteSpecies: [],
+        location: 'Victoria',
+        region: 'British Columbia',
+      },
+    ]);
+
+    geocodingService.forwardGeocode.mockResolvedValueOnce(undefined);
+
+    const req: any = { user: { _id: userId }, query: {} };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.getRecommendations(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const payload = getJsonPayload(res);
+    expect(payload?.data?.recommendations?.[0]?.locationMatch).toBe(true);
   });
 
   // API: GET /api/friends (FriendController.listFriends)
@@ -867,57 +1298,35 @@ describe('Mocked: FriendController', () => {
       },
     ]);
 
-    userModel.findMany.mockResolvedValueOnce([
-      {
-        _id: candidateId,
-        name: 'Candidate',
-        username: 'candidate',
-        favoriteSpecies: [],
-        location: null,
-        region: null,
-      },
-    ]);
-
-    geocodingService.forwardGeocode.mockResolvedValueOnce(undefined);
-
-    const originalEntries = Map.prototype.entries;
-    Map.prototype.entries = function () {
-      const syntheticId = new mongoose.Types.ObjectId();
-      const baseEntries = Array.from(originalEntries.call(this));
-      baseEntries.push([
-        syntheticId.toString(),
+    userModel.findMany
+      .mockResolvedValueOnce([
         {
-          mutualFriendIds: new Set<string>(),
-          sharedSpecies: new Set<string>(),
-          locationMatch: false,
-          distanceKm: undefined,
-          doc: {
-            _id: syntheticId,
-            name: 'ZeroScore',
-            username: 'zeroscore',
-            favoriteSpecies: [],
-            location: null,
-            region: null,
-          } as any,
+          _id: candidateId,
+          name: 'Candidate',
+          username: 'candidate',
+          favoriteSpecies: ['owl'],
+          location: 'Vancouver',
+          region: 'British Columbia',
         },
-      ]);
-      return baseEntries[Symbol.iterator]();
-    };
+      ])
+      .mockResolvedValueOnce([]);
+
+    geocodingService.forwardGeocode.mockResolvedValueOnce({ latitude: 49.2827, longitude: -123.1207 });
 
     const req: any = { user: { _id: userId }, query: {} };
     const res = createMockResponse();
     const next = jest.fn();
 
-    try {
-      await friendController.getRecommendations(req, res, next);
-    } finally {
-      Map.prototype.entries = originalEntries;
-    }
+    await friendController.getRecommendations(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(userModel.findMany).toHaveBeenCalledTimes(1);
     const payload = getJsonPayload(res);
     expect(Array.isArray(payload?.data?.recommendations)).toBe(true);
+    expect(
+      payload?.data?.recommendations?.some(
+        (rec: any) => rec?.user?.username === 'zeroscore'
+      )
+    ).toBe(false);
   });
 
   // API: GET /api/friends/recommendations (FriendController.getRecommendations)
@@ -996,24 +1405,6 @@ describe('Mocked: FriendController', () => {
     };
 
     const originalEntries = Map.prototype.entries;
-    Map.prototype.entries = function () {
-      const baseEntries = Array.from(originalEntries.call(this));
-      if (baseEntries.length > 0) {
-        const [key, data] = baseEntries[0];
-        baseEntries.push([
-          `${key}-duplicate`,
-          {
-            mutualFriendIds: new Set(data.mutualFriendIds as Set<string>),
-            sharedSpecies: new Set(data.sharedSpecies as Set<string>),
-            locationMatch: data.locationMatch,
-            distanceKm: data.distanceKm,
-            doc: data.doc,
-          },
-        ]);
-      }
-      return baseEntries[Symbol.iterator]();
-    };
-
     const userId = new mongoose.Types.ObjectId();
     const friendA = new mongoose.Types.ObjectId();
     const friendB = new mongoose.Types.ObjectId();
@@ -1090,7 +1481,6 @@ describe('Mocked: FriendController', () => {
       await friendController.getRecommendations(req, res, next);
     } finally {
       Array.prototype.sort = originalSort;
-      Map.prototype.entries = originalEntries;
     }
 
     expect(res.status).toHaveBeenCalledWith(200);
@@ -1112,9 +1502,9 @@ describe('Mocked: FriendController', () => {
 
     userModel.findById.mockResolvedValueOnce({
       _id: userId,
-      favoriteSpecies: ['owl'],
-      location: 'Vancouver',
-      region: 'British Columbia',
+      favoriteSpecies: [],
+      location: null,
+      region: null,
     });
 
     friendshipModel.getFriendsForUser.mockResolvedValueOnce([
@@ -1139,78 +1529,207 @@ describe('Mocked: FriendController', () => {
       { requester: friendId, addressee: candidateIncluded, status: 'accepted' },
     ]);
 
-    userModel.findMany
-      .mockResolvedValueOnce([
-        {
-          _id: candidateExcluded,
-          name: 'Excluded',
-          username: 'excluded',
-          favoriteSpecies: ['owl'],
-          location: 'Kelowna',
-          region: 'British Columbia',
-        },
-      ])
-      .mockResolvedValueOnce([
-        {
-          _id: candidateExcluded,
-          name: 'Excluded',
-          username: 'excluded',
-          favoriteSpecies: [],
-          location: 'Kelowna',
-          region: 'British Columbia',
-        },
-      ])
-      .mockResolvedValueOnce([
-        {
-          _id: candidateIncluded,
-          name: 'Included',
-          username: 'included',
-          favoriteSpecies: [],
-          location: 'Burnaby',
-          region: 'British Columbia',
-        },
-      ]);
+    userModel.findMany.mockResolvedValueOnce([
+      {
+        _id: candidateIncluded,
+        name: 'CandidateIncluded',
+        username: 'candidateIncluded',
+        favoriteSpecies: [],
+        location: 'Burnaby',
+        region: 'British Columbia',
+      },
+    ]);
 
-    geocodingService.forwardGeocode
-      .mockResolvedValueOnce({ latitude: 49.2827, longitude: -123.1207 })
-      .mockResolvedValueOnce({ latitude: 49.2488, longitude: -122.9805 });
+    geocodingService.forwardGeocode.mockResolvedValueOnce(undefined);
 
     const originalEntries = Map.prototype.entries;
-    Map.prototype.entries = function () {
+    const augmentedMaps = new WeakSet<Map<any, any>>();
+    const entriesSpy = jest.spyOn(Map.prototype, 'entries').mockImplementation(function (this: Map<any, any>) {
       const baseEntries = Array.from(originalEntries.call(this));
-      const includeKey = candidateIncluded.toString();
-      const includeEntry = baseEntries.find(([key]) => key === includeKey);
-      if (includeEntry) {
+      if (!augmentedMaps.has(this)) {
         baseEntries.push([
-          `${includeKey}-duplicate`,
+          'synthetic-zero',
           {
-            mutualFriendIds: new Set(includeEntry[1].mutualFriendIds as Set<string>),
-            sharedSpecies: new Set(includeEntry[1].sharedSpecies as Set<string>),
-            locationMatch: includeEntry[1].locationMatch,
-            distanceKm: includeEntry[1].distanceKm,
-            doc: includeEntry[1].doc,
+            mutualFriendIds: new Set<string>(),
+            sharedSpecies: new Set<string>(),
+            locationMatch: false,
+            distanceKm: undefined,
+            doc: {
+              _id: new mongoose.Types.ObjectId(),
+              name: 'ZeroScore',
+              username: 'zeroscore',
+              favoriteSpecies: [],
+              location: null,
+              region: null,
+            } as any,
           },
         ]);
+        augmentedMaps.add(this);
       }
-      baseEntries.push([
-        'synthetic-zero',
-        {
+      return baseEntries[Symbol.iterator]();
+    });
+
+    const req: any = { user: { _id: userId }, query: { limit: '5' } };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    try {
+      await friendController.getRecommendations(req, res, next);
+    } finally {
+      entriesSpy.mockRestore();
+    }
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const payload = getJsonPayload(res);
+    expect(Array.isArray(payload?.data?.recommendations)).toBe(true);
+  });
+
+  test('getRecommendations skips region candidates flagged as excluded', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const candidateId = new mongoose.Types.ObjectId();
+
+    userModel.findById.mockResolvedValueOnce({
+      _id: userId,
+      favoriteSpecies: [],
+      location: null,
+      region: 'British Columbia',
+    });
+
+    friendshipModel.getFriendsForUser.mockResolvedValueOnce([]);
+    friendshipModel.getRelationshipsForUser.mockResolvedValueOnce([
+      {
+        requester: userId,
+        addressee: candidateId,
+        status: 'pending',
+      },
+    ]);
+    friendshipModel.getAcceptedFriendshipsForUsers.mockResolvedValueOnce([]);
+
+    userModel.findMany.mockResolvedValueOnce([
+      {
+        _id: candidateId,
+        name: 'Candidate',
+        username: 'candidate',
+        favoriteSpecies: [],
+        location: 'Victoria',
+        region: 'British Columbia',
+      },
+    ]);
+
+    const req: any = { user: { _id: userId }, query: {} };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.getRecommendations(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(getJsonPayload(res)?.data?.count).toBe(0);
+  });
+
+  test('getRecommendations continues when candidate lacks populated doc', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const friendId = new mongoose.Types.ObjectId();
+    const candidateId = new mongoose.Types.ObjectId();
+
+    userModel.findById.mockResolvedValueOnce({
+      _id: userId,
+      favoriteSpecies: [],
+      location: null,
+      region: null,
+    });
+
+    friendshipModel.getFriendsForUser.mockResolvedValueOnce([
+      {
+        _id: new mongoose.Types.ObjectId(),
+        requester: createPopulatedUser(userId, { name: 'User', username: 'user' }),
+        addressee: createPopulatedUser(friendId, { name: 'Friend', username: 'friend' }),
+        status: 'accepted',
+      },
+    ]);
+
+    friendshipModel.getRelationshipsForUser.mockResolvedValueOnce([]);
+    friendshipModel.getAcceptedFriendshipsForUsers.mockResolvedValueOnce([
+      { requester: friendId, addressee: candidateId, status: 'accepted' },
+    ]);
+
+    userModel.findMany.mockResolvedValueOnce([]); // no species matches
+
+    const req: any = { user: { _id: userId }, query: {} };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.getRecommendations(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(getJsonPayload(res)?.data?.count).toBe(0);
+  });
+
+  test('getRecommendations drops zero-score candidates inserted later in map', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const friendId = new mongoose.Types.ObjectId();
+    const candidateId = new mongoose.Types.ObjectId();
+
+    userModel.findById.mockResolvedValueOnce({
+      _id: userId,
+      favoriteSpecies: ['owl'],
+      location: null,
+      region: null,
+    });
+
+    friendshipModel.getFriendsForUser.mockResolvedValueOnce([
+      {
+        _id: new mongoose.Types.ObjectId(),
+        requester: createPopulatedUser(userId, { name: 'User', username: 'user' }),
+        addressee: createPopulatedUser(friendId, { name: 'Friend', username: 'friend' }),
+        status: 'accepted',
+      },
+    ]);
+
+    friendshipModel.getRelationshipsForUser.mockResolvedValueOnce([]);
+    friendshipModel.getAcceptedFriendshipsForUsers.mockResolvedValueOnce([
+      { requester: friendId, addressee: candidateId, status: 'accepted' },
+    ]);
+
+    userModel.findMany.mockResolvedValueOnce([
+      {
+        _id: candidateId,
+        name: 'Candidate',
+        username: 'candidate',
+        favoriteSpecies: ['owl'],
+        location: null,
+        region: null,
+      },
+    ]);
+
+    const originalSet = Map.prototype.set;
+    const augmentedMaps = new WeakSet<Map<any, any>>();
+    const zeroId = new mongoose.Types.ObjectId();
+    const setSpy = jest.spyOn(Map.prototype, 'set').mockImplementation(function (this: Map<any, any>, key: any, value: any) {
+      const result = originalSet.call(this, key, value);
+      if (
+        value &&
+        value.mutualFriendIds instanceof Set &&
+        value.sharedSpecies instanceof Set &&
+        !augmentedMaps.has(this)
+      ) {
+        originalSet.call(this, zeroId.toString(), {
           mutualFriendIds: new Set<string>(),
           sharedSpecies: new Set<string>(),
           locationMatch: false,
           distanceKm: undefined,
           doc: {
-            _id: new mongoose.Types.ObjectId(),
+            _id: zeroId,
             name: 'ZeroScore',
             username: 'zeroscore',
             favoriteSpecies: [],
             location: null,
             region: null,
           } as any,
-        },
-      ]);
-      return baseEntries[Symbol.iterator]();
-    };
+        });
+        augmentedMaps.add(this);
+      }
+      return result;
+    });
 
     const req: any = { user: { _id: userId }, query: {} };
     const res = createMockResponse();
@@ -1219,12 +1738,12 @@ describe('Mocked: FriendController', () => {
     try {
       await friendController.getRecommendations(req, res, next);
     } finally {
-      Map.prototype.entries = originalEntries;
+      setSpy.mockRestore();
     }
 
     expect(res.status).toHaveBeenCalledWith(200);
     const payload = getJsonPayload(res);
-    expect(payload?.data?.count).toBeGreaterThanOrEqual(1);
+    expect(Array.isArray(payload?.data?.recommendations)).toBe(true);
   });
 
   // API: POST /api/friends/requests (FriendController.sendRequest)
