@@ -10,7 +10,10 @@
     "format:fix": "prettier --write \"src/**/*.{ts,js,json}\"",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:nfr-recognition": "jest --runTestsByPath tests/nonfunctional/recognitionLatency.spec.ts",
+    "test:nfr-privacy": "jest --runTestsByPath tests/nonfunctional/privacyDeletion.spec.ts",
+    "test:nfr": "npm run test:nfr-recognition && npm run test:nfr-privacy"
   },
   "author": "",
   "license": "ISC",

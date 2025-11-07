@@ -7,6 +7,8 @@ import { GetProfileResponse, UpdateProfileRequest, IUser, updateProfileSchema } 
 import logger from '../logger.util';
 import { userModel } from '../user/user.model';
 import { friendshipModel } from '../friends/friend.model';
+import { catalogRepository } from '../recognition/catalog.model';
+import { catalogModel } from '../catalog/catalog.model';
 
 export class UserController {
   getProfile(req: Request, res: Response<GetProfileResponse>) {
@@ -114,6 +116,9 @@ export class UserController {
           userModel.decrementFriendCount(new mongoose.Types.ObjectId(friendId))
         )
       );
+
+      await catalogRepository.deleteAllForUser(userId);
+      await catalogModel.deleteAllOwnedByUser(userId);
 
       await userModel.delete(user._id);
 

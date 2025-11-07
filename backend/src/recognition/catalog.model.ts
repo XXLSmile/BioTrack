@@ -204,6 +204,20 @@ export class CatalogRepository {
       throw error;
     }
   }
+
+  async deleteAllForUser(userId: mongoose.Types.ObjectId): Promise<number> {
+    const entries = await CatalogModel.find({ userId });
+    let deleted = 0;
+
+    for (const entry of entries) {
+      const result = await this.deleteById(entry._id.toString(), userId.toString());
+      if (result === 'deleted') {
+        deleted += 1;
+      }
+    }
+
+    return deleted;
+  }
 }
 
 export const catalogRepository = new CatalogRepository();
