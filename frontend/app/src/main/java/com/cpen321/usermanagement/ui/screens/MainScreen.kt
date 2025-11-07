@@ -179,23 +179,6 @@ private fun HandleMainScreenSideEffects(state: MainScreenState) {
 }
 
 @Composable
-private fun MainScreenContent(
-    snackBarHostState: SnackbarHostState,
-    summary: MainScreenSummary,
-    recentUi: RecentObservationsUi,
-    actions: MainScreenActions
-) {
-    Scaffold(snackbarHost = { SnackbarHost(snackBarHostState) }) { paddingValues ->
-        MainScreenList(
-            paddingValues = paddingValues,
-            summary = summary,
-            recentUi = recentUi,
-            actions = actions
-        )
-    }
-}
-
-@Composable
 private fun MainScreenList(
     paddingValues: PaddingValues,
     summary: MainScreenSummary,
@@ -365,14 +348,14 @@ private fun rememberSharedCatalogOptions(
     }
 }
 
-private data class MainScreenSummary(
+internal data class MainScreenSummary(
     val name: String,
     val location: String,
     val observations: Int,
     val friends: Int
 )
 
-private data class RecentObservationsUi(
+internal data class RecentObservationsUi(
     val observations: List<RecentObservation>,
     val isLoading: Boolean,
     val errorMessage: String?
@@ -845,7 +828,7 @@ private fun RecentObservationsEmpty() {
     )
 }
 
-private data class MainScreenActions(
+internal data class MainScreenActions(
     val onIdentifyClick: () -> Unit,
     val onViewCatalogs: () -> Unit,
     val onViewAll: () -> Unit,
