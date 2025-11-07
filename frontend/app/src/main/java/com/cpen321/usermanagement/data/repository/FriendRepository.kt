@@ -110,21 +110,22 @@ class FriendRepository @Inject constructor(
         if (response.isSuccessful) {
             val recommendations = response.body()?.data?.recommendations ?: emptyList()
             recommendations.mapNotNull { dto ->
-                val user = dto.user ?: return@mapNotNull null
-                FriendRecommendation(
-                    userId = user._id,
-                    name = user.name,
-                    username = user.username,
-                    profilePicture = user.profilePicture,
-                    location = user.location,
-                    region = user.region,
-                    favoriteSpecies = user.favoriteSpecies ?: emptyList(),
-                    mutualFriends = dto.mutualFriends ?: emptyList(),
-                    sharedSpecies = dto.sharedSpecies ?: emptyList(),
-                    locationMatch = dto.locationMatch ?: false,
-                    distanceKm = dto.distanceKm,
-                    score = dto.score ?: 0
-                )
+                dto.user?.let { user ->
+                    FriendRecommendation(
+                        userId = user._id,
+                        name = user.name,
+                        username = user.username,
+                        profilePicture = user.profilePicture,
+                        location = user.location,
+                        region = user.region,
+                        favoriteSpecies = user.favoriteSpecies ?: emptyList(),
+                        mutualFriends = dto.mutualFriends ?: emptyList(),
+                        sharedSpecies = dto.sharedSpecies ?: emptyList(),
+                        locationMatch = dto.locationMatch ?: false,
+                        distanceKm = dto.distanceKm,
+                        score = dto.score ?: 0
+                    )
+                }
             }
         } else {
             throw FriendRepositoryException(

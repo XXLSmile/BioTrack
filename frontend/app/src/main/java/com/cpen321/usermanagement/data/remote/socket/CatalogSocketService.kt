@@ -53,13 +53,11 @@ class CatalogSocketService @Inject constructor() {
     fun updateAuthToken(token: String?) {
         scope.launch {
             mutex.withLock {
-                if (token == authToken) {
-                    return@withLock
+                if (token != authToken) {
+                    authToken = token
+                    joinedCatalogs.clear()
+                    disconnectLocked()
                 }
-
-                authToken = token
-                joinedCatalogs.clear()
-                disconnectLocked()
             }
         }
     }
@@ -136,28 +134,28 @@ class CatalogSocketService @Inject constructor() {
                 if (!existing.connected()) {
                     existing.connect()
                 }
-                return@withLock existing
-            }
+                existing
+            } else {
+                val options = IO.Options().apply {
+                    reconnection = true
+                    reconnectionAttempts = Int.MAX_VALUE
+                    reconnectionDelay = 2_000
+                    timeout = 10_000
+                    transports = arrayOf(WebSocket.NAME, "polling")
+                    val encoded = URLEncoder.encode(token, StandardCharsets.UTF_8.toString())
+                    query = "token=$encoded"
+                    extraHeaders = mapOf(
+                        "Authorization" to listOf("Bearer $token")
+                    )
+                }
 
-            val options = IO.Options().apply {
-                reconnection = true
-                reconnectionAttempts = Int.MAX_VALUE
-                reconnectionDelay = 2_000
-                timeout = 10_000
-                transports = arrayOf(WebSocket.NAME, "polling")
-                val encoded = URLEncoder.encode(token, StandardCharsets.UTF_8.toString())
-                query = "token=$encoded"
-                extraHeaders = mapOf(
-                    "Authorization" to listOf("Bearer $token")
-                )
+                val socketUrl = resolveSocketBaseUrl()
+                val newSocket = IO.socket(socketUrl, options)
+                configureListeners(newSocket)
+                socket = newSocket
+                newSocket.connect()
+                newSocket
             }
-
-            val socketUrl = resolveSocketBaseUrl()
-            val newSocket = IO.socket(socketUrl, options)
-            configureListeners(newSocket)
-            socket = newSocket
-            newSocket.connect()
-            newSocket
         }
     }
 
@@ -209,9 +207,10 @@ class CatalogSocketService @Inject constructor() {
 
     private fun setupEntriesUpdatedListener(socket: Socket) {
         socket.on("catalog:entries-updated") { args ->
-            parseEntriesPayload(args)?.let { payload ->
-                val catalogId = payload.catalogId ?: return@let
-                val entries = payload.entries ?: return@let
+            val payload = parseEntriesPayload(args)
+            val catalogId = payload?.catalogId
+            val entries = payload?.entries
+            if (catalogId != null && entries != null) {
                 _events.tryEmit(
                     CatalogSocketEvent.EntriesUpdated(
                         catalogId = catalogId,
@@ -225,9 +224,10 @@ class CatalogSocketService @Inject constructor() {
 
     private fun setupMetadataUpdatedListener(socket: Socket) {
         socket.on("catalog:metadata-updated") { args ->
-            parseCatalogPayload(args)?.let { payload ->
-                val catalogId = payload.catalogId ?: return@let
-                val catalog = payload.catalog ?: return@let
+            val payload = parseCatalogPayload(args)
+            val catalogId = payload?.catalogId
+            val catalog = payload?.catalog
+            if (catalogId != null && catalog != null) {
                 _events.tryEmit(
                     CatalogSocketEvent.MetadataUpdated(
                         catalogId = catalogId,
@@ -241,8 +241,9 @@ class CatalogSocketService @Inject constructor() {
 
     private fun setupDeletionListener(socket: Socket) {
         socket.on("catalog:deleted") { args ->
-            parseDeletionPayload(args)?.let { payload ->
-                val catalogId = payload.catalogId ?: return@let
+            val payload = parseDeletionPayload(args)
+            val catalogId = payload?.catalogId
+            if (catalogId != null) {
                 scope.launch {
                     mutex.withLock {
                         joinedCatalogs.remove(catalogId)
