@@ -40,27 +40,22 @@ fun EntryDetailDialog(
     isProcessing: Boolean,
     errorMessage: String?,
     canRemoveFromCatalog: Boolean,
-    onDismiss: () -> Unit,
-    onAddToCatalog: (() -> Unit)?,
-    onRemoveFromCatalog: (() -> Unit)?,
-    onDeleteEntry: (() -> Unit)?
+    callbacks: EntryDetailDialogCallbacks
 ) {
     val observation = entry.toRecentObservation()
     val linkedAt = entry.linkedAt?.let(::formatIsoToPrettyDate)
     val actions = rememberActionsList(
         canRemoveFromCatalog = canRemoveFromCatalog,
-        onAddToCatalog = onAddToCatalog,
-        onRemoveFromCatalog = onRemoveFromCatalog,
-        onDeleteEntry = onDeleteEntry
+        callbacks = callbacks
     )
 
     AlertDialog(
-        onDismissRequest = { if (!isProcessing) onDismiss() },
+        onDismissRequest = { if (!isProcessing) callbacks.onDismiss() },
         confirmButton = {
             TextButton(
                 onClick = {
                     if (!isProcessing) {
-                        onDismiss()
+                        callbacks.onDismiss()
                     }
                 },
                 enabled = !isProcessing
@@ -175,27 +170,32 @@ private data class EntryDialogAction(
 @Composable
 private fun rememberActionsList(
     canRemoveFromCatalog: Boolean,
-    onAddToCatalog: (() -> Unit)?,
-    onRemoveFromCatalog: (() -> Unit)?,
-    onDeleteEntry: (() -> Unit)?
+    callbacks: EntryDetailDialogCallbacks
 ): List<EntryDialogAction> {
     val errorColor = MaterialTheme.colorScheme.error
-    return remember(canRemoveFromCatalog, onAddToCatalog, onRemoveFromCatalog, onDeleteEntry, errorColor) {
+    return remember(canRemoveFromCatalog, callbacks, errorColor) {
         buildList {
-            onAddToCatalog?.let {
+            callbacks.onAddToCatalog?.let {
                 add(EntryDialogAction("Add to another catalog", it))
             }
             if (canRemoveFromCatalog) {
-                onRemoveFromCatalog?.let {
+                callbacks.onRemoveFromCatalog?.let {
                     add(EntryDialogAction("Remove from this catalog", it))
                 }
             }
-            onDeleteEntry?.let {
+            callbacks.onDeleteEntry?.let {
                 add(EntryDialogAction(label = "Delete observation", onClick = it, color = errorColor))
             }
         }
     }
 }
+
+data class EntryDetailDialogCallbacks(
+    val onDismiss: () -> Unit,
+    val onAddToCatalog: (() -> Unit)? = null,
+    val onRemoveFromCatalog: (() -> Unit)? = null,
+    val onDeleteEntry: (() -> Unit)? = null
+)
 
 @Composable
 fun ConfirmEntryActionDialog(

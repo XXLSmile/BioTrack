@@ -44,6 +44,7 @@ import com.cpen321.usermanagement.data.model.CatalogEntry as RemoteCatalogEntry
 import com.cpen321.usermanagement.ui.components.ConfirmEntryActionDialog
 import com.cpen321.usermanagement.ui.components.EntryAction
 import com.cpen321.usermanagement.ui.components.EntryDetailDialog
+import com.cpen321.usermanagement.ui.components.EntryDetailDialogCallbacks
 import com.cpen321.usermanagement.ui.components.formatIsoToPrettyDate
 import com.cpen321.usermanagement.ui.components.resolveImageUrl
 import com.cpen321.usermanagement.ui.components.toCatalogEntry
@@ -318,18 +319,20 @@ private fun EntryDetailDialogHost(
         isProcessing = dialogState.isProcessing,
         errorMessage = dialogState.errorMessage,
         canRemoveFromCatalog = permissions.canRemoveFromCatalog && permissions.currentCatalogId != null,
-        onDismiss = {
-            if (!dialogState.isProcessing) {
-                dialogState.dismissDetail()
+        callbacks = EntryDetailDialogCallbacks(
+            onDismiss = {
+                if (!dialogState.isProcessing) {
+                    dialogState.dismissDetail()
+                }
+            },
+            onAddToCatalog = permissions.takeIf { it.canAddToOtherCatalog }?.let { { dialogState.openAddDialog() } },
+            onRemoveFromCatalog = permissions.takeIf { it.canRemoveFromCatalog }?.let {
+                { dialogState.scheduleAction(EntryAction.Remove(entry)) }
+            },
+            onDeleteEntry = permissions.takeIf { it.canDeleteEntry }?.let {
+                { dialogState.scheduleAction(EntryAction.Delete(entry)) }
             }
-        },
-        onAddToCatalog = permissions.takeIf { it.canAddToOtherCatalog }?.let { { dialogState.openAddDialog() } },
-        onRemoveFromCatalog = permissions.takeIf { it.canRemoveFromCatalog }?.let {
-            { dialogState.scheduleAction(EntryAction.Remove(entry)) }
-        },
-        onDeleteEntry = permissions.takeIf { it.canDeleteEntry }?.let {
-            { dialogState.scheduleAction(EntryAction.Delete(entry)) }
-        }
+        )
     )
 }
 
@@ -492,18 +495,21 @@ private fun CatalogDetailSideEffects(state: CatalogDetailScreenState) {
 @Stable
 private class CatalogDetailScreenState(
     val catalogId: String,
-    val catalogViewModel: CatalogViewModel,
-    val profileViewModel: ProfileViewModel,
-    val catalogShareViewModel: CatalogShareViewModel,
-    val snackbarHostState: SnackbarHostState,
-    val coroutineScope: CoroutineScope,
+    private val controllers: CatalogDetailControllers,
+    private val snapshots: CatalogDetailSnapshots,
     val dialogState: CatalogEntryDialogState,
-    val detailUi: CatalogDetailUi,
-    val permissions: CatalogEntryPermissions,
-    val shareUiState: CatalogShareUiState,
-    val profileUiState: ProfileUiState,
     private val shareDialogState: MutableState<Boolean>
 ) {
+    val catalogViewModel: CatalogViewModel get() = controllers.catalogViewModel
+    val profileViewModel: ProfileViewModel get() = controllers.profileViewModel
+    val catalogShareViewModel: CatalogShareViewModel get() = controllers.catalogShareViewModel
+    val snackbarHostState: SnackbarHostState get() = controllers.snackbarHostState
+    val coroutineScope: CoroutineScope get() = controllers.coroutineScope
+    val detailUi: CatalogDetailUi get() = snapshots.detailUi
+    val permissions: CatalogEntryPermissions get() = snapshots.permissions
+    val shareUiState: CatalogShareUiState get() = snapshots.shareUiState
+    val profileUiState: ProfileUiState get() = snapshots.profileUiState
+
     var showShareDialog: Boolean
         get() = shareDialogState.value
         set(value) {
@@ -540,18 +546,25 @@ private fun rememberCatalogDetailScreenState(
     }
     val shareDialogState = remember { mutableStateOf(false) }
 
-    return CatalogDetailScreenState(
-        catalogId = catalogId,
+    val controllers = CatalogDetailControllers(
         catalogViewModel = viewModel,
         profileViewModel = profileViewModel,
         catalogShareViewModel = catalogShareViewModel,
         snackbarHostState = snackbarHostState,
-        coroutineScope = coroutineScope,
-        dialogState = dialogState,
+        coroutineScope = coroutineScope
+    )
+    val snapshots = CatalogDetailSnapshots(
         detailUi = detailUi,
         permissions = permissions,
         shareUiState = shareUiState,
-        profileUiState = profileUiState,
+        profileUiState = profileUiState
+    )
+
+    return CatalogDetailScreenState(
+        catalogId = catalogId,
+        controllers = controllers,
+        snapshots = snapshots,
+        dialogState = dialogState,
         shareDialogState = shareDialogState
     )
 }
@@ -601,6 +614,21 @@ private data class CatalogEntryPermissions(
     val canDeleteEntry: Boolean,
     val currentCatalogId: String?,
     val additionalCatalogs: List<CatalogOption>
+)
+
+private data class CatalogDetailControllers(
+    val catalogViewModel: CatalogViewModel,
+    val profileViewModel: ProfileViewModel,
+    val catalogShareViewModel: CatalogShareViewModel,
+    val snackbarHostState: SnackbarHostState,
+    val coroutineScope: CoroutineScope
+)
+
+private data class CatalogDetailSnapshots(
+    val detailUi: CatalogDetailUi,
+    val permissions: CatalogEntryPermissions,
+    val shareUiState: CatalogShareUiState,
+    val profileUiState: ProfileUiState
 )
 
 @Stable

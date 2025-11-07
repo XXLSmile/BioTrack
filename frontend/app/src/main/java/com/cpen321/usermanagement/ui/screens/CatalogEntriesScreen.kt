@@ -53,6 +53,7 @@ import androidx.navigation.NavController
 import com.cpen321.usermanagement.ui.components.ConfirmEntryActionDialog
 import com.cpen321.usermanagement.ui.components.EntryAction
 import com.cpen321.usermanagement.ui.components.EntryDetailDialog
+import com.cpen321.usermanagement.ui.components.EntryDetailDialogCallbacks
 import com.cpen321.usermanagement.ui.components.ObservationListItem
 import com.cpen321.usermanagement.ui.components.toCatalogEntry
 import com.cpen321.usermanagement.ui.viewmodels.CatalogEntriesUiState
@@ -322,14 +323,15 @@ private fun CatalogEntriesDialogs(
             isProcessing = dialogState.isProcessing,
             errorMessage = dialogState.errorMessage,
             canRemoveFromCatalog = false,
-            onDismiss = {
-                if (!dialogState.isProcessing) {
-                    dialogState.dismissDetail()
-                }
-            },
-            onAddToCatalog = { dialogState.openAddDialog() },
-            onRemoveFromCatalog = null,
-            onDeleteEntry = { dialogState.scheduleDelete() }
+            callbacks = EntryDetailDialogCallbacks(
+                onDismiss = {
+                    if (!dialogState.isProcessing) {
+                        dialogState.dismissDetail()
+                    }
+                },
+                onAddToCatalog = { dialogState.openAddDialog() },
+                onDeleteEntry = { dialogState.scheduleDelete() }
+            )
         )
     }
 

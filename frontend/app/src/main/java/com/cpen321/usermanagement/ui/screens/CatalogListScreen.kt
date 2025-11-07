@@ -87,12 +87,14 @@ private fun CatalogListScreenHost(state: CatalogListScreenState) {
         shareUiState = state.shareUiState,
         showNavigationIcon = state.showNavigationIcon,
         snackbarHostState = state.snackbarHostState,
-        onBack = state::navigateBack,
-        onOpenCatalogEntries = state::openCatalogEntries,
-        onOpenCatalog = state::openCatalog,
-        onCreateCatalogClick = { state.creationDialogState.open() },
-        onRespondToInvitation = { id, action -> state.shareViewModel.respondToInvitation(id, action) },
-        onDeleteCatalog = { state.viewModel.deleteCatalog(it) }
+        callbacks = CatalogListCallbacks(
+            onBack = state::navigateBack,
+            onOpenCatalogEntries = state::openCatalogEntries,
+            onOpenCatalog = state::openCatalog,
+            onCreateCatalogClick = { state.creationDialogState.open() },
+            onRespondToInvitation = { id, action -> state.shareViewModel.respondToInvitation(id, action) },
+            onDeleteCatalog = { state.viewModel.deleteCatalog(it) }
+        )
     )
 
     CatalogCreationDialog(
@@ -111,27 +113,18 @@ private fun CatalogListScreenLayout(
     shareUiState: CatalogShareUiState,
     showNavigationIcon: Boolean,
     snackbarHostState: SnackbarHostState,
-    onBack: () -> Unit,
-    onOpenCatalogEntries: () -> Unit,
-    onOpenCatalog: (String) -> Unit,
-    onCreateCatalogClick: () -> Unit,
-    onRespondToInvitation: (String, String) -> Unit,
-    onDeleteCatalog: (String) -> Unit
+    callbacks: CatalogListCallbacks
 ) {
     CatalogListScaffold(
         snackbarHostState = snackbarHostState,
         showNavigationIcon = showNavigationIcon,
-        onBack = onBack,
-        onCreateCatalogClick = onCreateCatalogClick
+        callbacks = callbacks
     ) { paddingValues ->
         CatalogListBody(
             paddingValues = paddingValues,
             catalogs = catalogs,
             shareUiState = shareUiState,
-            onOpenCatalogEntries = onOpenCatalogEntries,
-            onOpenCatalog = onOpenCatalog,
-            onRespondToInvitation = onRespondToInvitation,
-            onDeleteCatalog = onDeleteCatalog
+            callbacks = callbacks
         )
     }
 }
@@ -140,8 +133,7 @@ private fun CatalogListScreenLayout(
 private fun CatalogListScaffold(
     snackbarHostState: SnackbarHostState,
     showNavigationIcon: Boolean,
-    onBack: () -> Unit,
-    onCreateCatalogClick: () -> Unit,
+    callbacks: CatalogListCallbacks,
     content: @Composable (PaddingValues) -> Unit
 ) {
     Scaffold(
@@ -151,7 +143,7 @@ private fun CatalogListScaffold(
                 title = { Text("My Catalogs") },
                 navigationIcon = {
                     if (showNavigationIcon) {
-                        IconButton(onClick = onBack) {
+                        IconButton(onClick = callbacks.onBack) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Back"
@@ -167,7 +159,7 @@ private fun CatalogListScaffold(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = onCreateCatalogClick,
+                onClick = callbacks.onCreateCatalogClick,
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
                 Icon(
@@ -185,10 +177,7 @@ private fun CatalogListBody(
     paddingValues: PaddingValues,
     catalogs: List<Catalog>,
     shareUiState: CatalogShareUiState,
-    onOpenCatalogEntries: () -> Unit,
-    onOpenCatalog: (String) -> Unit,
-    onRespondToInvitation: (String, String) -> Unit,
-    onDeleteCatalog: (String) -> Unit
+    callbacks: CatalogListCallbacks
 ) {
     Column(
         modifier = Modifier
@@ -197,25 +186,25 @@ private fun CatalogListBody(
             .padding(16.dp),
         verticalArrangement = Arrangement.Top
     ) {
-        ManageAllEntriesCard(onManageAll = onOpenCatalogEntries)
+        ManageAllEntriesCard(onManageAll = callbacks.onOpenCatalogEntries)
         Spacer(modifier = Modifier.height(16.dp))
 
         CatalogInvitationsSection(
             invitations = shareUiState.pendingInvitations,
             isProcessing = shareUiState.isProcessing,
-            onRespond = onRespondToInvitation
+            onRespond = callbacks.onRespondToInvitation
         )
 
         SharedCatalogsSection(
             shares = shareUiState.sharedCatalogs,
-            onOpenCatalog = onOpenCatalog
+            onOpenCatalog = callbacks.onOpenCatalog
         )
 
         Box(modifier = Modifier.weight(1f, fill = true)) {
             CatalogGrid(
                 catalogs = catalogs,
-                onOpenCatalog = onOpenCatalog,
-                onDeleteCatalog = onDeleteCatalog,
+                onOpenCatalog = callbacks.onOpenCatalog,
+                onDeleteCatalog = callbacks.onDeleteCatalog,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -640,3 +629,12 @@ private fun rememberCatalogListState(
         showNavigationIcon = showNavigationIcon
     )
 }
+
+private data class CatalogListCallbacks(
+    val onBack: () -> Unit,
+    val onOpenCatalogEntries: () -> Unit,
+    val onOpenCatalog: (String) -> Unit,
+    val onCreateCatalogClick: () -> Unit,
+    val onRespondToInvitation: (String, String) -> Unit,
+    val onDeleteCatalog: (String) -> Unit
+)

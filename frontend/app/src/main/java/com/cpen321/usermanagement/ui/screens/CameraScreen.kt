@@ -237,51 +237,36 @@ private fun CameraScreenSideEffects(
     }
 }
 
-private fun performRecognition(
-    context: Context,
-    scope: CoroutineScope,
-    uiState: CameraUiState,
-    fusedLocationClient: FusedLocationProviderClient,
-    currentLocation: Location?,
-    onLocationUpdated: (Location?) -> Unit,
-    hasLocationPermission: () -> Boolean,
-    requestLocationPermission: () -> Unit
-) {
-    if (!hasLocationPermission()) {
-        requestLocationPermission()
-        uiState.updateResult("Grant location permission to attach coordinates.")
+private fun performRecognition(environment: RecognitionContext) {
+    if (!environment.hasLocationPermission()) {
+        environment.requestLocationPermission()
+        environment.uiState.updateResult("Grant location permission to attach coordinates.")
         return
     }
 
-    val uri = uiState.imageUri
+    val uri = environment.uiState.imageUri
     if (uri == null) {
-        uiState.updateResult("Select a photo before scanning.")
+        environment.uiState.updateResult("Select a photo before scanning.")
         return
     }
 
-    scope.launch {
-        val locationToUse = currentLocation ?: fetchCurrentLocation(fusedLocationClient).also {
-            onLocationUpdated(it)
+    environment.scope.launch {
+        val locationToUse = environment.currentLocation ?: fetchCurrentLocation(environment.fusedLocationClient).also {
+            environment.onLocationUpdated(it)
         }
-        uiState.updateResult("Recognizing...")
-        val (message, response) = recognizeImage(context, uri, locationToUse)
-        uiState.showRecognitionResult(message, response)
+        environment.uiState.updateResult("Recognizing...")
+        val (message, response) = recognizeImage(environment.appContext, uri, locationToUse)
+        environment.uiState.showRecognitionResult(message, response)
     }
 }
 
 private fun handleCatalogSave(
     catalogId: String,
-    uiState: CameraUiState,
-    hasLocationPermission: Boolean,
-    fusedLocationClient: FusedLocationProviderClient,
-    currentLocation: Location?,
-    onLocationUpdated: (Location?) -> Unit,
-    viewModel: CatalogViewModel,
-    profileViewModel: ProfileViewModel,
-    scope: CoroutineScope
+    context: CatalogSaveContext
 ) {
+    val uiState = context.uiState
     if (uiState.isSaving) return
-    val recognition = uiState.recognitionResult
+    val recognition = context.uiState.recognitionResult
     if (recognition == null) {
         uiState.updateResult("⚠️ Run recognition before saving.")
         return
@@ -292,19 +277,19 @@ private fun handleCatalogSave(
     }
 
     uiState.setSavingState(true)
-    scope.launch {
-        val locationToUse = if (hasLocationPermission) {
-            currentLocation ?: fetchCurrentLocation(fusedLocationClient).also(onLocationUpdated)
+    context.scope.launch {
+        val locationToUse = if (context.hasLocationPermission) {
+            context.currentLocation ?: fetchCurrentLocation(context.fusedLocationClient).also(context.onLocationUpdated)
         } else {
-            currentLocation
+            context.currentLocation
         }
 
         val (success, message) = saveRecognitionToCatalog(recognition, catalogId, locationToUse)
         uiState.updateResult(message)
         if (success) {
             uiState.resetAfterSave()
-            viewModel.loadCatalogs()
-            profileViewModel.refreshStats()
+            context.viewModel.loadCatalogs()
+            context.profileViewModel.refreshStats()
         }
         uiState.setSavingState(false)
     }
@@ -628,8 +613,7 @@ private fun CameraScreenCatalogDialog(controller: CameraScreenController) {
         viewModel = controller.viewModel,
         isSaving = uiState.isSaving,
         onSave = { catalogId ->
-            handleCatalogSave(
-                catalogId = catalogId,
+            val saveContext = CatalogSaveContext(
                 uiState = uiState,
                 hasLocationPermission = hasLocationPermission(controller.context),
                 fusedLocationClient = controller.fusedLocationClient,
@@ -639,6 +623,7 @@ private fun CameraScreenCatalogDialog(controller: CameraScreenController) {
                 profileViewModel = controller.profileViewModel,
                 scope = controller.scope
             )
+            handleCatalogSave(catalogId = catalogId, context = saveContext)
         },
         onDismiss = {
             if (!uiState.isSaving) {
@@ -653,8 +638,8 @@ private fun triggerRecognition(
     controller: CameraScreenController,
     requestLocationPermission: () -> Unit
 ) {
-    performRecognition(
-        context = controller.context,
+    val recognitionContext = RecognitionContext(
+        appContext = controller.context,
         scope = controller.scope,
         uiState = controller.uiState,
         fusedLocationClient = controller.fusedLocationClient,
@@ -663,4 +648,27 @@ private fun triggerRecognition(
         hasLocationPermission = { hasLocationPermission(controller.context) },
         requestLocationPermission = requestLocationPermission
     )
+    performRecognition(recognitionContext)
 }
+
+private data class RecognitionContext(
+    val appContext: Context,
+    val scope: CoroutineScope,
+    val uiState: CameraUiState,
+    val fusedLocationClient: FusedLocationProviderClient,
+    val currentLocation: Location?,
+    val onLocationUpdated: (Location?) -> Unit,
+    val hasLocationPermission: () -> Boolean,
+    val requestLocationPermission: () -> Unit
+)
+
+private data class CatalogSaveContext(
+    val uiState: CameraUiState,
+    val hasLocationPermission: Boolean,
+    val fusedLocationClient: FusedLocationProviderClient,
+    val currentLocation: Location?,
+    val onLocationUpdated: (Location?) -> Unit,
+    val viewModel: CatalogViewModel,
+    val profileViewModel: ProfileViewModel,
+    val scope: CoroutineScope
+)

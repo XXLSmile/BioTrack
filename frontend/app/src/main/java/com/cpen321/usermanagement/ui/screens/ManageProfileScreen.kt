@@ -104,27 +104,38 @@ fun ManageProfileScreen(
         }
     }
 
+    val formActions = remember(profileViewModel, onBackClick) {
+        ManageProfileFormActions(
+            onFormChange = { formState = it },
+            onCheckUsername = profileViewModel::checkUsernameAvailability,
+            onClearUsernameResult = profileViewModel::clearUsernameResult,
+            onSaveProfile = { updatedState ->
+                profileViewModel.updateProfile(
+                    name = updatedState.name,
+                    username = updatedState.username,
+                    location = updatedState.location.ifBlank { null },
+                    region = updatedState.region.ifBlank { null },
+                    isPublicProfile = updatedState.isPublicProfile,
+                    favoriteSpecies = updatedState.favoriteSpecies,
+                    onSuccess = onBackClick
+                )
+            }
+        )
+    }
+    val screenActions = remember(formActions, onBackClick) {
+        ManageProfileActions(
+            formActions = formActions,
+            onBackClick = onBackClick,
+            onSuccessMessageShown = profileViewModel::clearSuccessMessage,
+            onErrorMessageShown = profileViewModel::clearError
+        )
+    }
+
     ManageProfileContent(
         uiState = uiState,
         formState = formState,
         snackBarHostState = snackBarHostState,
-        onFormChange = { formState = it },
-        onCheckUsername = profileViewModel::checkUsernameAvailability,
-        onClearUsernameResult = profileViewModel::clearUsernameResult,
-        onSaveProfile = { updatedState ->
-            profileViewModel.updateProfile(
-                name = updatedState.name,
-                username = updatedState.username,
-                location = updatedState.location.ifBlank { null },
-                region = updatedState.region.ifBlank { null },
-                isPublicProfile = updatedState.isPublicProfile,
-                favoriteSpecies = updatedState.favoriteSpecies,
-                onSuccess = onBackClick
-            )
-        },
-        onBackClick = onBackClick,
-        onSuccessMessageShown = profileViewModel::clearSuccessMessage,
-        onErrorMessageShown = profileViewModel::clearError
+        actions = screenActions
     )
 }
 
@@ -153,19 +164,13 @@ private fun ManageProfileContent(
     uiState: ProfileUiState,
     formState: ProfileFormState,
     snackBarHostState: SnackbarHostState,
-    onFormChange: (ProfileFormState) -> Unit,
-    onCheckUsername: (String) -> Unit,
-    onClearUsernameResult: () -> Unit,
-    onSaveProfile: (ProfileFormState) -> Unit,
-    onBackClick: () -> Unit,
-    onSuccessMessageShown: () -> Unit,
-    onErrorMessageShown: () -> Unit,
+    actions: ManageProfileActions,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
         modifier = modifier,
         topBar = {
-            ManageProfileTopBar(onBackClick = onBackClick)
+            ManageProfileTopBar(onBackClick = actions.onBackClick)
         },
         snackbarHost = {
             MessageSnackbar(
@@ -173,8 +178,8 @@ private fun ManageProfileContent(
                 messageState = MessageSnackbarState(
                     successMessage = uiState.successMessage,
                     errorMessage = uiState.errorMessage,
-                    onSuccessMessageShown = onSuccessMessageShown,
-                    onErrorMessageShown = onErrorMessageShown
+                    onSuccessMessageShown = actions.onSuccessMessageShown,
+                    onErrorMessageShown = actions.onErrorMessageShown
                 )
             )
         }
@@ -183,10 +188,7 @@ private fun ManageProfileContent(
             paddingValues = paddingValues,
             uiState = uiState,
             formState = formState,
-            onFormChange = onFormChange,
-            onCheckUsername = onCheckUsername,
-            onClearUsernameResult = onClearUsernameResult,
-            onSaveProfile = onSaveProfile
+            actions = actions.formActions
         )
     }
 }
@@ -223,10 +225,7 @@ private fun ManageProfileBody(
     paddingValues: PaddingValues,
     uiState: ProfileUiState,
     formState: ProfileFormState,
-    onFormChange: (ProfileFormState) -> Unit,
-    onCheckUsername: (String) -> Unit,
-    onClearUsernameResult: () -> Unit,
-    onSaveProfile: (ProfileFormState) -> Unit,
+    actions: ManageProfileFormActions,
     modifier: Modifier = Modifier
 ) {
     val spacing = LocalSpacing.current
@@ -245,10 +244,7 @@ private fun ManageProfileBody(
                 ProfileFormContent(
                     formState = formState,
                     uiState = uiState,
-                    onFormChange = onFormChange,
-                    onCheckUsername = onCheckUsername,
-                    onClearUsernameResult = onClearUsernameResult,
-                    onSaveProfile = onSaveProfile,
+                    actions = actions,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(spacing.large)
@@ -270,10 +266,7 @@ private fun ManageProfileBody(
 private fun ProfileFormContent(
     formState: ProfileFormState,
     uiState: ProfileUiState,
-    onFormChange: (ProfileFormState) -> Unit,
-    onCheckUsername: (String) -> Unit,
-    onClearUsernameResult: () -> Unit,
-    onSaveProfile: (ProfileFormState) -> Unit,
+    actions: ManageProfileFormActions,
     modifier: Modifier = Modifier
 ) {
     val spacing = LocalSpacing.current
@@ -285,17 +278,17 @@ private fun ProfileFormContent(
         item {
             ProfileInfoCard(
                 formState = formState,
-                onFormChange = onFormChange,
+                onFormChange = actions.onFormChange,
                 uiState = uiState,
-                onCheckUsername = onCheckUsername,
-                onClearUsernameResult = onClearUsernameResult
+                onCheckUsername = actions.onCheckUsername,
+                onClearUsernameResult = actions.onClearUsernameResult
             )
         }
 
         item {
             FavoriteSpeciesEditor(
                 formState = formState,
-                onFormChange = onFormChange
+                onFormChange = actions.onFormChange
             )
         }
 
@@ -303,7 +296,7 @@ private fun ProfileFormContent(
             SaveProfileButton(
                 enabled = formState.hasChanges() && !uiState.isSavingProfile,
                 isSaving = uiState.isSavingProfile,
-                onClick = { onSaveProfile(formState) }
+                onClick = { actions.onSaveProfile(formState) }
             )
         }
     }
@@ -531,6 +524,20 @@ private fun FavoriteSpeciesEditor(
         }
     }
 }
+
+private data class ManageProfileFormActions(
+    val onFormChange: (ProfileFormState) -> Unit,
+    val onCheckUsername: (String) -> Unit,
+    val onClearUsernameResult: () -> Unit,
+    val onSaveProfile: (ProfileFormState) -> Unit
+)
+
+private data class ManageProfileActions(
+    val formActions: ManageProfileFormActions,
+    val onBackClick: () -> Unit,
+    val onSuccessMessageShown: () -> Unit,
+    val onErrorMessageShown: () -> Unit
+)
 
 @Composable
 private fun FavoriteSpeciesInputRow(

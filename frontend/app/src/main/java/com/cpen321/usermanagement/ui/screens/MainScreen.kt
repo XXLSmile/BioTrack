@@ -52,6 +52,7 @@ import com.cpen321.usermanagement.data.model.RecentObservation
 import com.cpen321.usermanagement.ui.components.ObservationListItem
 import com.cpen321.usermanagement.ui.components.EntryAction
 import com.cpen321.usermanagement.ui.components.EntryDetailDialog
+import com.cpen321.usermanagement.ui.components.EntryDetailDialogCallbacks
 import com.cpen321.usermanagement.ui.components.ConfirmEntryActionDialog
 import com.cpen321.usermanagement.ui.components.toCatalogEntry
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
@@ -94,10 +95,7 @@ private fun rememberNavigateToRoute(navController: NavHostController): (String) 
 private fun MainScreenHost(state: MainScreenState) {
     HandleMainScreenSideEffects(state)
 
-    MainScreenContent(
-        snackBarHostState = state.snackBarHostState,
-        summary = state.summary,
-        recentUi = state.recentUi,
+    val actions = MainScreenActions(
         onIdentifyClick = { state.navigateToRoute(NavRoutes.IDENTIFY) },
         onViewCatalogs = { state.navigateToRoute(NavRoutes.CATALOGS) },
         onViewAll = { state.navigateToRoute(NavRoutes.CATALOG_ENTRIES) },
@@ -109,6 +107,13 @@ private fun MainScreenHost(state: MainScreenState) {
                 state.entryDialogState.showEntry(observation.toCatalogEntry())
             }
         }
+    )
+
+    MainScreenContent(
+        snackBarHostState = state.snackBarHostState,
+        summary = state.summary,
+        recentUi = state.recentUi,
+        actions = actions
     )
 
     AddEntryToCatalogDialog(
@@ -178,22 +183,14 @@ private fun MainScreenContent(
     snackBarHostState: SnackbarHostState,
     summary: MainScreenSummary,
     recentUi: RecentObservationsUi,
-    onIdentifyClick: () -> Unit,
-    onViewCatalogs: () -> Unit,
-    onViewAll: () -> Unit,
-    onRetry: () -> Unit,
-    onSelectObservation: (RecentObservation) -> Unit
+    actions: MainScreenActions
 ) {
     Scaffold(snackbarHost = { SnackbarHost(snackBarHostState) }) { paddingValues ->
         MainScreenList(
             paddingValues = paddingValues,
             summary = summary,
             recentUi = recentUi,
-            onIdentifyClick = onIdentifyClick,
-            onViewCatalogs = onViewCatalogs,
-            onViewAll = onViewAll,
-            onRetry = onRetry,
-            onSelectObservation = onSelectObservation
+            actions = actions
         )
     }
 }
@@ -203,11 +200,7 @@ private fun MainScreenList(
     paddingValues: PaddingValues,
     summary: MainScreenSummary,
     recentUi: RecentObservationsUi,
-    onIdentifyClick: () -> Unit,
-    onViewCatalogs: () -> Unit,
-    onViewAll: () -> Unit,
-    onRetry: () -> Unit,
-    onSelectObservation: (RecentObservation) -> Unit
+    actions: MainScreenActions
 ) {
     LazyColumn(
         modifier = Modifier
@@ -220,8 +213,8 @@ private fun MainScreenList(
             WelcomeCard(
                 name = summary.name,
                 location = summary.location,
-                onIdentifyClick = onIdentifyClick,
-                onViewCatalogs = onViewCatalogs
+                onIdentifyClick = actions.onIdentifyClick,
+                onViewCatalogs = actions.onViewCatalogs
             )
         }
 
@@ -241,9 +234,9 @@ private fun MainScreenList(
                 observations = recentUi.observations,
                 isLoading = recentUi.isLoading,
                 errorMessage = recentUi.errorMessage,
-                onRetry = onRetry,
-                onViewAll = onViewAll,
-                onSelectObservation = onSelectObservation
+                onRetry = actions.onRetry,
+                onViewAll = actions.onViewAll,
+                onSelectObservation = actions.onSelectObservation
             )
         }
     }
@@ -283,22 +276,23 @@ private fun ObservationEntryDetailDialog(state: EntryDialogState) {
         isProcessing = state.isProcessing,
         errorMessage = state.errorMessage,
         canRemoveFromCatalog = false,
-        onDismiss = {
-            if (!state.isProcessing) {
-                state.dismissAll()
+        callbacks = EntryDetailDialogCallbacks(
+            onDismiss = {
+                if (!state.isProcessing) {
+                    state.dismissAll()
+                }
+            },
+            onAddToCatalog = {
+                if (!state.isProcessing) {
+                    state.openAddDialog()
+                }
+            },
+            onDeleteEntry = {
+                if (!state.isProcessing) {
+                    state.scheduleDelete()
+                }
             }
-        },
-        onAddToCatalog = {
-            if (!state.isProcessing) {
-                state.openAddDialog()
-            }
-        },
-        onRemoveFromCatalog = null,
-        onDeleteEntry = {
-            if (!state.isProcessing) {
-                state.scheduleDelete()
-            }
-        }
+        )
     )
 }
 
@@ -386,22 +380,25 @@ private data class RecentObservationsUi(
 
 @Stable
 private class MainScreenState(
-    val mainViewModel: MainViewModel,
-    val profileViewModel: ProfileViewModel,
-    val catalogViewModel: CatalogViewModel,
-    val catalogShareViewModel: CatalogShareViewModel,
-    val navController: NavHostController,
-    val mainUiState: MainUiState,
-    val profileUiState: ProfileUiState,
-    val shareUiState: CatalogShareUiState,
-    val snackBarHostState: SnackbarHostState,
-    val coroutineScope: CoroutineScope,
+    private val controllers: MainScreenControllers,
+    private val uiSnapshots: MainScreenUiSnapshots,
     val entryDialogState: EntryDialogState,
     val navigateToRoute: (String) -> Unit,
     val additionalCatalogOptions: List<CatalogOption>,
     val summary: MainScreenSummary,
     val recentUi: RecentObservationsUi
-)
+) {
+    val mainViewModel: MainViewModel get() = controllers.mainViewModel
+    val profileViewModel: ProfileViewModel get() = controllers.profileViewModel
+    val catalogViewModel: CatalogViewModel get() = controllers.catalogViewModel
+    val catalogShareViewModel: CatalogShareViewModel get() = controllers.catalogShareViewModel
+    val navController: NavHostController get() = controllers.navController
+    val snackBarHostState: SnackbarHostState get() = controllers.snackBarHostState
+    val coroutineScope: CoroutineScope get() = controllers.coroutineScope
+    val mainUiState: MainUiState get() = uiSnapshots.mainUiState
+    val profileUiState: ProfileUiState get() = uiSnapshots.profileUiState
+    val shareUiState: CatalogShareUiState get() = uiSnapshots.shareUiState
+}
 
 @Composable
 private fun rememberMainScreenState(
@@ -424,17 +421,24 @@ private fun rememberMainScreenState(
     }
     val recentUi = remember(mainUiState) { buildRecentObservationsUi(mainUiState) }
 
-    return MainScreenState(
+    val controllers = MainScreenControllers(
         mainViewModel = mainViewModel,
         profileViewModel = profileViewModel,
         catalogViewModel = catalogViewModel,
         catalogShareViewModel = catalogShareViewModel,
         navController = navController,
+        snackBarHostState = snackBarHostState,
+        coroutineScope = coroutineScope
+    )
+    val snapshots = MainScreenUiSnapshots(
         mainUiState = mainUiState,
         profileUiState = profileUiState,
-        shareUiState = shareUiState,
-        snackBarHostState = snackBarHostState,
-        coroutineScope = coroutineScope,
+        shareUiState = shareUiState
+    )
+
+    return MainScreenState(
+        controllers = controllers,
+        uiSnapshots = snapshots,
         entryDialogState = entryDialogState,
         navigateToRoute = navigateToRoute,
         additionalCatalogOptions = additionalCatalogOptions,
@@ -840,6 +844,30 @@ private fun RecentObservationsEmpty() {
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
+
+private data class MainScreenActions(
+    val onIdentifyClick: () -> Unit,
+    val onViewCatalogs: () -> Unit,
+    val onViewAll: () -> Unit,
+    val onRetry: () -> Unit,
+    val onSelectObservation: (RecentObservation) -> Unit
+)
+
+private data class MainScreenControllers(
+    val mainViewModel: MainViewModel,
+    val profileViewModel: ProfileViewModel,
+    val catalogViewModel: CatalogViewModel,
+    val catalogShareViewModel: CatalogShareViewModel,
+    val navController: NavHostController,
+    val snackBarHostState: SnackbarHostState,
+    val coroutineScope: CoroutineScope
+)
+
+private data class MainScreenUiSnapshots(
+    val mainUiState: MainUiState,
+    val profileUiState: ProfileUiState,
+    val shareUiState: CatalogShareUiState
+)
 
 @Composable
 private fun RecentObservationsList(
