@@ -74,15 +74,7 @@ fun FriendsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     val handlers = rememberFriendsScreenHandlers(
-        onSearchQueryChange = viewModel::updateSearchQuery,
-        onSearch = viewModel::searchUsers,
-        onTabSelected = viewModel::switchTab,
-        onSendRequest = viewModel::sendFriendRequest,
-        onAcceptRequest = viewModel::acceptFriendRequest,
-        onDeclineRequest = viewModel::declineFriendRequest,
-        onRemoveFriend = viewModel::removeFriend,
-        onCancelRequest = viewModel::cancelFriendRequest,
-        onRefreshRecommendations = { viewModel.loadRecommendations() },
+        viewModel = viewModel,
         onUserSelected = onUserSelected,
         onClearMessage = viewModel::clearMessages
     )
@@ -768,41 +760,21 @@ private data class FriendsScreenHandlers(
 
 @Composable
 private fun rememberFriendsScreenHandlers(
-    onSearchQueryChange: (String) -> Unit,
-    onSearch: () -> Unit,
-    onTabSelected: (FriendUiTab) -> Unit,
-    onSendRequest: (String) -> Unit,
-    onAcceptRequest: (String) -> Unit,
-    onDeclineRequest: (String) -> Unit,
-    onRemoveFriend: (String) -> Unit,
-    onCancelRequest: (String) -> Unit,
-    onRefreshRecommendations: () -> Unit,
+    viewModel: FriendViewModel,
     onUserSelected: (PublicUserSummary) -> Unit,
     onClearMessage: () -> Unit
 ): FriendsScreenHandlers {
-    return remember(
-        onSearchQueryChange,
-        onSearch,
-        onTabSelected,
-        onSendRequest,
-        onAcceptRequest,
-        onDeclineRequest,
-        onRemoveFriend,
-        onCancelRequest,
-        onRefreshRecommendations,
-        onUserSelected,
-        onClearMessage
-    ) {
+    return remember(viewModel, onUserSelected, onClearMessage) {
         FriendsScreenHandlers(
-            onSearchQueryChange = onSearchQueryChange,
-            onSearch = onSearch,
-            onTabSelected = onTabSelected,
-            onSendRequest = onSendRequest,
-            onAcceptRequest = onAcceptRequest,
-            onDeclineRequest = onDeclineRequest,
-            onRemoveFriend = onRemoveFriend,
-            onCancelRequest = onCancelRequest,
-            onRefreshRecommendations = onRefreshRecommendations,
+            onSearchQueryChange = viewModel::updateSearchQuery,
+            onSearch = viewModel::searchUsers,
+            onTabSelected = viewModel::switchTab,
+            onSendRequest = viewModel::sendFriendRequest,
+            onAcceptRequest = viewModel::acceptFriendRequest,
+            onDeclineRequest = viewModel::declineFriendRequest,
+            onRemoveFriend = viewModel::removeFriend,
+            onCancelRequest = viewModel::cancelFriendRequest,
+            onRefreshRecommendations = { viewModel.loadRecommendations() },
             onUserSelected = onUserSelected,
             onClearMessage = onClearMessage
         )
