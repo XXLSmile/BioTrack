@@ -73,6 +73,11 @@ fun FriendsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
+    val handlers = rememberFriendsScreenHandlers(
+        viewModel = viewModel,
+        onUserSelected = onUserSelected,
+        onClearMessage = viewModel::clearMessages
+    )
 
     LaunchedEffect(Unit) {
         viewModel.refreshAll()
@@ -90,19 +95,35 @@ fun FriendsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    FriendsScreenHost(uiState = uiState, handlers = handlers)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FriendsScreenHost(
+    uiState: FriendUiState,
+    handlers: FriendsScreenHandlers
+) {
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.successMessage) {
+        uiState.successMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            handlers.onClearMessage()
+        }
+    }
+
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            handlers.onClearMessage()
+        }
+    }
+
     FriendsScreenContent(
         uiState = uiState,
-        onSearchQueryChange = viewModel::updateSearchQuery,
-        onSearch = viewModel::searchUsers,
-        onTabSelected = viewModel::switchTab,
-        onSendRequest = viewModel::sendFriendRequest,
-        onAcceptRequest = viewModel::acceptFriendRequest,
-        onDeclineRequest = viewModel::declineFriendRequest,
-        onRemoveFriend = viewModel::removeFriend,
-        onCancelRequest = viewModel::cancelFriendRequest,
-        onClearMessage = viewModel::clearMessages,
-        onRefreshRecommendations = { viewModel.loadRecommendations() },
-        onUserSelected = onUserSelected
+        handlers = handlers,
+        snackbarHostState = snackbarHostState
     )
 }
 
@@ -110,34 +131,9 @@ fun FriendsScreen(
 @Composable
 private fun FriendsScreenContent(
     uiState: FriendUiState,
-    onSearchQueryChange: (String) -> Unit,
-    onSearch: () -> Unit,
-    onTabSelected: (FriendUiTab) -> Unit,
-    onSendRequest: (String) -> Unit,
-    onAcceptRequest: (String) -> Unit,
-    onDeclineRequest: (String) -> Unit,
-    onRemoveFriend: (String) -> Unit,
-    onCancelRequest: (String) -> Unit,
-    onClearMessage: () -> Unit,
-    onRefreshRecommendations: () -> Unit,
-    onUserSelected: (PublicUserSummary) -> Unit,
+    handlers: FriendsScreenHandlers,
+    snackbarHostState: SnackbarHostState
 ) {
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    LaunchedEffect(uiState.successMessage) {
-        uiState.successMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            onClearMessage()
-        }
-    }
-
-    LaunchedEffect(uiState.errorMessage) {
-        uiState.errorMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            onClearMessage()
-        }
-    }
-
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -151,93 +147,126 @@ private fun FriendsScreenContent(
         ) {
             SearchBar(
                 query = uiState.searchQuery,
-                onQueryChange = onSearchQueryChange,
-                onSearch = onSearch,
+                onQueryChange = handlers.onSearchQueryChange,
+                onSearch = handlers.onSearch,
                 isSearching = uiState.isSearching
             )
 
-            FriendTabRow(selected = uiState.selectedTab, onTabSelected = onTabSelected)
+            FriendTabRow(selected = uiState.selectedTab, onTabSelected = handlers.onTabSelected)
 
-            when (uiState.selectedTab) {
-                FriendUiTab.FRIENDS -> FriendListSection(
-                    friends = uiState.friends,
-                    isLoading = uiState.isLoadingFriends,
-                    onRemoveFriend = onRemoveFriend,
-                    emptyMessage = "No friends yet\nSearch above to connect with other users",
-                    onUserSelected = onUserSelected
-                )
-                FriendUiTab.REQUESTS -> FriendRequestSection(
-                    requests = uiState.incomingRequests,
-                    isLoading = uiState.isLoadingRequests,
-                    onAccept = onAcceptRequest,
-                    onDecline = onDeclineRequest,
-                    emptyMessage = "No new requests",
-                    primaryActionText = "Accept",
-                    secondaryActionText = "Decline",
-                    primaryActionEnabled = true,
-                    userResolver = { it.requester },
-                    onUserSelected = onUserSelected
-                )
-                FriendUiTab.SENT -> FriendRequestSection(
-                    requests = uiState.sentRequests,
-                    isLoading = uiState.isLoadingSentRequests,
-                    onAccept = {},
-                    onDecline = onCancelRequest,
-                    emptyMessage = "No pending requests",
-                    primaryActionText = "Pending",
-                    secondaryActionText = "Cancel",
-                    primaryActionEnabled = false,
-                    userResolver = { it.addressee },
-                    onUserSelected = onUserSelected
-                )
-            }
+            FriendTabContent(
+                uiState = uiState,
+                onRemoveFriend = handlers.onRemoveFriend,
+                onAcceptRequest = handlers.onAcceptRequest,
+                onDeclineRequest = handlers.onDeclineRequest,
+                onCancelRequest = handlers.onCancelRequest,
+                onUserSelected = handlers.onUserSelected
+            )
 
-            if (uiState.searchResults.isNotEmpty()) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    shape = RoundedCornerShape(24.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text(
-                            text = "Search results",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                        HorizontalDivider(
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                            thickness = 1.dp
-                        )
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.heightIn(max = 280.dp)
-                        ) {
-                            items(uiState.searchResults) { user ->
-                                SearchResultRow(
-                                    user = user,
-                                    onSendRequest = onSendRequest,
-                                    isActionEnabled = uiState.canSendRequest(user._id),
-                                    onUserSelected = onUserSelected
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            SearchResultsCard(
+                uiState = uiState,
+                onSendRequest = handlers.onSendRequest,
+                onUserSelected = handlers.onUserSelected
+            )
 
             RecommendationSection(
                 recommendations = uiState.recommendations,
                 isLoading = uiState.isLoadingRecommendations,
-                onSendRequest = onSendRequest,
-                onUserSelected = onUserSelected,
-                onRefresh = onRefreshRecommendations
+                onSendRequest = handlers.onSendRequest,
+                onUserSelected = handlers.onUserSelected,
+                onRefresh = handlers.onRefreshRecommendations
             )
+        }
+    }
+}
+
+@Composable
+private fun FriendTabContent(
+    uiState: FriendUiState,
+    onRemoveFriend: (String) -> Unit,
+    onAcceptRequest: (String) -> Unit,
+    onDeclineRequest: (String) -> Unit,
+    onCancelRequest: (String) -> Unit,
+    onUserSelected: (PublicUserSummary) -> Unit
+) {
+    when (uiState.selectedTab) {
+        FriendUiTab.FRIENDS -> FriendListSection(
+            friends = uiState.friends,
+            isLoading = uiState.isLoadingFriends,
+            onRemoveFriend = onRemoveFriend,
+            emptyMessage = "No friends yet\nSearch above to connect with other users",
+            onUserSelected = onUserSelected
+        )
+        FriendUiTab.REQUESTS -> FriendRequestSection(
+            requests = uiState.incomingRequests,
+            isLoading = uiState.isLoadingRequests,
+            config = FriendRequestSectionConfig(
+                emptyMessage = "No new requests",
+                primaryActionText = "Accept",
+                secondaryActionText = "Decline",
+                primaryActionEnabled = true,
+                userResolver = { it.requester },
+                onPrimaryAction = onAcceptRequest,
+                onSecondaryAction = onDeclineRequest,
+                onUserSelected = onUserSelected
+            )
+        )
+        FriendUiTab.SENT -> FriendRequestSection(
+            requests = uiState.sentRequests,
+            isLoading = uiState.isLoadingSentRequests,
+            config = FriendRequestSectionConfig(
+                emptyMessage = "No pending requests",
+                primaryActionText = "Pending",
+                secondaryActionText = "Cancel",
+                primaryActionEnabled = false,
+                userResolver = { it.addressee },
+                onPrimaryAction = {},
+                onSecondaryAction = onCancelRequest,
+                onUserSelected = onUserSelected
+            )
+        )
+    }
+}
+
+@Composable
+private fun SearchResultsCard(
+    uiState: FriendUiState,
+    onSendRequest: (String) -> Unit,
+    onUserSelected: (PublicUserSummary) -> Unit
+) {
+    if (uiState.searchResults.isEmpty()) return
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Search results",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium
+            )
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                thickness = 1.dp
+            )
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.heightIn(max = 280.dp)
+            ) {
+                items(uiState.searchResults) { user ->
+                    SearchResultRow(
+                        user = user,
+                        onSendRequest = onSendRequest,
+                        isActionEnabled = uiState.canSendRequest(user._id),
+                        onUserSelected = onUserSelected
+                    )
+                }
+            }
         }
     }
 }
@@ -356,30 +385,26 @@ private fun FriendListSection(
 private fun FriendRequestSection(
     requests: List<FriendRequestSummary>,
     isLoading: Boolean,
-    onAccept: (String) -> Unit,
-    onDecline: (String) -> Unit,
-    emptyMessage: String,
-    primaryActionText: String,
-    secondaryActionText: String,
-    primaryActionEnabled: Boolean = true,
-    userResolver: (FriendRequestSummary) -> PublicUserSummary?,
-    onUserSelected: (PublicUserSummary) -> Unit
+    config: FriendRequestSectionConfig
 ) {
     FriendCardWrapper {
         when {
             isLoading -> LoadingPlaceholder()
-            requests.isEmpty() -> EmptyState(message = emptyMessage)
+            requests.isEmpty() -> EmptyState(message = config.emptyMessage)
             else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(requests) { request ->
+                    val user = config.userResolver(request) ?: request.requester ?: request.addressee
                     FriendRequestRow(
                         request = request,
-                        user = userResolver(request) ?: request.requester ?: request.addressee,
-                        primaryActionText = primaryActionText,
-                        secondaryActionText = secondaryActionText,
-                        onPrimaryAction = { onAccept(request._id) },
-                        onSecondaryAction = { onDecline(request._id) },
-                        primaryActionEnabled = primaryActionEnabled,
-                        onUserSelected = onUserSelected
+                        user = user,
+                        config = FriendRequestRowConfig(
+                            primaryActionText = config.primaryActionText,
+                            secondaryActionText = config.secondaryActionText,
+                            onPrimaryAction = { config.onPrimaryAction(request._id) },
+                            onSecondaryAction = { config.onSecondaryAction(request._id) },
+                            primaryActionEnabled = config.primaryActionEnabled,
+                            onUserSelected = config.onUserSelected
+                        )
                     )
                 }
             }
@@ -593,12 +618,7 @@ private fun RecommendationRow(
 private fun FriendRequestRow(
     request: FriendRequestSummary,
     user: PublicUserSummary?,
-    primaryActionText: String,
-    secondaryActionText: String,
-    onPrimaryAction: () -> Unit,
-    onSecondaryAction: () -> Unit,
-    primaryActionEnabled: Boolean,
-    onUserSelected: (PublicUserSummary) -> Unit
+    config: FriendRequestRowConfig
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -608,7 +628,7 @@ private fun FriendRequestRow(
             UserSummary(
                 user = user,
                 subtitle = request.status.replaceFirstChar { it.uppercase() },
-                onClick = user.username?.let { { onUserSelected(user) } }
+                onClick = user.username?.let { { config.onUserSelected(user) } }
             )
         }
         Row(
@@ -616,17 +636,17 @@ private fun FriendRequestRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Button(
-                onClick = onPrimaryAction,
-                enabled = primaryActionEnabled,
+                onClick = config.onPrimaryAction,
+                enabled = config.primaryActionEnabled,
                 modifier = Modifier.weight(1f)
             ) {
-                Text(primaryActionText)
+                Text(config.primaryActionText)
             }
             OutlinedButton(
-                onClick = onSecondaryAction,
+                onClick = config.onSecondaryAction,
                 modifier = Modifier.weight(1f)
             ) {
-                Text(secondaryActionText)
+                Text(config.secondaryActionText)
             }
         }
     }
@@ -723,3 +743,60 @@ private fun UserSummary(
         }
     }
 }
+
+private data class FriendsScreenHandlers(
+    val onSearchQueryChange: (String) -> Unit,
+    val onSearch: () -> Unit,
+    val onTabSelected: (FriendUiTab) -> Unit,
+    val onSendRequest: (String) -> Unit,
+    val onAcceptRequest: (String) -> Unit,
+    val onDeclineRequest: (String) -> Unit,
+    val onRemoveFriend: (String) -> Unit,
+    val onCancelRequest: (String) -> Unit,
+    val onRefreshRecommendations: () -> Unit,
+    val onUserSelected: (PublicUserSummary) -> Unit,
+    val onClearMessage: () -> Unit
+)
+
+@Composable
+private fun rememberFriendsScreenHandlers(
+    viewModel: FriendViewModel,
+    onUserSelected: (PublicUserSummary) -> Unit,
+    onClearMessage: () -> Unit
+): FriendsScreenHandlers {
+    return remember(viewModel, onUserSelected, onClearMessage) {
+        FriendsScreenHandlers(
+            onSearchQueryChange = viewModel::updateSearchQuery,
+            onSearch = viewModel::searchUsers,
+            onTabSelected = viewModel::switchTab,
+            onSendRequest = viewModel::sendFriendRequest,
+            onAcceptRequest = viewModel::acceptFriendRequest,
+            onDeclineRequest = viewModel::declineFriendRequest,
+            onRemoveFriend = viewModel::removeFriend,
+            onCancelRequest = viewModel::cancelFriendRequest,
+            onRefreshRecommendations = { viewModel.loadRecommendations() },
+            onUserSelected = onUserSelected,
+            onClearMessage = onClearMessage
+        )
+    }
+}
+
+private data class FriendRequestSectionConfig(
+    val emptyMessage: String,
+    val primaryActionText: String,
+    val secondaryActionText: String,
+    val primaryActionEnabled: Boolean,
+    val userResolver: (FriendRequestSummary) -> PublicUserSummary?,
+    val onPrimaryAction: (String) -> Unit,
+    val onSecondaryAction: (String) -> Unit,
+    val onUserSelected: (PublicUserSummary) -> Unit
+)
+
+private data class FriendRequestRowConfig(
+    val primaryActionText: String,
+    val secondaryActionText: String,
+    val onPrimaryAction: () -> Unit,
+    val onSecondaryAction: () -> Unit,
+    val primaryActionEnabled: Boolean,
+    val onUserSelected: (PublicUserSummary) -> Unit
+)

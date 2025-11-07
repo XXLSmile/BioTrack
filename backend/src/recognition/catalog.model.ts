@@ -1,10 +1,13 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import fs from 'fs';
 import path from 'path';
 
 import { catalogEntryLinkModel } from '../catalog/catalogEntryLink.model';
 import logger from '../logger.util';
 import { userModel } from '../user/user.model';
+import { ensurePathWithinRoot, resolveWithinRoot } from '../utils/pathSafe';
+import { unlinkSync as safeUnlinkSync } from '../utils/safeFs';
+
+type FileSystemError = Error & { code?: string };
 
 // Catalog entry interface (represents a user's saved wildlife sighting)
 export interface ICatalogEntry extends Document {
@@ -94,6 +97,9 @@ catalogSchema.index({ userId: 1, imageHash: 1 }, { unique: true });
 export const CatalogModel = mongoose.model<ICatalogEntry>('CatalogEntry', catalogSchema);
 
 // Catalog Repository
+const UPLOADS_ROOT = path.resolve(path.join(__dirname, '../../uploads'));
+const IMAGES_ROOT = resolveWithinRoot(UPLOADS_ROOT, 'images');
+
 export class CatalogRepository {
   async create(data: {
     userId: string;
@@ -127,14 +133,14 @@ export class CatalogRepository {
     return await CatalogModel.findById(entryId).populate('speciesId');
   }
 
-  async findByUserId(userId: string, limit: number = 50): Promise<ICatalogEntry[]> {
+  async findByUserId(userId: string, limit = 50): Promise<ICatalogEntry[]> {
     return await CatalogModel.find({ userId })
       .sort({ createdAt: -1 })
       .limit(limit)
       .populate('speciesId');
   }
 
-  async findRecentByUserId(userId: string, limit: number = 10): Promise<ICatalogEntry[]> {
+  async findRecentByUserId(userId: string, limit = 10): Promise<ICatalogEntry[]> {
     return CatalogModel.find({ userId })
       .sort({ createdAt: -1 })
       .limit(limit)
@@ -175,11 +181,15 @@ export class CatalogRepository {
       await catalogEntryLinkModel.removeEntryFromAllCatalogs(entry._id);
 
       if (entry.imageUrl) {
-        const uploadsDir = path.join(__dirname, '../../uploads/images');
         const filename = path.basename(entry.imageUrl);
-        const filepath = path.join(uploadsDir, filename);
-        if (fs.existsSync(filepath)) {
-          fs.unlinkSync(filepath);
+        const filepath = ensurePathWithinRoot(IMAGES_ROOT, path.join(IMAGES_ROOT, filename));
+        try {
+          safeUnlinkSync(filepath);
+        } catch (error) {
+          const nodeError = error as FileSystemError;
+          if (nodeError.code !== 'ENOENT') {
+            throw error;
+          }
         }
       }
 
@@ -193,6 +203,20 @@ export class CatalogRepository {
       });
       throw error;
     }
+  }
+
+  async deleteAllForUser(userId: mongoose.Types.ObjectId): Promise<number> {
+    const entries = await CatalogModel.find({ userId });
+    let deleted = 0;
+
+    for (const entry of entries) {
+      const result = await this.deleteById(entry._id.toString(), userId.toString());
+      if (result === 'deleted') {
+        deleted += 1;
+      }
+    }
+
+    return deleted;
   }
 }
 

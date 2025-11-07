@@ -3,11 +3,11 @@ import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import { userModel } from '../user/user.model';
 
-export const authenticateToken: RequestHandler = async (
+const authenticateTokenImpl = async (
   req: Request,
   res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader?.split(' ')[1];
@@ -20,11 +20,36 @@ export const authenticateToken: RequestHandler = async (
       return;
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-      id: mongoose.Types.ObjectId;
-    };
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      res.status(500).json({
+        error: 'Server misconfiguration',
+        message: 'JWT secret is not configured',
+      });
+      return;
+    }
 
-    if (!decoded || !decoded.id) {
+    const decoded = jwt.verify(token, secret);
+
+    const rawId =
+      typeof decoded === 'object' && decoded !== null && 'id' in decoded
+        ? (decoded as { id: unknown }).id
+        : undefined;
+
+    let userObjectId: mongoose.Types.ObjectId | undefined;
+
+    if (typeof rawId === 'string') {
+      if (!mongoose.Types.ObjectId.isValid(rawId)) {
+        res.status(401).json({
+          error: 'Invalid token',
+          message: 'Token verification failed',
+        });
+        return;
+      }
+      userObjectId = new mongoose.Types.ObjectId(rawId);
+    } else if (rawId instanceof mongoose.Types.ObjectId) {
+      userObjectId = rawId;
+    } else {
       res.status(401).json({
         error: 'Invalid token',
         message: 'Token verification failed',
@@ -32,7 +57,7 @@ export const authenticateToken: RequestHandler = async (
       return;
     }
 
-    const user = await userModel.findById(decoded.id);
+    const user = await userModel.findById(userObjectId);
 
     if (!user) {
       res.status(401).json({
@@ -64,4 +89,10 @@ export const authenticateToken: RequestHandler = async (
 
     next(error);
   }
+};
+
+export const authenticateToken: RequestHandler = (req, res, next) => {
+  authenticateTokenImpl(req, res, next).catch((error: unknown) => {
+    next(error);
+  });
 };

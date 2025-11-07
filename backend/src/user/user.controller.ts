@@ -1,15 +1,21 @@
 import { NextFunction, Request, Response } from 'express';
 
 import mongoose from 'mongoose';
+import type { ParamsDictionary } from 'express-serve-static-core';
 
-import { GetProfileResponse, UpdateProfileRequest } from '../user/user.types';
+import { GetProfileResponse, UpdateProfileRequest, IUser, updateProfileSchema } from '../user/user.types';
 import logger from '../logger.util';
 import { userModel } from '../user/user.model';
 import { friendshipModel } from '../friends/friend.model';
+import { catalogRepository } from '../recognition/catalog.model';
+import { catalogModel } from '../catalog/catalog.model';
 
 export class UserController {
   getProfile(req: Request, res: Response<GetProfileResponse>) {
-    const user = req.user!;
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
 
     res.status(200).json({
       message: 'Profile fetched successfully',
@@ -18,25 +24,52 @@ export class UserController {
   }
 
   async updateProfile(
-    req: Request<unknown, unknown, UpdateProfileRequest>,
+    req: Request<ParamsDictionary, GetProfileResponse, UpdateProfileRequest>,
     res: Response<GetProfileResponse>,
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
-      const { username } = req.body;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+      const updatePayload = updateProfileSchema.parse(req.body) as UpdateProfileRequest;
+      const username = updatePayload.username;
 
       // Check if username is being changed and if it's available
-      if (username && username !== user.username) {
-        const isAvailable = await userModel.isUsernameAvailable(username);
+      if (typeof username === 'string' && username !== user.username) {
+        const candidateUsername: string = username;
+        const isAvailable = await userModel.isUsernameAvailable(candidateUsername);
         if (!isAvailable) {
           return res.status(409).json({
             message: 'Username already taken. Please choose a different username.',
           });
         }
       }
+      const updateData: Partial<IUser> = {};
+      if (typeof updatePayload.name === 'string') {
+        updateData.name = updatePayload.name;
+      }
+      if (typeof updatePayload.username === 'string') {
+        updateData.username = updatePayload.username;
+      }
+      if (typeof updatePayload.location === 'string') {
+        updateData.location = updatePayload.location;
+      }
+      if (typeof updatePayload.region === 'string') {
+        updateData.region = updatePayload.region;
+      }
+      if (typeof updatePayload.isPublicProfile === 'boolean') {
+        updateData.isPublicProfile = updatePayload.isPublicProfile;
+      }
+      if (Array.isArray(updatePayload.favoriteSpecies)) {
+        updateData.favoriteSpecies = updatePayload.favoriteSpecies;
+      }
+      if (typeof updatePayload.fcmToken === 'string' || updatePayload.fcmToken === null) {
+        updateData.fcmToken = updatePayload.fcmToken;
+      }
 
-      const updatedUser = await userModel.update(user._id, req.body);
+      const updatedUser = await userModel.update(user._id, updateData);
 
       if (!updatedUser) {
         return res.status(404).json({
@@ -70,9 +103,12 @@ export class UserController {
 
   async deleteProfile(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
 
-      const userId = user._id as mongoose.Types.ObjectId;
+      const userId = user._id;
 
       const connectedFriendIds = await friendshipModel.deleteAllForUser(userId);
       await Promise.all(
@@ -80,6 +116,9 @@ export class UserController {
           userModel.decrementFriendCount(new mongoose.Types.ObjectId(friendId))
         )
       );
+
+      await catalogRepository.deleteAllForUser(userId);
+      await catalogModel.deleteAllOwnedByUser(userId);
 
       await userModel.delete(user._id);
 
@@ -201,7 +240,7 @@ export class UserController {
     try {
       const { userId } = req.params;
 
-      const user = await userModel.findById(new (require('mongoose').Types.ObjectId)(userId));
+      const user = await userModel.findById(new mongoose.Types.ObjectId(userId));
 
       if (!user) {
         return res.status(404).json({
@@ -258,7 +297,7 @@ export class UserController {
         : undefined;
 
       const users = await userModel.searchByName(query, 10, excludeUserId);
-      const currentUserId = req.user?._id?.toString();
+      const currentUserId = req.user ? req.user._id.toString() : undefined;
 
       // Filter to only show public profiles
       const publicUsers = users
@@ -290,7 +329,10 @@ export class UserController {
 
   async getUserStats(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
 
       const stats = await userModel.getUserStats(user._id);
 
@@ -319,16 +361,19 @@ export class UserController {
 
   async addFavoriteSpecies(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user!;
-      const { speciesName } = req.body;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+      const { speciesName } = req.body as { speciesName?: unknown };
 
-      if (!speciesName) {
+      if (typeof speciesName !== 'string' || speciesName.trim().length === 0) {
         return res.status(400).json({
           message: 'Species name is required',
         });
       }
 
-      await userModel.addFavoriteSpecies(user._id, speciesName);
+      await userModel.addFavoriteSpecies(user._id, speciesName.trim());
 
       res.status(200).json({
         message: 'Favorite species added successfully',
@@ -341,16 +386,19 @@ export class UserController {
 
   async removeFavoriteSpecies(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user!;
-      const { speciesName } = req.body;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+      const { speciesName } = req.body as { speciesName?: unknown };
 
-      if (!speciesName) {
+      if (typeof speciesName !== 'string' || speciesName.trim().length === 0) {
         return res.status(400).json({
           message: 'Species name is required',
         });
       }
 
-      await userModel.removeFavoriteSpecies(user._id, speciesName);
+      await userModel.removeFavoriteSpecies(user._id, speciesName.trim());
 
       res.status(200).json({
         message: 'Favorite species removed successfully',
@@ -401,7 +449,10 @@ export class UserController {
 
   async updateFcmToken(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const { token } = req.body as { token?: unknown };
 
       if (typeof token !== 'string' || token.trim().length === 0) {
@@ -421,7 +472,10 @@ export class UserController {
 
   async clearFcmToken(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
 
       await userModel.update(user._id, { fcmToken: null });
 

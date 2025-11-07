@@ -7,7 +7,9 @@ import com.cpen321.usermanagement.data.model.InviteCollaboratorBody
 import com.cpen321.usermanagement.data.model.RespondInvitationBody
 import com.cpen321.usermanagement.data.model.UpdateCollaboratorBody
 import com.cpen321.usermanagement.data.remote.api.CatalogApi
+import java.io.IOException
 import javax.inject.Inject
+import retrofit2.HttpException
 
 class CatalogRepository @Inject constructor(
     private val api: CatalogApi
@@ -48,7 +50,9 @@ class CatalogRepository @Inject constructor(
         if (response.isSuccessful) {
             response.body()?.data?.collaborators ?: emptyList()
         } else {
-            throw Exception(response.errorBody()?.string() ?: "Failed to load collaborators")
+            throw CatalogRepositoryException(
+                response.errorBody()?.string().orEmpty().ifBlank { "Failed to load collaborators" }
+            )
         }
     }
 
@@ -61,7 +65,9 @@ class CatalogRepository @Inject constructor(
         if (response.isSuccessful) {
             response.body()?.data?.invitation
         } else {
-            throw Exception(response.errorBody()?.string() ?: "Failed to invite collaborator")
+            throw CatalogRepositoryException(
+                response.errorBody()?.string().orEmpty().ifBlank { "Failed to invite collaborator" }
+            )
         }
     }
 
@@ -75,7 +81,9 @@ class CatalogRepository @Inject constructor(
         if (response.isSuccessful) {
             response.body()?.data?.invitation
         } else {
-            throw Exception(response.errorBody()?.string() ?: "Failed to update collaborator")
+            throw CatalogRepositoryException(
+                response.errorBody()?.string().orEmpty().ifBlank { "Failed to update collaborator" }
+            )
         }
     }
 
@@ -84,7 +92,9 @@ class CatalogRepository @Inject constructor(
         if (response.isSuccessful) {
             response.body()?.data?.shares ?: emptyList()
         } else {
-            throw Exception(response.errorBody()?.string() ?: "Failed to load shared catalogs")
+            throw CatalogRepositoryException(
+                response.errorBody()?.string().orEmpty().ifBlank { "Failed to load shared catalogs" }
+            )
         }
     }
 
@@ -93,7 +103,9 @@ class CatalogRepository @Inject constructor(
         if (response.isSuccessful) {
             response.body()?.data?.shares ?: emptyList()
         } else {
-            throw Exception(response.errorBody()?.string() ?: "Failed to load invitations")
+            throw CatalogRepositoryException(
+                response.errorBody()?.string().orEmpty().ifBlank { "Failed to load invitations" }
+            )
         }
     }
 
@@ -102,7 +114,9 @@ class CatalogRepository @Inject constructor(
         if (response.isSuccessful) {
             response.body()?.data?.invitation
         } else {
-            throw Exception(response.errorBody()?.string() ?: "Failed to respond to invitation")
+            throw CatalogRepositoryException(
+                response.errorBody()?.string().orEmpty().ifBlank { "Failed to respond to invitation" }
+            )
         }
     }
 
@@ -110,8 +124,9 @@ class CatalogRepository @Inject constructor(
         return try {
             val response = api.deleteCatalog(catalogId)
             response.isSuccessful
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (e: IOException) {
+            false
+        } catch (e: HttpException) {
             false
         }
     }

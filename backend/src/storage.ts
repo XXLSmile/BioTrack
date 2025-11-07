@@ -1,5 +1,6 @@
 import multer from 'multer';
 import path from 'path';
+import { randomBytes } from 'crypto';
 import { UPLOADS_ROOT } from './config/paths';
 
 // Disk storage for file system (keeps both file and buffer available)
@@ -8,8 +9,11 @@ const storage = multer.diskStorage({
     cb(null, UPLOADS_ROOT);
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
+    const originalName: string =
+      typeof file.originalname === 'string' ? file.originalname : '';
+    const extension = path.extname(originalName).toLowerCase();
+    const secureName = `${randomBytes(16).toString('hex')}${extension}`;
+    cb(null, secureName);
   },
 });
 

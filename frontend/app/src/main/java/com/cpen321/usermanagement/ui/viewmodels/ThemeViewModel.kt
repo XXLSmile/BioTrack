@@ -9,7 +9,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.io.IOException
 import javax.inject.Inject
+import retrofit2.HttpException
 
 @HiltViewModel
 class ThemeViewModel @Inject constructor(
@@ -25,8 +27,10 @@ class ThemeViewModel @Inject constructor(
                 val colors = colorRepository.getRandomThemeColors()
                 Log.d("Theme", "Colors from API: $colors")
                 _themeColors.value = colors.map { Color(it[0], it[1], it[2]) }
-            } catch (e: Exception) {
-                Log.e("Theme", "Error getting theme colors", e)
+            } catch (e: IOException) {
+                Log.e("Theme", "Network error getting theme colors", e)
+            } catch (e: HttpException) {
+                Log.e("Theme", "HTTP error getting theme colors: ${e.code()}", e)
             }
         }
     }

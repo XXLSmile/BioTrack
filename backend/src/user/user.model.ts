@@ -125,10 +125,10 @@ export class UserModel {
       return await this.user.create(validatedData);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        console.error('Validation error:', error.issues);
+        logger.error('Validation error:', JSON.stringify(error.issues));
         throw new Error('Invalid update data');
       }
-      console.error('Error updating user:', error);
+      logger.error('Error creating user:', error);
       throw new Error('Failed to update user');
     }
   }
@@ -139,14 +139,13 @@ export class UserModel {
   ): Promise<IUser | null> {
     try {
       const validatedData = updateProfileSchema.parse(user);
+      const updateDocument: mongoose.UpdateQuery<IUser> = {
+        $set: validatedData,
+      };
 
-      const updatedUser = await this.user.findByIdAndUpdate(
-        userId,
-        validatedData,
-        {
-          new: true,
-        }
-      );
+      const updatedUser = await this.user.findByIdAndUpdate(userId, updateDocument, {
+        new: true,
+      });
       return updatedUser;
     } catch (error) {
       logger.error('Error updating user:', error);
@@ -173,7 +172,7 @@ export class UserModel {
 
       return user;
     } catch (error) {
-      console.error('Error finding user by Google ID:', error);
+      logger.error('Error finding user by id:', error);
       throw new Error('Failed to find user');
     }
   }
@@ -188,7 +187,7 @@ export class UserModel {
 
       return user;
     } catch (error) {
-      console.error('Error finding user by Google ID:', error);
+      logger.error('Error finding user by Google ID:', error);
       throw new Error('Failed to find user');
     }
   }
@@ -222,8 +221,11 @@ export class UserModel {
   async findByName(name: string): Promise<IUser | null> {
     try {
       // Case-insensitive search
-      const user = await this.user.findOne({ 
-        name: new RegExp(`^${name}$`, 'i')
+      const normalizedName = name.trim().toLowerCase();
+      const user = await this.user.findOne({
+        $expr: {
+          $eq: [{ $toLower: '$name' }, normalizedName],
+        },
       });
 
       if (!user) {
@@ -256,13 +258,14 @@ export class UserModel {
 
   async searchByName(
     query: string,
-    limit: number = 10,
+    limit = 10,
     excludeUserId?: mongoose.Types.ObjectId
   ): Promise<IUser[]> {
     try {
-      // Case-insensitive partial match
+      // Case-insensitive partial match using regex
+      const sanitizedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const filter: Record<string, unknown> = {
-        name: new RegExp(query, 'i')
+        name: { $regex: sanitizedQuery, $options: 'i' },
       };
 
       if (excludeUserId) {

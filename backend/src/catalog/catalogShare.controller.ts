@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import {
+  CatalogShareRole,
   InviteCollaboratorRequest,
   inviteCollaboratorSchema,
   RespondToInvitationRequest,
@@ -21,7 +22,10 @@ export class CatalogShareController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const { catalogId } = req.params;
 
       const catalog = await catalogModel.findById(catalogId);
@@ -51,9 +55,14 @@ export class CatalogShareController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const { catalogId } = req.params;
-      const { inviteeId, role } = inviteCollaboratorSchema.parse(req.body);
+      const invitePayload = inviteCollaboratorSchema.parse(req.body) as InviteCollaboratorRequest;
+      const inviteeId: string = invitePayload.inviteeId;
+      const role: CatalogShareRole = invitePayload.role;
 
       const catalog = await catalogModel.findById(catalogId);
       if (!catalog) {
@@ -138,9 +147,12 @@ export class CatalogShareController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const { catalogId, shareId } = req.params;
-      const body = updateCollaboratorSchema.parse(req.body);
+      const updatePayload = updateCollaboratorSchema.parse(req.body) as UpdateCollaboratorRequest;
 
       const catalog = await catalogModel.findById(catalogId);
       if (!catalog) {
@@ -153,16 +165,17 @@ export class CatalogShareController {
 
       const shareObjectId = new mongoose.Types.ObjectId(shareId);
       const share = await catalogShareModel.findById(shareObjectId);
-      if (!share || !share.catalog.equals(catalog._id)) {
+      if (!share?.catalog.equals(catalog._id)) {
         return res.status(404).json({ message: 'Invitation not found' });
       }
 
       let updatedShare: typeof share | null = share;
 
-      if (body.action === 'revoke') {
+      if (updatePayload.action === 'revoke') {
         updatedShare = await catalogShareModel.revokeInvitation(shareObjectId);
-      } else if (body.role) {
-        updatedShare = await catalogShareModel.updateRole(shareObjectId, body.role);
+      } else if (updatePayload.role) {
+        const nextRole: CatalogShareRole = updatePayload.role;
+        updatedShare = await catalogShareModel.updateRole(shareObjectId, nextRole);
       }
 
       if (!updatedShare) {
@@ -185,7 +198,10 @@ export class CatalogShareController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const { shareId } = req.params;
       const { action } = respondToInvitationSchema.parse(req.body);
 
@@ -211,44 +227,40 @@ export class CatalogShareController {
         return res.status(500).json({ message: 'Failed to update invitation' });
       }
 
-      if (newStatus === 'accepted' || newStatus === 'declined') {
-        try {
-          const catalog = await catalogModel.findById(invitation.catalog.toString());;
-          if (catalog) {
-            const owner = await userModel.findById(catalog.owner);
-            if (owner?.fcmToken) {
-              const title =
+      try {
+        const catalog = await catalogModel.findById(invitation.catalog.toString());
+        if (catalog) {
+          const owner = await userModel.findById(catalog.owner);
+          if (owner?.fcmToken) {
+            const title =
               newStatus === 'accepted'
-              ? "Invitation Accepted ✅"
-              : "Invitation Declined 🚫";
+                ? 'Invitation Accepted ✅'
+                : 'Invitation Declined 🚫';
 
-              const body =
+            const body =
               newStatus === 'accepted'
-              ? `${user.name || user.username} accepted your invitation to "${catalog.name}"`
-              : `${user.name || user.username} declined your invitation to "${catalog.name}"`;
+                ? `${user.name || user.username} accepted your invitation to "${catalog.name}"`
+                : `${user.name || user.username} declined your invitation to "${catalog.name}"`;
 
-              await messaging.send({
-                token: owner.fcmToken,
-                notification: { title, body },
-                data: {
-                  type:
+            await messaging.send({
+              token: owner.fcmToken,
+              notification: { title, body },
+              data: {
+                type:
                   newStatus === 'accepted'
-                  ? "CATALOG_INVITE_ACCEPTED"
-                  : "CATALOG_INVITE_DECLINED",
-                  catalogId: catalog._id.toString(),
-                  inviteeId: user._id.toString(),
-                },
-              });
+                    ? 'CATALOG_INVITE_ACCEPTED'
+                    : 'CATALOG_INVITE_DECLINED',
+                catalogId: catalog._id.toString(),
+                inviteeId: user._id.toString(),
+              },
+            });
 
-              logger.info(
-              `Sent catalog ${newStatus} notification to ${owner.username}`
-              );
-            }
+            logger.info(`Sent catalog ${newStatus} notification to ${owner.username}`);
           }
-        } catch (err) {
-          logger.warn(`Failed to send catalog invitation response notification:`, err);
         }
-     }
+      } catch (err) {
+        logger.warn('Failed to send catalog invitation response notification:', err);
+      }
 
       res.status(200).json({
         message: `Invitation ${action}ed successfully`,
@@ -267,7 +279,10 @@ export class CatalogShareController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const invitations = await catalogShareModel.listPendingInvitations(user._id);
 
       res.status(200).json({
@@ -286,7 +301,10 @@ export class CatalogShareController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const shares = await catalogShareModel.listSharedWithUser(user._id);
 
       res.status(200).json({

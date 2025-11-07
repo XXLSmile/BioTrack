@@ -14,10 +14,10 @@ import { messaging } from "../firebase";
 import { IUser } from '../user/user.types';
 import { geocodingService } from '../location/geocoding.service';
 
-type Coordinates = {
+interface Coordinates {
   latitude: number;
   longitude: number;
-};
+}
 
 const toRadians = (value: number) => (value * Math.PI) / 180;
 
@@ -41,10 +41,20 @@ const haversineDistanceKm = (a: Coordinates, b: Coordinates): number => {
 
 const LOCATION_DISTANCE_THRESHOLD_KM = 30;
 
+const isPopulatedUser = (value: unknown): value is IUser & { _id: mongoose.Types.ObjectId } =>
+  typeof value === 'object' &&
+  value !== null &&
+  '_id' in value &&
+  (value as { _id: unknown })._id instanceof mongoose.Types.ObjectId;
+
 export class FriendController {
   async listFriends(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
       const friendships = await friendshipModel.getFriendsForUser(user._id);
 
       const friends = friendships
@@ -99,7 +109,11 @@ export class FriendController {
 
   async getRecommendations(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
       const limit = req.query.limit ? Math.min(Math.max(parseInt(req.query.limit as string, 10) || 10, 1), 50) : 10;
 
       const currentUser = await userModel.findById(user._id);
@@ -116,18 +130,27 @@ export class FriendController {
       const friendDetails = new Map<string, { _id: mongoose.Types.ObjectId; name?: string | null; username?: string | null }>();
 
       for (const friendship of friends) {
-        const isRequester = (friendship.requester as mongoose.Types.ObjectId).equals(user._id);
-        const friendDoc = (isRequester ? friendship.addressee : friendship.requester) as unknown as IUser;
-        if (!friendDoc?._id) {
+        const isRequester = friendship.requester.equals(user._id);
+        const friendCandidate = isRequester ? friendship.addressee : friendship.requester;
+        const friendshipId =
+          friendship._id instanceof mongoose.Types.ObjectId
+            ? friendship._id
+            : new mongoose.Types.ObjectId(String(friendship._id));
+
+        if (!isPopulatedUser(friendCandidate)) {
+          logger.warn('Friendship missing populated user data', {
+            friendshipId: friendshipId.toString(),
+          });
           continue;
         }
 
+        const friendDoc = friendCandidate;
         const friendIdStr = friendDoc._id.toString();
         friendIds.add(friendIdStr);
         friendDetails.set(friendIdStr, {
           _id: friendDoc._id,
-          name: friendDoc.name ?? null,
-          username: friendDoc.username ?? null,
+          name: typeof friendDoc.name === 'string' ? friendDoc.name : null,
+          username: typeof friendDoc.username === 'string' ? friendDoc.username : null,
         });
       }
 
@@ -135,8 +158,8 @@ export class FriendController {
       const excludedIds = new Set<string>([userIdStr]);
 
       for (const relationship of relationships) {
-        const requesterId = (relationship.requester as mongoose.Types.ObjectId).toString();
-        const addresseeId = (relationship.addressee as mongoose.Types.ObjectId).toString();
+        const requesterId = relationship.requester.toString();
+        const addresseeId = relationship.addressee.toString();
         const otherId = requesterId === userIdStr ? addresseeId : requesterId;
 
         excludedIds.add(otherId);
@@ -147,13 +170,13 @@ export class FriendController {
       const toObjectIds = (ids: Iterable<string>) =>
         Array.from(ids).map(id => new mongoose.Types.ObjectId(id));
 
-      type CandidateAggregate = {
+      interface CandidateAggregate {
         mutualFriendIds: Set<string>;
         sharedSpecies: Set<string>;
         locationMatch: boolean;
         distanceKm?: number;
         doc?: IUser;
-      };
+      }
 
       const coordinateCache = new Map<string, Coordinates | null>();
       const buildAddressQuery = (doc: IUser): string | null => {
@@ -216,8 +239,8 @@ export class FriendController {
         const networkFriendships = await friendshipModel.getAcceptedFriendshipsForUsers(friendObjectIds);
 
         for (const relation of networkFriendships) {
-          const requesterId = (relation.requester as mongoose.Types.ObjectId).toString();
-          const addresseeId = (relation.addressee as mongoose.Types.ObjectId).toString();
+          const requesterId = relation.requester.toString();
+          const addresseeId = relation.addressee.toString();
 
           let mutualFriendId: string | null = null;
           let candidateId: string | null = null;
@@ -240,12 +263,14 @@ export class FriendController {
             continue;
           }
 
-          ensureCandidate(candidateId).mutualFriendIds.add(mutualFriendId!);
+          if (mutualFriendId) {
+            ensureCandidate(candidateId).mutualFriendIds.add(mutualFriendId);
+          }
         }
       }
 
       const userFavorites = Array.isArray(currentUser.favoriteSpecies)
-        ? currentUser.favoriteSpecies.filter(Boolean) as string[]
+        ? currentUser.favoriteSpecies.filter(Boolean)
         : [];
 
       const excludedObjectIds = toObjectIds(excludedIds);
@@ -288,17 +313,23 @@ export class FriendController {
         }
       }
 
-      const escapeRegex = (value: string) =>
-        value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
       const normalizedRegion = currentUser.region?.trim();
       if (normalizedRegion) {
-        const regionRegex = new RegExp(`^${escapeRegex(normalizedRegion)}$`, 'i');
+        const normalizedRegionLower = normalizedRegion.toLowerCase();
         const regionMatches = await userModel.findMany(
           {
             _id: { $nin: excludedObjectIds },
             isPublicProfile: true,
-            region: regionRegex,
+            $expr: {
+              $eq: [
+                {
+                  $toLower: {
+                    $ifNull: ['$region', ''],
+                  },
+                },
+                normalizedRegionLower,
+              ],
+            },
           },
           {
             name: 1,
@@ -360,9 +391,16 @@ export class FriendController {
       const normalizedUserRegion = normalize(currentUser.region);
       const normalizedUserLocation = normalize(currentUser.location);
 
+      const toNullableString = (value: unknown): string | null =>
+        typeof value === 'string' ? value : null;
+
+      const isPopulatedFriend = (
+        value: { _id: mongoose.Types.ObjectId; name?: string | null; username?: string | null } | undefined
+      ): value is { _id: mongoose.Types.ObjectId; name?: string | null; username?: string | null } => Boolean(value);
+
       const recommendations: FriendRecommendation[] = [];
 
-      for (const [candidateId, data] of candidateData) {
+      for (const data of candidateData.values()) {
         const doc = data.doc;
         if (!doc) {
           continue;
@@ -376,18 +414,18 @@ export class FriendController {
             !regionMatch &&
             normalizedUserLocation &&
             normalize(doc.location) === normalizedUserLocation;
-          data.locationMatch = Boolean(regionMatch || locationMatch);
+          data.locationMatch = Boolean(regionMatch ?? locationMatch);
         }
 
         const sharedSpecies = Array.from(data.sharedSpecies);
         const mutualFriends = Array.from(data.mutualFriendIds)
           .map(friendId => friendDetails.get(friendId))
-          .filter(Boolean)
+          .filter(isPopulatedFriend)
           .slice(0, 5)
           .map(detail => ({
-            _id: detail!._id,
-            name: detail!.name ?? null,
-            username: detail!.username ?? null,
+            _id: detail._id,
+            name: typeof detail.name === 'string' ? detail.name : null,
+            username: typeof detail.username === 'string' ? detail.username : null,
           }));
 
         let distanceKm: number | undefined;
@@ -420,11 +458,11 @@ export class FriendController {
         recommendations.push({
           user: {
             _id: doc._id,
-            name: doc.name ?? null,
-            username: doc.username ?? null,
-            profilePicture: doc.profilePicture ?? null,
-            location: doc.location ?? null,
-            region: doc.region ?? null,
+            name: typeof doc.name === 'string' ? doc.name : null,
+            username: typeof doc.username === 'string' ? doc.username : null,
+            profilePicture: typeof doc.profilePicture === 'string' ? doc.profilePicture : null,
+            location: typeof doc.location === 'string' ? doc.location : null,
+            region: typeof doc.region === 'string' ? doc.region : null,
             favoriteSpecies: favoriteSpeciesSample,
           },
           mutualFriends,
@@ -456,17 +494,19 @@ export class FriendController {
           recommendations: limited.map(rec => ({
             user: {
               _id: rec.user._id.toString(),
-              name: rec.user.name ?? null,
-              username: rec.user.username ?? null,
-              profilePicture: rec.user.profilePicture ?? null,
-              location: rec.user.location ?? null,
-              region: rec.user.region ?? null,
-              favoriteSpecies: rec.user.favoriteSpecies ?? [],
+              name: toNullableString(rec.user.name),
+              username: toNullableString(rec.user.username),
+              profilePicture: toNullableString(rec.user.profilePicture),
+              location: toNullableString(rec.user.location),
+              region: toNullableString(rec.user.region),
+              favoriteSpecies: Array.isArray(rec.user.favoriteSpecies)
+                ? rec.user.favoriteSpecies
+                : [],
             },
             mutualFriends: rec.mutualFriends.map(mutual => ({
               _id: mutual._id.toString(),
-              name: mutual.name ?? null,
-              username: mutual.username ?? null,
+              name: toNullableString(mutual.name),
+              username: toNullableString(mutual.username),
             })),
             sharedSpecies: rec.sharedSpecies,
             locationMatch: rec.locationMatch,
@@ -484,7 +524,11 @@ export class FriendController {
 
   async listRequests(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
       const { type } = req.query;
 
       if (type === 'outgoing') {
@@ -512,9 +556,14 @@ export class FriendController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
-      const body = createFriendRequestSchema.parse(req.body);
-      const targetId = new mongoose.Types.ObjectId(body.targetUserId);
+      const user = req.user;
+      if (!user) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
+      const friendRequestPayload = createFriendRequestSchema.parse(req.body) as CreateFriendRequest;
+      const targetUserId: string = friendRequestPayload.targetUserId;
+      const targetId = new mongoose.Types.ObjectId(targetUserId);
 
       if (targetId.equals(user._id)) {
         return res.status(400).json({
@@ -548,7 +597,11 @@ export class FriendController {
       // Send FCM notification to target user if they have an FCM token
       if (targetUser.fcmToken) {
         try {
-          console.log(`Try sending FCM notification to ${targetUser.username}, token: ${targetUser.fcmToken}`);
+          const debugUsername =
+            typeof targetUser.username === 'string' ? targetUser.username : 'unknown';
+          const debugToken =
+            typeof targetUser.fcmToken === 'string' ? targetUser.fcmToken : 'missing';
+          logger.debug('Try sending FCM notification', `username=${debugUsername} token=${debugToken}`);
 
           await messaging.send({
             token: targetUser.fcmToken,
@@ -585,7 +638,11 @@ export class FriendController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
       const { requestId } = req.params;
       const { action } = respondFriendRequestSchema.parse(req.body);
 
@@ -624,8 +681,8 @@ export class FriendController {
       }
 
       if (newStatus === 'accepted') {
-        const requesterId = request.requester as mongoose.Types.ObjectId;
-        const addresseeId = request.addressee as mongoose.Types.ObjectId;
+        const requesterId = request.requester;
+        const addresseeId = request.addressee;
         await userModel.incrementFriendCount(requesterId);
         await userModel.incrementFriendCount(addresseeId);
 
@@ -634,24 +691,21 @@ export class FriendController {
         // Send FCM notification to requester if they have an FCM token
         if (requesterUser?.fcmToken) {
           try {
-            let message : any = {
+            await messaging.send({
               token: requesterUser.fcmToken,
               notification: {
-                title: "Friend Request Accepted ✅",
-                body: `${addresseeUser?.name || addresseeUser?.username} accepted your friend request!`,
+                title: 'Friend Request Accepted ✅',
+                body: `${addresseeUser?.name ?? addresseeUser?.username} accepted your friend request!`,
               },
               data: {
-                type: "FRIEND_REQUEST_ACCEPTED",
+                type: 'FRIEND_REQUEST_ACCEPTED',
                 friendId: addresseeId.toString(),
               },
-            };
+            });
 
-            // console.log(`${message.toString()}`);
-            
-            await messaging.send(message);
             logger.info(`Sent acceptance notification to ${requesterUser.username}`);
           } catch (err) {
-            logger.warn(`Failed to send FCM acceptance notification:`, err);
+            logger.warn('Failed to send FCM acceptance notification:', err);
           }
         }
       }
@@ -678,7 +732,11 @@ export class FriendController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
       const { requestId } = req.params;
       const requestObjectId = new mongoose.Types.ObjectId(requestId);
 
@@ -719,7 +777,11 @@ export class FriendController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        res.status(401).json({ message: 'Authentication required' });
+        return;
+      }
       const { friendshipId } = req.params;
       const friendshipObjectId = new mongoose.Types.ObjectId(friendshipId);
 
@@ -740,8 +802,8 @@ export class FriendController {
         });
       }
 
-      const requesterId = friendship.requester as mongoose.Types.ObjectId;
-      const addresseeId = friendship.addressee as mongoose.Types.ObjectId;
+      const requesterId = friendship.requester;
+      const addresseeId = friendship.addressee;
 
       const otherUserId = requesterId.equals(user._id)
         ? addresseeId

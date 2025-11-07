@@ -1,28 +1,58 @@
 import mongoose from 'mongoose';
 
+import logger from './logger.util';
+
+const handleConnectionError = (error: unknown): void => {
+  logger.error('❌ MongoDB connection error:', error);
+  process.exitCode = 1;
+};
+
+const handleDisconnection = (): void => {
+  logger.warn('⚠️ MongoDB disconnected');
+};
+
+const handleSigint = (): void => {
+  mongoose.connection
+    .close()
+    .then(() => {
+      logger.info('MongoDB connection closed through app termination');
+      process.exitCode = 0;
+    })
+    .catch((error: unknown) => {
+      logger.error('❌ Error closing MongoDB connection:', error);
+      process.exitCode = 1;
+    });
+};
+
+const registerConnectionEventHandlers = (): void => {
+  const connection = mongoose.connection;
+
+  if (!connection.listeners('error').includes(handleConnectionError)) {
+    connection.on('error', handleConnectionError);
+  }
+
+  if (!connection.listeners('disconnected').includes(handleDisconnection)) {
+    connection.on('disconnected', handleDisconnection);
+  }
+
+  if (!process.listeners('SIGINT').includes(handleSigint)) {
+    process.once('SIGINT', handleSigint);
+  }
+};
+
 export const connectDB = async (): Promise<void> => {
   try {
-    const uri = process.env.MONGODB_URI!;
+    const uri = process.env.MONGODB_URI;
+    if (!uri) {
+      throw new Error('MONGODB_URI environment variable is not configured');
+    }
 
+    registerConnectionEventHandlers();
     await mongoose.connect(uri);
 
-    console.log(`✅ MongoDB connected successfully`);
-
-    mongoose.connection.on('error', error => {
-      console.error('❌ MongoDB connection error:', error);
-    });
-
-    mongoose.connection.on('disconnected', () => {
-      console.log('⚠️ MongoDB disconnected');
-    });
-
-    process.on('SIGINT', async () => {
-      await mongoose.connection.close();
-      console.log('MongoDB connection closed through app termination');
-      process.exitCode = 0;
-    });
+    logger.info('✅ MongoDB connected successfully');
   } catch (error) {
-    console.error('❌ Failed to connect to MongoDB:', error);
+    logger.error('❌ Failed to connect to MongoDB:', error);
     process.exitCode = 1;
   }
 };
@@ -30,8 +60,8 @@ export const connectDB = async (): Promise<void> => {
 export const disconnectDB = async (): Promise<void> => {
   try {
     await mongoose.connection.close();
-    console.log('✅ MongoDB disconnected successfully');
+    logger.info('✅ MongoDB disconnected successfully');
   } catch (error) {
-    console.error('❌ Error disconnecting from MongoDB:', error);
+    logger.error('❌ Error disconnecting from MongoDB:', error);
   }
 };

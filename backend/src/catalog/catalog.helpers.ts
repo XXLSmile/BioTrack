@@ -7,9 +7,18 @@ import { ICatalogEntry } from '../recognition/catalog.model';
 import { ISpecies } from '../recognition/species.model';
 import { ICatalogEntryLink } from './catalogEntryLink.model';
 
-type ImageContext = {
+interface ImageContext {
   protocol?: string | null;
   host?: string | null;
+}
+
+const isExpressRequest = (value: unknown): value is Request => {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'get' in (value as Record<string, unknown>) &&
+    typeof (value as Request).get === 'function'
+  );
 };
 
 const buildBaseUrl = (context?: ImageContext): string | undefined => {
@@ -20,7 +29,7 @@ const buildBaseUrl = (context?: ImageContext): string | undefined => {
     }
   }
 
-  if (context?.protocol && context?.host) {
+  if (context?.protocol && context.host) {
     return `${context.protocol}://${context.host}`;
   }
 
@@ -93,11 +102,17 @@ const serializeCatalogLinks = (
       normalizedSpeciesId = speciesDoc;
     }
 
+    const rawImageUrl = (rawEntry as { imageUrl?: unknown }).imageUrl;
+    const normalizedImageUrl =
+      typeof rawImageUrl === 'string' && rawImageUrl.length > 0
+        ? rawImageUrl
+        : speciesImageUrl;
+
     const normalizedEntry: Record<string, unknown> = {
       ...rawEntry,
       speciesId: normalizedSpeciesId ?? rawEntry.speciesId,
       species: speciesName ?? (rawEntry as unknown as { species?: string }).species,
-      imageUrl: rawEntry.imageUrl ?? speciesImageUrl,
+      imageUrl: normalizedImageUrl,
     };
 
     const addedAtIso = link.addedAt instanceof Date ? link.addedAt.toISOString() : new Date(link.addedAt).toISOString();
@@ -109,10 +124,15 @@ const serializeCatalogLinks = (
     seen.add(dedupeKey);
 
     const addedByDoc = link.addedBy as { _id?: mongoose.Types.ObjectId } | mongoose.Types.ObjectId;
-    const addedBy =
-      addedByDoc instanceof mongoose.Types.ObjectId
-        ? addedByDoc
-        : addedByDoc?._id ?? fallbackUserId;
+    let addedBy: mongoose.Types.ObjectId;
+
+    if (addedByDoc instanceof mongoose.Types.ObjectId) {
+      addedBy = addedByDoc;
+    } else if (addedByDoc._id instanceof mongoose.Types.ObjectId) {
+      addedBy = addedByDoc._id;
+    } else {
+      addedBy = fallbackUserId;
+    }
 
     acc.push({
       entry: normalizedEntry as unknown as ICatalogEntry,
@@ -129,12 +149,12 @@ export const buildCatalogEntriesResponse = (
   fallbackUserId: mongoose.Types.ObjectId,
   reqOrContext?: Request | ImageContext
 ): CatalogEntryLinkResponse[] => {
-  const context = reqOrContext instanceof Object && 'get' in reqOrContext
+  const context: ImageContext | undefined = isExpressRequest(reqOrContext)
     ? {
-        protocol: (reqOrContext as Request).protocol,
-        host: (reqOrContext as Request).get('host'),
+        protocol: reqOrContext.protocol,
+        host: reqOrContext.get('host'),
       }
-    : (reqOrContext as ImageContext | undefined);
+    : reqOrContext;
 
   const serialized = serializeCatalogLinks(links, fallbackUserId);
 
@@ -146,4 +166,3 @@ export const buildCatalogEntriesResponse = (
     } as unknown as ICatalogEntry,
   }));
 };
-

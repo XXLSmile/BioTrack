@@ -34,11 +34,11 @@ export interface FriendRecommendation {
     region?: string | null;
     favoriteSpecies?: string[];
   };
-  mutualFriends: Array<{
+  mutualFriends: {
     _id: mongoose.Types.ObjectId;
     name?: string | null;
     username?: string | null;
-  }>;
+  }[];
   sharedSpecies: string[];
   locationMatch: boolean;
   distanceKm?: number;

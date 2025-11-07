@@ -2,6 +2,7 @@
 
 package com.cpen321.usermanagement.ui.screens
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
@@ -155,6 +156,7 @@ private fun LocationSection(observation: RecentObservation) {
     val lat = observation.latitude
     val lng = observation.longitude
     val context = LocalContext.current
+    val coordinates = if (lat != null && lng != null) LatLng(lat, lng) else null
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -169,66 +171,89 @@ private fun LocationSection(observation: RecentObservation) {
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
             )
 
-            observation.displayLocation.takeIf { it.isNotBlank() }?.let { locationLabel ->
-                Text(
-                    text = locationLabel,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            observation.displayLocation
+                .takeIf { it.isNotBlank() }
+                ?.let { LocationLabel(it) }
+
+            coordinates?.let { latLng ->
+                ObservationMap(latLng = latLng, observation = observation)
+                OpenInMapsButton(
+                    latLng = latLng,
+                    title = observation.title,
+                    context = context
                 )
-            }
-
-            if (lat != null && lng != null) {
-                val latLng = LatLng(lat, lng)
-                val cameraPositionState = rememberCameraPositionState {
-                    position = CameraPosition.fromLatLngZoom(latLng, 14f)
-                }
-
-                GoogleMap(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(220.dp)
-                        .clip(MaterialTheme.shapes.medium),
-                    cameraPositionState = cameraPositionState
-                ) {
-                    Marker(
-                        state = MarkerState(position = latLng),
-                        title = observation.title,
-                        snippet = observation.subtitle.ifBlank { observation.title }
-                    )
-                }
-
-                Button(
-                    onClick = {
-                        val encodedTitle = Uri.encode(observation.title)
-                        val gmmIntentUri = Uri.parse("geo:$lat,$lng?q=$lat,$lng($encodedTitle)")
-                        val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri).apply {
-                            `package` = "com.google.android.apps.maps"
-                        }
-                        if (mapIntent.resolveActivity(context.packageManager) != null) {
-                            context.startActivity(mapIntent)
-                        } else {
-                            // Fallback to any app that can handle geo URI
-                            context.startActivity(Intent(Intent.ACTION_VIEW, gmmIntentUri))
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.LocationOn,
-                        contentDescription = null,
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
-                    Text("Open in Google Maps")
-                }
-            } else {
-                Text(
-                    text = "Location unavailable for this observation",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            } ?: MissingLocationMessage()
         }
     }
+}
+
+@Composable
+private fun LocationLabel(label: String) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+@Composable
+private fun ObservationMap(latLng: LatLng, observation: RecentObservation) {
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(latLng, 14f)
+    }
+
+    GoogleMap(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(220.dp)
+            .clip(MaterialTheme.shapes.medium),
+        cameraPositionState = cameraPositionState
+    ) {
+        Marker(
+            state = MarkerState(position = latLng),
+            title = observation.title,
+            snippet = observation.subtitle.ifBlank { observation.title }
+        )
+    }
+}
+
+@Composable
+private fun OpenInMapsButton(
+    latLng: LatLng,
+    title: String,
+    context: Context
+) {
+    Button(
+        onClick = { context.launchMapsIntent(latLng, title) },
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.LocationOn,
+            contentDescription = null,
+            modifier = Modifier.padding(end = 8.dp)
+        )
+        Text("Open in Google Maps")
+    }
+}
+
+@Composable
+private fun MissingLocationMessage() {
+    Text(
+        text = "Location unavailable for this observation",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+private fun Context.launchMapsIntent(latLng: LatLng, title: String) {
+    val encodedTitle = Uri.encode(title)
+    val uri = Uri.parse("geo:${latLng.latitude},${latLng.longitude}?q=${latLng.latitude},${latLng.longitude}($encodedTitle)")
+    val defaultIntent = Intent(Intent.ACTION_VIEW, uri)
+    val googleMapsIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+        `package` = "com.google.android.apps.maps"
+    }
+    val intent = googleMapsIntent.takeIf { it.resolveActivity(packageManager) != null } ?: defaultIntent
+    startActivity(intent)
 }
 
 @Composable

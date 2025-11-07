@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
-import fs from 'fs';
+import type { Express } from 'express-serve-static-core';
 import path from 'path';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
+import { Buffer } from 'node:buffer';
 
 import { recognitionService } from './recognition.service';
-import { catalogRepository } from './catalog.model';
+import { catalogRepository, ICatalogEntry } from './catalog.model';
 import { speciesRepository } from './species.model';
 import { userModel } from '../user/user.model';
 import logger from '../logger.util';
@@ -16,6 +17,14 @@ import { catalogShareModel } from '../catalog/catalogShare.model';
 import { buildCatalogEntriesResponse, resolveImageUrl } from '../catalog/catalog.helpers';
 import { emitCatalogEntriesUpdated } from '../socket/socket.manager';
 import { geocodingService } from '../location/geocoding.service';
+import { ensurePathWithinRoot, resolveWithinRoot } from '../utils/pathSafe';
+import {
+  ensureDirSync,
+  existsSync as safeExistsSync,
+  readFileBufferSync,
+  writeFileSync as safeWriteFileSync,
+  renameSync as safeRenameSync,
+} from '../utils/safeFs';
 
 const parseCoordinate = (value: unknown): number | undefined => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -35,12 +44,12 @@ const parseCoordinate = (value: unknown): number | undefined => {
   return undefined;
 };
 
-const UPLOADS_ROOT = path.join(__dirname, '../../uploads');
+const UPLOADS_ROOT = path.resolve(path.join(__dirname, '../../uploads'));
 
-const ensureDirectoryExists = (directory: string): void => {
-  if (!fs.existsSync(directory)) {
-    fs.mkdirSync(directory, { recursive: true });
-  }
+const ensureDirectoryExists = (directory: string): string => {
+  const safeDirectory = ensurePathWithinRoot(UPLOADS_ROOT, directory);
+  ensureDirSync(safeDirectory);
+  return safeDirectory;
 };
 
 const saveUploadedFile = (
@@ -48,13 +57,21 @@ const saveUploadedFile = (
   subDirectory: string
 ): { fullPath: string; relativePath: string; filename: string } => {
   const sanitizedSubDir = subDirectory.replace(/^\//, '');
-  const directory = path.join(UPLOADS_ROOT, sanitizedSubDir);
-  ensureDirectoryExists(directory);
+  const directory = resolveWithinRoot(UPLOADS_ROOT, sanitizedSubDir);
+  const safeDirectory = ensureDirectoryExists(directory);
 
-  const extension = path.extname(file.originalname || '').toLowerCase() || '.jpg';
-  const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extension}`;
-  const fullPath = path.join(directory, filename);
-  fs.writeFileSync(fullPath, file.buffer);
+  const originalName: string =
+    typeof file.originalname === 'string' ? file.originalname : '';
+  const rawExtension = path.extname(originalName).toLowerCase();
+  const extension = rawExtension || '.jpg';
+  const randomSuffix = crypto.randomBytes(16).toString('hex');
+  const filename = `${randomSuffix}${extension}`;
+  const fullPath = ensurePathWithinRoot(UPLOADS_ROOT, path.join(safeDirectory, filename));
+  if (!Buffer.isBuffer(file.buffer)) {
+    throw new Error('Uploaded file buffer is not available.');
+  }
+  const fileBuffer: Buffer = file.buffer;
+  safeWriteFileSync(fullPath, fileBuffer);
 
   const relativePath = `/uploads/${sanitizedSubDir}/${filename}`;
   return { fullPath, relativePath, filename };
@@ -114,12 +131,17 @@ const normalizeUploadsPath = (
 };
 
 const generateUniqueFilename = (directory: string, filename: string): string => {
-  let candidate = filename;
-  const extension = path.extname(filename);
-  const baseName = path.basename(filename, extension);
+  const safeDirectory = ensurePathWithinRoot(UPLOADS_ROOT, directory);
+  let candidate = path.basename(filename);
+  const extension = path.extname(candidate);
+  const baseName = path.basename(candidate, extension);
   let counter = 1;
 
-  while (fs.existsSync(path.join(directory, candidate))) {
+  while (
+    safeExistsSync(
+      ensurePathWithinRoot(UPLOADS_ROOT, path.join(safeDirectory, candidate))
+    )
+  ) {
     candidate = `${baseName}-${counter}${extension}`;
     counter += 1;
   }
@@ -241,7 +263,10 @@ export class RecognitionController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const {
         imagePath,
         recognition,
@@ -266,7 +291,7 @@ export class RecognitionController {
         });
       }
 
-      type RawSpecies = {
+      interface RawSpecies {
         id?: unknown;
         scientificName?: unknown;
         commonName?: unknown;
@@ -274,7 +299,7 @@ export class RecognitionController {
         taxonomy?: unknown;
         wikipediaUrl?: unknown;
         imageUrl?: unknown;
-      };
+      }
 
       const recognitionPayload = recognition as {
         species?: RawSpecies;
@@ -354,15 +379,15 @@ export class RecognitionController {
       };
 
       const uploadsInfo = normalizeUploadsPath(imagePath);
-      const currentFullPath = path.join(UPLOADS_ROOT, uploadsInfo.relativePath);
+      const currentFullPath = resolveWithinRoot(UPLOADS_ROOT, uploadsInfo.relativePath);
 
-      if (!fs.existsSync(currentFullPath)) {
+      if (!safeExistsSync(currentFullPath)) {
         return res.status(404).json({
           message: 'Uploaded image could not be found. Please run recognition again.',
         });
       }
 
-      const imageBuffer = fs.readFileSync(currentFullPath);
+      const imageBuffer = readFileBufferSync(currentFullPath);
       const imageHash = crypto.createHash('sha256').update(imageBuffer).digest('hex');
 
       const species = await speciesRepository.findOrCreate({
@@ -387,22 +412,25 @@ export class RecognitionController {
 
       let isNewEntry = false;
       let finalRelativePath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+      let persistedCatalogEntry: ICatalogEntry;
 
       if (!catalogEntry) {
-        const imagesDir = path.join(UPLOADS_ROOT, 'images');
-        ensureDirectoryExists(imagesDir);
+        const imagesDir = ensureDirectoryExists(resolveWithinRoot(UPLOADS_ROOT, 'images'));
 
         let targetFilename = uploadsInfo.filename;
         if (!uploadsInfo.relativePath.startsWith('images/')) {
           targetFilename = generateUniqueFilename(imagesDir, uploadsInfo.filename);
-          const destinationPath = path.join(imagesDir, targetFilename);
-          fs.renameSync(currentFullPath, destinationPath);
+          const destinationPath = ensurePathWithinRoot(
+            UPLOADS_ROOT,
+            path.join(imagesDir, targetFilename)
+          );
+          safeRenameSync(currentFullPath, destinationPath);
           finalRelativePath = path.posix.join('/uploads/images', targetFilename);
         }
 
         const imageMimeType = guessMimeType(targetFilename);
 
-        catalogEntry = await catalogRepository.create({
+        persistedCatalogEntry = await catalogRepository.create({
           userId: user._id.toString(),
           speciesId: species._id.toString(),
           imageUrl: finalRelativePath,
@@ -418,23 +446,18 @@ export class RecognitionController {
         });
 
         isNewEntry = true;
-      } else if (!uploadsInfo.relativePath.startsWith('images/')) {
-        const imagesDir = path.join(UPLOADS_ROOT, 'images');
-        ensureDirectoryExists(imagesDir);
-        const targetFilename = generateUniqueFilename(imagesDir, uploadsInfo.filename);
-        const destinationPath = path.join(imagesDir, targetFilename);
-        fs.renameSync(currentFullPath, destinationPath);
-      }
+      } else {
+        persistedCatalogEntry = catalogEntry;
 
-      if (!catalogEntry) {
-        logger.error('Catalog entry could not be created or retrieved for hash', {
-          userId: user._id.toString(),
-          imageHash,
-        });
-
-        return res.status(500).json({
-          message: 'Failed to save catalog entry',
-        });
+        if (!uploadsInfo.relativePath.startsWith('images/')) {
+          const imagesDir = ensureDirectoryExists(resolveWithinRoot(UPLOADS_ROOT, 'images'));
+          const targetFilename = generateUniqueFilename(imagesDir, uploadsInfo.filename);
+          const destinationPath = ensurePathWithinRoot(
+            UPLOADS_ROOT,
+            path.join(imagesDir, targetFilename)
+          );
+          safeRenameSync(currentFullPath, destinationPath);
+        }
       }
 
       let catalogToLink: { _id: mongoose.Types.ObjectId } | null = null;
@@ -471,13 +494,13 @@ export class RecognitionController {
       if (catalogToLink) {
         const alreadyLinked = await catalogEntryLinkModel.isEntryLinked(
           catalogToLink._id,
-          catalogEntry._id
+          persistedCatalogEntry._id
         );
 
         if (!alreadyLinked) {
           await catalogEntryLinkModel.linkEntry(
             catalogToLink._id,
-            catalogEntry._id,
+            persistedCatalogEntry._id,
             user._id
           );
 
@@ -488,7 +511,7 @@ export class RecognitionController {
           } catch (broadcastError) {
             logger.warn('Failed to broadcast catalog update after recognition save', {
               catalogId: catalogToLink._id.toString(),
-              entryId: catalogEntry._id.toString(),
+              entryId: persistedCatalogEntry._id.toString(),
               error: broadcastError,
             });
           }
@@ -497,21 +520,21 @@ export class RecognitionController {
         linkedCatalogId = catalogToLink._id;
       }
 
-      if (catalogEntry && locationInfo) {
+      if (locationInfo) {
         let shouldSave = false;
 
-        if (!catalogEntry.city && locationInfo.city) {
-          catalogEntry.city = locationInfo.city;
+        if (!persistedCatalogEntry.city && locationInfo.city) {
+          persistedCatalogEntry.city = locationInfo.city;
           shouldSave = true;
         }
 
-        if (!catalogEntry.province && locationInfo.province) {
-          catalogEntry.province = locationInfo.province;
+        if (!persistedCatalogEntry.province && locationInfo.province) {
+          persistedCatalogEntry.province = locationInfo.province;
           shouldSave = true;
         }
 
         if (shouldSave) {
-          await catalogEntry.save();
+          await persistedCatalogEntry.save();
         }
       }
 
@@ -533,12 +556,12 @@ export class RecognitionController {
         }
       }
 
-      logger.info(`Observation entry saved: ${catalogEntry._id}`);
+      logger.info(`Observation entry saved: ${persistedCatalogEntry._id.toString()}`);
 
       return res.status(201).json({
         message: 'Species recognized and saved successfully',
         data: {
-          entry: catalogEntry,
+          entry: persistedCatalogEntry,
           recognition: recognitionResult,
           linkedCatalogId,
         },
@@ -559,7 +582,10 @@ export class RecognitionController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
 
       const catalogEntries = await catalogRepository.findByUserId(user._id.toString(), limit);
@@ -583,7 +609,10 @@ export class RecognitionController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
 
       const entries = await catalogRepository.findRecentByUserId(user._id.toString(), limit);
@@ -607,7 +636,10 @@ export class RecognitionController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const { entryId } = req.params;
 
       if (!entryId) {
@@ -639,7 +671,7 @@ export class RecognitionController {
         });
       }
 
-      if (result === 'deleted' && affectedCatalogIds.length > 0) {
+      if (affectedCatalogIds.length > 0) {
         for (const catalogId of affectedCatalogIds) {
           try {
             const links = await catalogEntryLinkModel.listEntriesWithDetails(catalogId);

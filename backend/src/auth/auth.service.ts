@@ -42,9 +42,16 @@ export class AuthService {
   }
 
   private generateAccessToken(user: IUser): string {
-    return jwt.sign({ id: user._id }, process.env.JWT_SECRET!, {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT secret is not configured');
+    }
+
+    const token: string = jwt.sign({ id: user._id }, secret, {
       expiresIn: '19h',
     });
+
+    return token;
   }
 
   async signUpWithGoogle(idToken: string): Promise<AuthResult> {

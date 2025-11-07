@@ -115,6 +115,11 @@ export class CatalogModel {
     return result.deletedCount === 1;
   }
 
+  async deleteAllOwnedByUser(owner: mongoose.Types.ObjectId): Promise<number> {
+    const result = await this.catalog.deleteMany({ owner });
+    return result.deletedCount ?? 0;
+  }
+
 }
 
 export const catalogModel = new CatalogModel();

@@ -9,40 +9,56 @@ import { catalogModel } from '../catalog/catalog.model';
 import { catalogShareModel } from '../catalog/catalogShare.model';
 import { CatalogEntryLinkResponse, ICatalog } from '../catalog/catalog.types';
 
-type SocketAuthPayload = {
-  id: string;
-};
-
-type SocketUserData = {
+interface SocketUserData {
   userId: string;
-};
+}
 
-type CatalogSocketAck = {
+interface CatalogSocketAck {
   ok: boolean;
   error?: string;
-};
+}
 
-export type CatalogEntriesEventPayload = {
+interface ClientToServerEvents {
+  'catalog:join': (catalogId: string, ack?: (response: CatalogSocketAck) => void) => void;
+  'catalog:leave': (catalogId: string) => void;
+}
+
+interface ServerToClientEvents {
+  'catalog:entries-updated': (payload: CatalogEntriesEventPayload) => void;
+  'catalog:metadata-updated': (payload: CatalogUpdatedEventPayload) => void;
+  'catalog:deleted': (payload: CatalogDeletedEventPayload) => void;
+}
+
+type InterServerEvents = Record<string, never>;
+
+interface ServerSocketData {
+  user?: SocketUserData;
+}
+
+export interface CatalogEntriesEventPayload {
   catalogId: string;
   entries: unknown[];
   triggeredBy: string;
   updatedAt: string;
-};
+}
 
-export type CatalogUpdatedEventPayload = {
+export interface CatalogUpdatedEventPayload {
   catalogId: string;
   catalog: Record<string, unknown>;
   triggeredBy: string;
   updatedAt: string;
-};
+}
 
-export type CatalogDeletedEventPayload = {
+export interface CatalogDeletedEventPayload {
   catalogId: string;
   triggeredBy: string;
   timestamp: string;
-};
+}
 
-let io: Server | null = null;
+type SocketServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, ServerSocketData>;
+
+let io: SocketServer;
+let isServerInitialized = false;
 
 const buildCatalogRoom = (catalogId: string): string => `catalog:${catalogId}`;
 
@@ -60,7 +76,9 @@ const getCorsOrigins = (): string[] | string => {
   return origins.length > 0 ? origins : '*';
 };
 
-const extractToken = (socket: Socket): string | undefined => {
+const extractToken = (
+  socket: Socket<ClientToServerEvents, ServerToClientEvents, InterServerEvents, ServerSocketData>
+): string | undefined => {
   const authToken = socket.handshake.auth?.token;
   if (typeof authToken === 'string' && authToken.trim().length > 0) {
     return authToken.trim();
@@ -100,12 +118,14 @@ const userHasCatalogAccess = async (userId: string, catalogId: string): Promise<
   return !!share;
 };
 
-export const initializeSocketServer = (server: http.Server): Server => {
-  if (io) {
+export const initializeSocketServer = (
+  server: http.Server
+): Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, ServerSocketData> => {
+  if (isServerInitialized) {
     return io;
   }
 
-  io = new Server(server, {
+  io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, ServerSocketData>(server, {
     cors: {
       origin: getCorsOrigins(),
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
@@ -121,38 +141,59 @@ export const initializeSocketServer = (server: http.Server): Server => {
         if (fallbackUserId && mongoose.Types.ObjectId.isValid(fallbackUserId)) {
           socket.data.user = {
             userId: fallbackUserId,
-          } satisfies SocketUserData;
-          return next();
+          };
+          next();
+          return;
         }
 
         logger.warn('Socket authentication disabled but TEST_USER_ID is not configured. Connection denied.');
-        return next(new Error('Unauthorized'));
+        next(new Error('Unauthorized'));
+        return;
       }
 
       const token = extractToken(socket);
       if (!token) {
-        return next(new Error('Unauthorized'));
+        next(new Error('Unauthorized'));
+        return;
       }
 
       const secret = process.env.JWT_SECRET;
       if (!secret) {
         logger.error('JWT_SECRET is not configured. Socket authentication cannot proceed.');
-        return next(new Error('Unauthorized'));
+        next(new Error('Unauthorized'));
+        return;
       }
 
-      const decoded = jwt.verify(token, secret) as SocketAuthPayload;
-      if (!decoded?.id || !mongoose.Types.ObjectId.isValid(decoded.id)) {
-        return next(new Error('Unauthorized'));
+      const decoded = jwt.verify(token, secret);
+      const rawId =
+        typeof decoded === 'object' && decoded !== null && 'id' in decoded
+          ? (decoded as { id: unknown }).id
+          : undefined;
+
+      let userObjectId: mongoose.Types.ObjectId | undefined;
+
+      if (typeof rawId === 'string') {
+        if (!mongoose.Types.ObjectId.isValid(rawId)) {
+          next(new Error('Unauthorized'));
+          return;
+        }
+        userObjectId = new mongoose.Types.ObjectId(rawId);
+      } else if (rawId instanceof mongoose.Types.ObjectId) {
+        userObjectId = rawId;
+      } else {
+        next(new Error('Unauthorized'));
+        return;
       }
 
-      const user = await userModel.findById(new mongoose.Types.ObjectId(decoded.id));
+      const user = await userModel.findById(userObjectId);
       if (!user) {
-        return next(new Error('Unauthorized'));
+        next(new Error('Unauthorized'));
+        return;
       }
 
       socket.data.user = {
         userId: user._id.toString(),
-      } satisfies SocketUserData;
+      };
 
       next();
     } catch (error) {
@@ -162,7 +203,7 @@ export const initializeSocketServer = (server: http.Server): Server => {
   });
 
   io.on('connection', socket => {
-    const userData = socket.data.user as SocketUserData | undefined;
+    const userData = socket.data.user;
     const userId = userData?.userId;
 
     if (!userId) {
@@ -170,6 +211,8 @@ export const initializeSocketServer = (server: http.Server): Server => {
       socket.disconnect(true);
       return;
     }
+
+    const authenticatedUserId: string = userId;
 
     logger.info('Socket connected', { socketId: socket.id, userId });
 
@@ -185,7 +228,7 @@ export const initializeSocketServer = (server: http.Server): Server => {
           return;
         }
 
-        const hasAccess = await userHasCatalogAccess(userId, catalogId);
+        const hasAccess = await userHasCatalogAccess(authenticatedUserId, catalogId);
         if (!hasAccess) {
           ack?.({ ok: false, error: 'Access denied' });
           return;
@@ -215,14 +258,23 @@ export const initializeSocketServer = (server: http.Server): Server => {
     });
   });
 
+  isServerInitialized = true;
   return io;
 };
 
-const getServer = (): Server | null => io;
+const getServer = (): SocketServer => {
+  if (!isServerInitialized) {
+    throw new Error('Socket.IO server has not been initialized.');
+  }
+  return io;
+};
 
-const emitToCatalogRoom = (catalogId: mongoose.Types.ObjectId | string, event: string, payload: unknown): void => {
-  const server = getServer();
-  if (!server) {
+const emitToCatalogRoom = <TEvent extends keyof ServerToClientEvents>(
+  catalogId: mongoose.Types.ObjectId | string,
+  event: TEvent,
+  payload: Parameters<ServerToClientEvents[TEvent]>[0]
+): void => {
+  if (!isServerInitialized) {
     logger.warn('Socket.IO server not initialized. Skipping emit.', {
       event,
       catalogId: catalogId.toString(),
@@ -230,7 +282,9 @@ const emitToCatalogRoom = (catalogId: mongoose.Types.ObjectId | string, event: s
     return;
   }
 
-  server.to(buildCatalogRoom(catalogId.toString())).emit(event, payload);
+  const server = getServer();
+  const args = [payload] as Parameters<ServerToClientEvents[TEvent]>;
+  server.to(buildCatalogRoom(catalogId.toString())).emit(event, ...args);
 };
 
 export const emitCatalogEntriesUpdated = (

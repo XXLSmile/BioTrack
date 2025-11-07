@@ -1,9 +1,11 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { recognitionController } from './recognition.controller';
 import { uploadMemory } from '../storage';
 import { authenticateToken } from '../auth/auth.middleware';
+import { asyncHandler } from '../utils/asyncHandler';
 
 const router = Router();
+const uploadRecognitionImage: RequestHandler = uploadMemory.single('image');
 
 /**
  * POST /api/recognition
@@ -11,8 +13,8 @@ const router = Router();
  */
 router.post(
   '/',
-  uploadMemory.single('image'),
-  recognitionController.recognizeImage
+  uploadRecognitionImage,
+  asyncHandler(recognitionController.recognizeImage.bind(recognitionController))
 );
 
 /**
@@ -22,7 +24,7 @@ router.post(
 router.post(
   '/save',
   authenticateToken,
-  recognitionController.recognizeAndSave
+  asyncHandler(recognitionController.recognizeAndSave.bind(recognitionController))
 );
 
 /**
@@ -32,19 +34,19 @@ router.post(
 router.get(
   '/catalog',
   authenticateToken,
-  recognitionController.getUserCatalog
+  asyncHandler(recognitionController.getUserCatalog.bind(recognitionController))
 );
 
 router.get(
   '/recent',
   authenticateToken,
-  recognitionController.getRecentEntries
+  asyncHandler(recognitionController.getRecentEntries.bind(recognitionController))
 );
 
 router.delete(
   '/entry/:entryId',
   authenticateToken,
-  recognitionController.deleteEntry
+  asyncHandler(recognitionController.deleteEntry.bind(recognitionController))
 );
 
 export default router;

@@ -74,26 +74,35 @@ _(Placeholder for Jest coverage screenshot both with and without mocking)_
 
 ### 3.1. Test Locations in Git
 
-| **Non-Functional Requirement**  | **Location in Git**                              |
-| ------------------------------- | ------------------------------------------------ |
-| **Performance (Response Time)** | [`tests/nonfunctional/response_time.test.js`](#) |
-| **Chat Data Security**          | [`tests/nonfunctional/chat_security.test.js`](#) |
+| **Non-Functional Requirement**                  | **Location in Git**                                                                                   |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| **Recognition Latency (≤ 10 s end-to-end)**     | [`backend/tests/nonfunctional/recognitionLatency.spec.ts`](../backend/tests/nonfunctional/recognitionLatency.spec.ts#L1) |
+| **Privacy & Data Protection (Account Deletion)** | [`backend/tests/nonfunctional/privacyDeletion.spec.ts`](../backend/tests/nonfunctional/privacyDeletion.spec.ts#L1)         |
 
 ### 3.2. Test Verification and Logs
 
-- **Performance (Response Time)**
+- **Recognition Latency (≤ 10 s end-to-end)**
 
-  - **Verification:** This test suite simulates multiple concurrent API calls using Jest along with a load-testing utility to mimic real-world user behavior. The focus is on key endpoints such as user login and study group search to ensure that each call completes within the target response time of 2 seconds under normal load. The test logs capture metrics such as average response time, maximum response time, and error rates. These logs are then analyzed to identify any performance bottlenecks, ensuring the system can handle expected traffic without degradation in user experience.
+  - **Verification:** A Jest + Supertest suite hits `POST /api/recognition`, injects canned Zyla responses via `jest.spyOn(recognitionService, 'recognizeFromUrl')`, and measures the elapsed wall-clock time between request dispatch and JSON payload delivery. The test iterates through three representative payload descriptors (1 MB, 3 MB, 5 MB) and fails if any response exceeds the 10 000 ms SLA, giving us a fast regression signal that controller/middleware changes didn’t bloat latency. Execute with `npm run test:nfr-recognition`.
   - **Log Output**
     ```
-    [Placeholder for response time test logs]
+    $ cd backend && npm run test:nfr-recognition
+    PASS tests/nonfunctional/recognitionLatency.spec.ts
+      NFR: Recognition latency
+        ✓ { label: '1MB payload', body: [Object] } completes within 10 seconds (17 ms)
+        ✓ { label: '3MB payload', body: [Object] } completes within 10 seconds (2 ms)
+        ✓ { label: '5MB payload', body: [Object] } completes within 10 seconds (1 ms)
     ```
 
-- **Chat Data Security**
-  - **Verification:** ...
+- **Privacy & Data Protection (Account Deletion)**
+  - **Verification:** Using `mongodb-memory-server`, the suite provisions a user, catalogs, and friendships, then invokes `DELETE /api/user/profile`. It verifies that every protected route returns 401 without a JWT, 200 with a valid token, and that after deletion the `users`, `catalogs`, `entries`, and `friendships` collections contain no documents tied to the deleted user. The test also confirms that subsequent authorized requests fail with 401, proving the token is invalidated. Execute via `npm run test:nfr-privacy`.
   - **Log Output**
     ```
-    [Placeholder for chat security test logs]
+    $ cd backend && npm run test:nfr-privacy
+    PASS tests/nonfunctional/privacyDeletion.spec.ts
+      NFR: Privacy & Data Protection
+        ✓ catalog endpoints reject unauthenticated access (153 ms)
+        ✓ deleting a profile removes personal data and invalidates the token (449 ms)
     ```
 
 ---
@@ -146,15 +155,15 @@ _(Placeholder for Jest coverage screenshot both with and without mocking)_
 
 ### 5.1. Commit Hash Where Codacy Ran
 
-`[Insert Commit SHA here]`
+`527afd4`
 
 ### 5.2. Unfixed Issues per Codacy Category
 
-_(Placeholder for screenshots of Codacy's Category Breakdown table in Overview)_
+![issuesCategory](images/codacyIssuesByCategories.png)
 
 ### 5.3. Unfixed Issues per Codacy Code Pattern
 
-_(Placeholder for screenshots of Codacy's Issues page)_
+![issuesPattern](images/codacyIssuesByPatterns.png)
 
 ### 5.4. Justifications for Unfixed Issues
 

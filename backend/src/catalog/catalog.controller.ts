@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
+import type { ParamsDictionary } from 'express-serve-static-core';
 import mongoose from 'mongoose';
 
 import logger from '../logger.util';
@@ -7,6 +8,7 @@ import {
   CatalogListResponse,
   CatalogResponse,
   CreateCatalogRequest,
+  createCatalogSchema,
   UpdateCatalogRequest,
 } from './catalog.types';
 import { catalogModel } from './catalog.model';
@@ -22,14 +24,21 @@ import {
 
 export class CatalogController {
   async createCatalog(
-    req: Request<unknown, unknown, CreateCatalogRequest>,
+    req: Request<ParamsDictionary, CatalogResponse, CreateCatalogRequest>,
     res: Response<CatalogResponse>,
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
 
-      const catalog = await catalogModel.createCatalog(user._id, req.body);
+      const createPayload = createCatalogSchema.parse(req.body) as CreateCatalogRequest;
+      const catalog = await catalogModel.createCatalog(user._id, {
+        name: createPayload.name,
+        description: createPayload.description,
+      });
 
       res.status(201).json({
         message: 'Catalog created successfully',
@@ -55,12 +64,15 @@ export class CatalogController {
   }
 
   async listCatalogs(
-    req: Request,
+    req: Request<ParamsDictionary, CatalogListResponse>,
     res: Response<CatalogListResponse>,
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
 
       const catalogs = await catalogModel.listCatalogs(user._id);
 
@@ -80,7 +92,10 @@ export class CatalogController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const { catalogId } = req.params;
 
       const catalog = await catalogModel.findById(catalogId);
@@ -122,12 +137,15 @@ export class CatalogController {
   }
 
   async updateCatalog(
-    req: Request<{ catalogId: string }, unknown, UpdateCatalogRequest>,
+    req: Request<{ catalogId: string }, CatalogResponse, UpdateCatalogRequest>,
     res: Response<CatalogResponse>,
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const { catalogId } = req.params;
 
       const catalog = await catalogModel.findById(catalogId);
@@ -180,7 +198,10 @@ export class CatalogController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const { catalogId } = req.params;
 
       const catalog = await catalogModel.findById(catalogId);
@@ -221,7 +242,10 @@ export class CatalogController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const { catalogId, entryId } = req.params;
 
       const catalog = await catalogModel.findById(catalogId);
@@ -294,7 +318,10 @@ export class CatalogController {
     next: NextFunction
   ) {
     try {
-      const user = req.user!;
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
       const { catalogId, entryId } = req.params;
 
       const catalog = await catalogModel.findById(catalogId);
