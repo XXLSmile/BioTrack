@@ -29,7 +29,7 @@ const buildBaseUrl = (context?: ImageContext): string | undefined => {
     }
   }
 
-  if (context?.protocol && context?.host) {
+  if (context?.protocol && context.host) {
     return `${context.protocol}://${context.host}`;
   }
 

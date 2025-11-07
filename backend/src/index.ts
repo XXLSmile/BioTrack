@@ -11,7 +11,7 @@ const PORT = process.env.PORT ?? 3000;
 const server = http.createServer(app);
 initializeSocketServer(server);
 
-connectDB().catch(error => {
+connectDB().catch((error: unknown) => {
   logger.error('Failed to initialize MongoDB connection:', error);
 });
 
