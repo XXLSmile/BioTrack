@@ -36,12 +36,32 @@ jest.mock('../../../src/friends/friend.model', () => ({
   friendshipModel: mockFriendshipModel,
 }));
 
+const mockCatalogRepository = {
+  deleteAllForUser: jest.fn(),
+};
+
+jest.mock('../../../src/recognition/catalog.model', () => ({
+  catalogRepository: mockCatalogRepository,
+}));
+
+const mockCatalogModel = {
+  deleteAllOwnedByUser: jest.fn(),
+};
+
+jest.mock('../../../src/catalog/catalog.model', () => ({
+  catalogModel: mockCatalogModel,
+}));
+
 import { UserController } from '../../../src/user/user.controller';
 import { userModel } from '../../../src/user/user.model';
 import { friendshipModel } from '../../../src/friends/friend.model';
+import { catalogRepository } from '../../../src/recognition/catalog.model';
+import { catalogModel } from '../../../src/catalog/catalog.model';
 
 const mockedUserModel = userModel as jest.Mocked<typeof userModel>;
 const mockedFriendshipModel = friendshipModel as jest.Mocked<typeof friendshipModel>;
+const mockedCatalogRepository = catalogRepository as jest.Mocked<typeof catalogRepository>;
+const mockedCatalogModel = catalogModel as jest.Mocked<typeof catalogModel>;
 
 const controller = new UserController();
 
@@ -76,6 +96,8 @@ const sampleUser = () => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockedCatalogRepository.deleteAllForUser.mockResolvedValue(0);
+  mockedCatalogModel.deleteAllOwnedByUser.mockResolvedValue(0);
 });
 
 // Interface UserController.updateProfile
@@ -228,6 +250,8 @@ describe('Mocked: UserController.deleteProfile', () => {
     mockedFriendshipModel.deleteAllForUser.mockResolvedValueOnce([friendA, friendB, friendA]);
     mockedUserModel.decrementFriendCount.mockResolvedValue(undefined);
     mockedUserModel.delete.mockResolvedValue(undefined);
+    mockedCatalogRepository.deleteAllForUser.mockResolvedValueOnce(2);
+    mockedCatalogModel.deleteAllOwnedByUser.mockResolvedValueOnce(1);
 
     const req = { user } as any;
     const res = createResponse();
@@ -239,6 +263,8 @@ describe('Mocked: UserController.deleteProfile', () => {
     expect(mockedUserModel.decrementFriendCount).toHaveBeenCalledTimes(2);
     expect(mockedUserModel.decrementFriendCount).toHaveBeenCalledWith(friendA);
     expect(mockedUserModel.decrementFriendCount).toHaveBeenCalledWith(friendB);
+    expect(mockedCatalogRepository.deleteAllForUser).toHaveBeenCalledWith(user._id);
+    expect(mockedCatalogModel.deleteAllOwnedByUser).toHaveBeenCalledWith(user._id);
     expect(mockedUserModel.delete).toHaveBeenCalledWith(user._id);
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
@@ -255,6 +281,8 @@ describe('Mocked: UserController.deleteProfile', () => {
   test('returns 500 when delete fails', async () => {
     const user = sampleUser();
     mockedFriendshipModel.deleteAllForUser.mockRejectedValueOnce(new Error('fail'));
+    mockedCatalogRepository.deleteAllForUser.mockResolvedValueOnce(0);
+    mockedCatalogModel.deleteAllOwnedByUser.mockResolvedValueOnce(0);
 
     const req = { user } as any;
     const res = createResponse();

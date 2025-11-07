@@ -88,6 +88,12 @@ describe('Mocked: CatalogController', () => {
   beforeEach(() => {
     controller = new CatalogController();
     jest.clearAllMocks();
+    // Reset all mock implementations to prevent test pollution
+    Object.values(catalogModelMock).forEach(mock => mock.mockReset?.());
+    Object.values(catalogShareModelMock).forEach(mock => mock.mockReset?.());
+    Object.values(catalogEntryLinkModelMock).forEach(mock => mock.mockReset?.());
+    Object.values(catalogRepositoryMock).forEach(mock => mock.mockReset?.());
+    buildCatalogEntriesResponseMock.mockReset();
   });
 
   // API: POST /api/catalogs (CatalogController.createCatalog)
@@ -111,6 +117,31 @@ describe('Mocked: CatalogController', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  test('createCatalog returns 401 when request lacks authenticated user', async () => {
+    const req: any = { user: undefined, body: { name: 'Birds' } };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await controller.createCatalog(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(catalogModelMock.createCatalog).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  test('createCatalog maps Zod schema errors to 400', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const req: any = { user: { _id: userId }, body: { name: '' } };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await controller.createCatalog(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(catalogModelMock.createCatalog).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
   // API: POST /api/catalogs (CatalogController.createCatalog)
   // Input: invalid payload triggering mongoose validation error
   // Expected status code: 400
@@ -119,7 +150,7 @@ describe('Mocked: CatalogController', () => {
   test('createCatalog maps mongoose validation errors to 400', async () => {
     const error = new mongoose.Error.ValidationError(undefined as any);
     catalogModelMock.createCatalog.mockRejectedValueOnce(error);
-    const req: any = { user: { _id: new mongoose.Types.ObjectId() }, body: { name: '' } };
+    const req: any = { user: { _id: new mongoose.Types.ObjectId() }, body: { name: 'ValidName' } };
     const res = createMockResponse();
     const next = jest.fn();
 
@@ -136,7 +167,9 @@ describe('Mocked: CatalogController', () => {
   // Expected behavior: controller returns conflict response without calling next
   // Expected output: JSON message about catalog existing
   test('createCatalog returns 409 when duplicate key error occurs', async () => {
-    catalogModelMock.createCatalog.mockRejectedValueOnce({ code: 11000 });
+    const duplicateError = new Error('Duplicate key') as any;
+    duplicateError.code = 11000;
+    catalogModelMock.createCatalog.mockRejectedValueOnce(duplicateError);
     const req: any = { user: { _id: new mongoose.Types.ObjectId() }, body: { name: 'Dup' } };
     const res = createMockResponse();
     const next = jest.fn();
@@ -145,6 +178,7 @@ describe('Mocked: CatalogController', () => {
 
     expect(res.status).toHaveBeenCalledWith(409);
     expect(getJsonPayload(res)?.message).toBe('Catalog with the same name already exists');
+    expect(next).not.toHaveBeenCalled();
   });
 
   // API: POST /api/catalogs (CatalogController.createCatalog)
@@ -179,6 +213,17 @@ describe('Mocked: CatalogController', () => {
 
     expect(res.status).toHaveBeenCalledWith(200);
     expect(getJsonPayload(res)?.data?.catalogs).toBe(catalogs);
+  });
+
+  test('listCatalogs requires authentication', async () => {
+    const req: any = { user: undefined };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await controller.listCatalogs(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
   });
 
   // API: GET /api/catalogs (CatalogController.listCatalogs)
@@ -275,6 +320,17 @@ describe('Mocked: CatalogController', () => {
 
     expect(res.status).toHaveBeenCalledWith(200);
     expect(getJsonPayload(res)?.data?.entries).toEqual([{ entry: { id: 1 } }]);
+  });
+
+  test('getCatalogById returns 401 when request lacks user', async () => {
+    const req: any = { user: undefined, params: { catalogId: 'abc' } };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await controller.getCatalogById(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
   });
 
   // API: GET /api/catalogs/:catalogId (CatalogController.getCatalogById)
@@ -384,6 +440,17 @@ describe('Mocked: CatalogController', () => {
     await controller.updateCatalog(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(409);
+  });
+
+  test('updateCatalog requires authenticated user', async () => {
+    const req: any = { user: undefined, params: { catalogId: 'abc' }, body: {} };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await controller.updateCatalog(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
   });
 
   // API: PUT /api/catalogs/:catalogId (CatalogController.updateCatalog)
@@ -505,6 +572,17 @@ describe('Mocked: CatalogController', () => {
     await controller.deleteCatalog(req, res, next);
 
     expect(next).toHaveBeenCalledWith(error);
+  });
+
+  test('deleteCatalog requires authentication', async () => {
+    const req: any = { user: undefined, params: { catalogId: 'abc' } };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await controller.deleteCatalog(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
   });
 
   // API: POST /api/catalogs/:catalogId/entries/:entryId (CatalogController.linkCatalogEntry)
@@ -644,6 +722,17 @@ describe('Mocked: CatalogController', () => {
     expect(next).toHaveBeenCalledWith(error);
   });
 
+  test('linkCatalogEntry requires authenticated user', async () => {
+    const req: any = { user: undefined, params: { catalogId: 'c', entryId: 'e' } };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await controller.linkCatalogEntry(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(catalogModelMock.findById).not.toHaveBeenCalled();
+  });
+
   // API: DELETE /api/catalogs/:catalogId/entries/:entryId (CatalogController.unlinkCatalogEntry)
   // Input: missing catalog
   // Expected status code: 404
@@ -666,12 +755,21 @@ describe('Mocked: CatalogController', () => {
     const catalog = { _id: new mongoose.Types.ObjectId(), owner };
     catalogModelMock.findById.mockResolvedValueOnce(catalog);
     catalogShareModelMock.getUserAccess.mockResolvedValueOnce({ role: 'viewer' });
-    const req: any = { user: { _id: new mongoose.Types.ObjectId() }, params: { catalogId: 'c', entryId: 'e' } };
+    // These should NOT be called if 403 is returned
+    catalogEntryLinkModelMock.unlinkEntry.mockResolvedValueOnce(undefined);
+    catalogEntryLinkModelMock.listEntriesWithDetails.mockResolvedValueOnce([]);
+    buildCatalogEntriesResponseMock.mockReturnValueOnce([]);
+    
+    const req: any = {
+      user: { _id: new mongoose.Types.ObjectId() },
+      params: { catalogId: 'c', entryId: new mongoose.Types.ObjectId().toString() },
+    };
     const res = createMockResponse();
     const next = jest.fn();
 
     await controller.unlinkCatalogEntry(req, res, next);
 
+    expect(catalogEntryLinkModelMock.unlinkEntry).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(403);
   });
 
@@ -702,15 +800,28 @@ describe('Mocked: CatalogController', () => {
   // Expected behavior: forwards to next
   test('unlinkCatalogEntry forwards unexpected errors', async () => {
     const owner = new mongoose.Types.ObjectId();
+    const catalogId = new mongoose.Types.ObjectId();
+    const entryId = new mongoose.Types.ObjectId();
     const error = new Error('unlink fail');
-    catalogModelMock.findById.mockResolvedValueOnce({ _id: new mongoose.Types.ObjectId(), owner });
+    catalogModelMock.findById.mockResolvedValueOnce({ _id: catalogId, owner });
     catalogEntryLinkModelMock.unlinkEntry.mockRejectedValueOnce(error);
-    const req: any = { user: { _id: owner }, params: { catalogId: 'c', entryId: 'e' } };
+    const req: any = { user: { _id: owner }, params: { catalogId: catalogId.toString(), entryId: entryId.toString() } };
     const res = createMockResponse();
     const next = jest.fn();
 
     await controller.unlinkCatalogEntry(req, res, next);
 
     expect(next).toHaveBeenCalledWith(error);
+  });
+
+  test('unlinkCatalogEntry requires authenticated user', async () => {
+    const req: any = { user: undefined, params: { catalogId: 'c', entryId: new mongoose.Types.ObjectId().toString() } };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await controller.unlinkCatalogEntry(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(catalogModelMock.findById).not.toHaveBeenCalled();
   });
 });

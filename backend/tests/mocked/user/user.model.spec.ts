@@ -413,7 +413,9 @@ describe('Mocked: UserModel.findByName', () => {
     const result = await userModel.findByName('Alice');
 
     expect(collectionStub.findOne).toHaveBeenCalledWith({
-      name: expect.any(RegExp),
+      $expr: {
+        $eq: [{ $toLower: '$name' }, 'alice'],
+      },
     });
     expect(result).toEqual(user);
   });
@@ -537,7 +539,9 @@ describe('Mocked: UserModel.searchByName', () => {
     );
 
     expect(collectionStub.find).toHaveBeenCalledWith(
-      expect.objectContaining({ name: expect.any(RegExp) })
+      expect.objectContaining({
+        name: { $regex: 'ali', $options: 'i' },
+      })
     );
     expect(result).toEqual(users);
   });

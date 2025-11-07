@@ -1104,11 +1104,10 @@ describe('RecognitionController', () => {
 
   // API: POST /api/recognition/save (recognizeAndSave)
   // Input: new entry creation where catalogRepository.create returns null
-  // Expected status code: 500
-  // Expected behavior: controller logs error and responds with failure message
-  // Expected output: JSON message "Failed to save catalog entry"
+  // Expected behavior: controller logs error and forwards it to the error handler
+  // Expected output: next invoked with Error; response not sent
   // Mock behavior: catalogRepository.create mocked to resolve null causing failure branch
-  test('recognizeAndSave returns 500 when catalog creation fails', async () => {
+  test('recognizeAndSave forwards errors when catalog creation fails', async () => {
     const userId = new mongoose.Types.ObjectId();
     speciesFindOrCreateMock.mockResolvedValue({
       _id: new mongoose.Types.ObjectId(),
@@ -1142,13 +1141,10 @@ describe('RecognitionController', () => {
 
     await recognitionController.recognizeAndSave(req, res, next);
 
-    expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: 'Failed to save catalog entry',
-      })
-    );
-    expect(incrementObservationCountMock).not.toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalledWith(500);
+    expect(res.json).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+    expect(incrementObservationCountMock).toHaveBeenCalled();
     existsSpy.mockRestore();
     readSpy.mockRestore();
   });

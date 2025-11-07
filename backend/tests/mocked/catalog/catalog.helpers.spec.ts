@@ -23,6 +23,28 @@ describe('Mocked: catalog.helpers', () => {
     process.env.MEDIA_BASE_URL = originalEnv;
   });
 
+  test('resolveImageUrl returns undefined for missing values', () => {
+    expect(resolveImageUrl(undefined)).toBeUndefined();
+    expect(resolveImageUrl('   ')).toBeUndefined();
+  });
+
+  test('resolveImageUrl returns absolute URL unchanged', () => {
+    const url = 'https://example.org/image.jpg';
+    expect(resolveImageUrl(url)).toBe(url);
+  });
+
+  // API: resolveImageUrl
+  // Input: relative path with no MEDIA_BASE_URL or request context
+  // Expected behavior: falls back to original value and buildBaseUrl returns undefined
+  // Expected output: original relative path string
+  test('resolveImageUrl falls back to original value without base URL context', () => {
+    process.env.MEDIA_BASE_URL = '';
+
+    const result = resolveImageUrl('media/pic.jpg');
+
+    expect(result).toBe('media/pic.jpg');
+  });
+
   // API: resolveImageUrl
   // Input: relative img path with MEDIA_BASE_URL configured
   // Expected behavior: trims env var and prefixes path
@@ -59,6 +81,110 @@ describe('Mocked: catalog.helpers', () => {
 
     expect(result).toBe('%%%');
     expect(getLoggerWarn()).toHaveBeenCalled();
+  });
+
+  // API: buildCatalogEntriesResponse
+  // Input: entry containing speciesId as ObjectId and addedBy without identifier
+  // Expected behavior: retains species ObjectId and falls back to provided user id
+  // Expected output: serialized response referencing fallback addedBy
+  test('buildCatalogEntriesResponse handles species ObjectIds and fallback addedBy', () => {
+    const fallbackUserId = new mongoose.Types.ObjectId();
+    const speciesId = new mongoose.Types.ObjectId();
+    const entryId = new mongoose.Types.ObjectId();
+    const addedAt = new Date();
+
+    const entryDoc = {
+      _id: entryId,
+      speciesId,
+      toObject: jest.fn().mockReturnValue({
+        _id: entryId,
+        speciesId,
+      }),
+    } as unknown as ICatalogEntry;
+
+    const links: ICatalogEntryLink[] = [
+      {
+        _id: new mongoose.Types.ObjectId(),
+        catalog: new mongoose.Types.ObjectId(),
+        entry: entryDoc as any,
+        addedBy: {} as any,
+        addedAt,
+      } as unknown as ICatalogEntryLink,
+    ];
+
+    const responses = buildCatalogEntriesResponse(links, fallbackUserId);
+
+    expect(responses).toHaveLength(1);
+    expect(responses[0].entry.speciesId?.toString()).toBe(speciesId.toString());
+    expect(responses[0].addedBy.toString()).toBe(fallbackUserId.toString());
+  });
+
+  // API: buildCatalogEntriesResponse
+  // Input: link where speciesId is only an ObjectId and duplicates same timestamp
+  // Expected behavior: dedupe prevents duplicate entries
+  test('buildCatalogEntriesResponse dedupes identical entry/timestamp pairs', () => {
+    const fallbackUserId = new mongoose.Types.ObjectId();
+    const speciesId = new mongoose.Types.ObjectId();
+    const entryId = new mongoose.Types.ObjectId();
+    const addedAt = new Date();
+
+    const links: ICatalogEntryLink[] = [
+      {
+        _id: new mongoose.Types.ObjectId(),
+        catalog: new mongoose.Types.ObjectId(),
+        entry: {
+          _id: entryId,
+          speciesId,
+          imageUrl: undefined,
+          toObject: jest.fn().mockReturnValue({ _id: entryId, speciesId }),
+        } as any,
+        addedBy: fallbackUserId,
+        addedAt,
+      } as unknown as ICatalogEntryLink,
+      {
+        _id: new mongoose.Types.ObjectId(),
+        catalog: new mongoose.Types.ObjectId(),
+        entry: {
+          _id: entryId,
+          speciesId,
+          toObject: jest.fn().mockReturnValue({ _id: entryId, speciesId }),
+        } as any,
+        addedBy: fallbackUserId,
+        addedAt,
+      } as unknown as ICatalogEntryLink,
+    ];
+
+    const responses = buildCatalogEntriesResponse(links, fallbackUserId);
+
+    expect(responses).toHaveLength(1);
+    expect(responses[0].entry.speciesId?.toString()).toBe(speciesId.toString());
+  });
+
+  // API: buildCatalogEntriesResponse
+  // Input: link whose addedBy is already an ObjectId
+  // Expected behavior: returns same ObjectId without coercion
+  // Expected output: response addedBy equals provided ObjectId
+  test('buildCatalogEntriesResponse preserves addedBy ObjectIds', () => {
+    const addedBy = new mongoose.Types.ObjectId();
+    const entryId = new mongoose.Types.ObjectId();
+    const addedAt = new Date();
+    const links: ICatalogEntryLink[] = [
+      {
+        _id: new mongoose.Types.ObjectId(),
+        catalog: new mongoose.Types.ObjectId(),
+        entry: {
+          _id: entryId,
+          toObject: jest.fn().mockReturnValue({ _id: entryId }),
+        } as any,
+        addedBy,
+        addedAt,
+      } as unknown as ICatalogEntryLink,
+    ];
+
+    const responses = buildCatalogEntriesResponse(links, addedBy);
+
+    expect(responses).toHaveLength(1);
+    expect(responses[0].addedBy.toString()).toBe(addedBy.toString());
   });
 
   // API: buildCatalogEntriesResponse
