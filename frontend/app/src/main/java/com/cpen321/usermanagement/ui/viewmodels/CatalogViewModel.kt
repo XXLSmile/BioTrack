@@ -9,6 +9,7 @@ import com.cpen321.usermanagement.data.remote.socket.CatalogSocketEvent
 import com.cpen321.usermanagement.data.remote.socket.CatalogSocketService
 import com.cpen321.usermanagement.data.repository.CatalogRepository
 import com.cpen321.usermanagement.data.repository.RecognitionRepository
+import com.cpen321.usermanagement.data.repository.RepositoryException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.LinkedHashSet
 import javax.inject.Inject
@@ -17,6 +18,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import java.io.IOException
+import retrofit2.HttpException
 
 @HiltViewModel
 class CatalogViewModel @Inject constructor(
@@ -59,8 +62,12 @@ class CatalogViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 _catalogs.value = repository.getCatalogs()
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load catalogs", e)
+            } catch (e: RepositoryException) {
+                logCatalogError("Failed to load catalogs", e)
+            } catch (e: IOException) {
+                logCatalogError("Failed to load catalogs due to network error", e)
+            } catch (e: HttpException) {
+                logCatalogError("Failed to load catalogs: HTTP ${e.code()}", e)
             }
         }
     }
@@ -72,8 +79,12 @@ class CatalogViewModel @Inject constructor(
                 if (created != null) {
                     _catalogs.value = _catalogs.value + created
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to create catalog", e)
+            } catch (e: RepositoryException) {
+                logCatalogError("Failed to create catalog", e)
+            } catch (e: IOException) {
+                logCatalogError("Failed to create catalog due to network error", e)
+            } catch (e: HttpException) {
+                logCatalogError("Failed to create catalog: HTTP ${e.code()}", e)
             }
         }
     }
@@ -92,8 +103,14 @@ class CatalogViewModel @Inject constructor(
 
                 val detail = repository.getCatalogById(catalogId)
                 applyCatalogData(detail)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load catalog detail", e)
+            } catch (e: RepositoryException) {
+                logCatalogError("Failed to load catalog detail", e)
+                _catalogDetail.value = null
+            } catch (e: IOException) {
+                logCatalogError("Failed to load catalog detail due to network error", e)
+                _catalogDetail.value = null
+            } catch (e: HttpException) {
+                logCatalogError("Failed to load catalog detail: HTTP ${e.code()}", e)
                 _catalogDetail.value = null
             }
         }
@@ -111,8 +128,12 @@ class CatalogViewModel @Inject constructor(
                     }
                     socketService.leaveCatalog(catalogId)
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to delete catalog", e)
+            } catch (e: RepositoryException) {
+                logCatalogError("Failed to delete catalog", e)
+            } catch (e: IOException) {
+                logCatalogError("Failed to delete catalog due to network error", e)
+            } catch (e: HttpException) {
+                logCatalogError("Failed to delete catalog: HTTP ${e.code()}", e)
             }
         }
     }
@@ -133,9 +154,15 @@ class CatalogViewModel @Inject constructor(
                     else -> currentCatalogId?.let { loadCatalogDetail(it) }
                 }
                 onComplete(true, null)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to add entry to catalog", e)
+            } catch (e: RepositoryException) {
+                logCatalogError("Failed to add entry to catalog", e)
                 onComplete(false, e.message)
+            } catch (e: IOException) {
+                logCatalogError("Failed to add entry to catalog due to network error", e)
+                onComplete(false, "Network error")
+            } catch (e: HttpException) {
+                logCatalogError("Failed to add entry to catalog: HTTP ${e.code()}", e)
+                onComplete(false, "Server error")
             }
         }
     }
@@ -155,9 +182,15 @@ class CatalogViewModel @Inject constructor(
                     loadCatalogDetail(catalogId)
                 }
                 onComplete(true, null)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to remove entry from catalog", e)
+            } catch (e: RepositoryException) {
+                logCatalogError("Failed to remove entry from catalog", e)
                 onComplete(false, e.message)
+            } catch (e: IOException) {
+                logCatalogError("Failed to remove entry from catalog due to network error", e)
+                onComplete(false, "Network error")
+            } catch (e: HttpException) {
+                logCatalogError("Failed to remove entry from catalog: HTTP ${e.code()}", e)
+                onComplete(false, "Server error")
             }
         }
     }
@@ -220,6 +253,10 @@ class CatalogViewModel @Inject constructor(
             val updated = current.copy(catalog = updatedCatalog)
             applyCatalogData(updated)
         }
+    }
+
+    private fun logCatalogError(message: String, throwable: Throwable) {
+        Log.e(TAG, message, throwable)
     }
 
     private fun handleCatalogDeleted(event: CatalogSocketEvent.CatalogDeleted) {

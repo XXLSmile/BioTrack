@@ -8,6 +8,7 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import retrofit2.HttpException
 import java.io.File
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -30,8 +31,8 @@ class MediaRepository @Inject constructor(
         } catch (e: HttpException) {
             Log.e("MediaRepository", "HTTP error: ${e.code()}", e)
             Result.failure(e)
-        } catch (e: Exception) {
-            Log.e("MediaRepository", "Upload failed", e)
+        } catch (e: IOException) {
+            Log.e("MediaRepository", "Upload failed due to network error", e)
             Result.failure(e)
         }
     }

@@ -26,6 +26,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.tasks.await
+import java.io.IOException
+import retrofit2.HttpException
+import kotlinx.coroutines.CancellationException
 
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
@@ -173,7 +176,11 @@ class AuthRepositoryImpl @Inject constructor(
             RetrofitClient.setAuthToken(authToken)
 
             val tokenToSend = fcmToken?.takeIf { it.isNotBlank() }
-                ?: FirebaseMessaging.getInstance().token.await()
+                ?: runCatching { FirebaseMessaging.getInstance().token.await() }
+                    .getOrElse { error ->
+                        Log.e(TAG, "Failed to retrieve FCM token", error)
+                        return
+                    }
 
             if (tokenToSend.isBlank()) {
                 Log.w(TAG, "Skipping FCM token sync: token is blank")
@@ -186,8 +193,12 @@ class AuthRepositoryImpl @Inject constructor(
             } else {
                 Log.e(TAG, "Failed to send FCM token: ${response.errorBody()?.string()}")
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error sending FCM token", e)
+        } catch (e: IOException) {
+            Log.e(TAG, "Network error sending FCM token", e)
+        } catch (e: HttpException) {
+            Log.e(TAG, "HTTP error sending FCM token: ${e.code()}", e)
+        } catch (e: CancellationException) {
+            Log.e(TAG, "FCM token sync cancelled", e)
         }
     }
 
@@ -255,8 +266,10 @@ class AuthRepositoryImpl @Inject constructor(
                     if (!clearResponse.isSuccessful) {
                         Log.w(TAG, "Failed to clear FCM token on server during logout: ${clearResponse.errorBody()?.string()}")
                     }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Error clearing FCM token during logout", e)
+                } catch (e: IOException) {
+                    Log.w(TAG, "Network error clearing FCM token during logout", e)
+                } catch (e: HttpException) {
+                    Log.w(TAG, "HTTP error clearing FCM token during logout: ${e.code()}", e)
                 }
             }
 
@@ -275,8 +288,11 @@ class AuthRepositoryImpl @Inject constructor(
                 Log.e(TAG, "Logout failed: $errorMessage")
                 Result.failure(Exception(errorMessage))
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Logout failed", e)
+        } catch (e: IOException) {
+            Log.e(TAG, "Logout failed due to network error", e)
+            Result.failure(e)
+        } catch (e: HttpException) {
+            Log.e(TAG, "Logout failed with HTTP ${e.code()}", e)
             Result.failure(e)
         }
     }
@@ -284,8 +300,10 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun deleteAccount() {
         try {
             userInterface.deleteProfile()
-        } catch (e: Exception) {
-            Log.e(TAG, "Delete account failed", e)
+        } catch (e: IOException) {
+            Log.e(TAG, "Delete account failed due to network error", e)
+        } catch (e: HttpException) {
+            Log.e(TAG, "Delete account failed with HTTP ${e.code()}", e)
         }
     }
 }

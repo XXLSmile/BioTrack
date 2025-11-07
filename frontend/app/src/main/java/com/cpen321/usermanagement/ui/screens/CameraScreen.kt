@@ -76,6 +76,8 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
+import retrofit2.HttpException
 
 @Composable
 fun CameraScreen(
@@ -425,8 +427,12 @@ private suspend fun recognizeImage(
             val errorMessage = response.errorBody()?.string()?.takeIf { it.isNotBlank() }
             "❌ Error: ${errorMessage ?: response.message()}" to null
         }
-    } catch (e: Exception) {
-        "⚠️ Upload failed: ${e.localizedMessage ?: "Unknown error"}" to null
+    } catch (e: IOException) {
+        "⚠️ Upload failed: ${e.localizedMessage ?: "Check your connection and try again."}" to null
+    } catch (e: HttpException) {
+        "⚠️ Upload failed: HTTP ${e.code()}" to null
+    } catch (e: IllegalArgumentException) {
+        "⚠️ Upload failed: ${e.localizedMessage ?: "Invalid image"}" to null
     } finally {
         tempFile?.delete()
     }
@@ -475,8 +481,12 @@ private suspend fun saveRecognitionToCatalog(
             val errorMessage = response.errorBody()?.string()?.takeIf { it.isNotBlank() }
             false to ("❌ Error: ${errorMessage ?: response.message()}")
         }
-    } catch (e: Exception) {
-        false to ("⚠️ Save failed: ${e.localizedMessage ?: "Unknown error"}")
+    } catch (e: IOException) {
+        false to ("⚠️ Save failed: ${e.localizedMessage ?: "Check your connection and try again."}")
+    } catch (e: HttpException) {
+        false to ("⚠️ Save failed: HTTP ${e.code()}")
+    } catch (e: IllegalArgumentException) {
+        false to ("⚠️ Save failed: ${e.localizedMessage ?: "Invalid data"}")
     }
 }
 
@@ -527,8 +537,8 @@ private fun hasLocationPermission(context: Context): Boolean {
 private suspend fun fetchCurrentLocation(
     client: FusedLocationProviderClient
 ): Location? {
-    return try {
-        val tokenSource = CancellationTokenSource()
+    val tokenSource = CancellationTokenSource()
+    return runCatching {
         try {
             client.getCurrentLocation(
                 Priority.PRIORITY_BALANCED_POWER_ACCURACY,
@@ -538,9 +548,7 @@ private suspend fun fetchCurrentLocation(
         } finally {
             tokenSource.cancel()
         }
-    } catch (exception: Exception) {
-        null
-    }
+    }.getOrNull()
 }
 
 private fun Double.toTextRequestBody() =

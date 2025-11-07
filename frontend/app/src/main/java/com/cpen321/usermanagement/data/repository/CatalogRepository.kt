@@ -7,7 +7,9 @@ import com.cpen321.usermanagement.data.model.InviteCollaboratorBody
 import com.cpen321.usermanagement.data.model.RespondInvitationBody
 import com.cpen321.usermanagement.data.model.UpdateCollaboratorBody
 import com.cpen321.usermanagement.data.remote.api.CatalogApi
+import java.io.IOException
 import javax.inject.Inject
+import retrofit2.HttpException
 
 class CatalogRepository @Inject constructor(
     private val api: CatalogApi
@@ -122,8 +124,9 @@ class CatalogRepository @Inject constructor(
         return try {
             val response = api.deleteCatalog(catalogId)
             response.isSuccessful
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (e: IOException) {
+            false
+        } catch (e: HttpException) {
             false
         }
     }

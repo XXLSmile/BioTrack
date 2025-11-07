@@ -31,6 +31,7 @@ import com.cpen321.usermanagement.data.model.CatalogEntry as RemoteCatalogEntry
 import com.cpen321.usermanagement.data.model.Entry
 import com.cpen321.usermanagement.data.model.RecentObservation
 import com.cpen321.usermanagement.ui.screens.ObservationDetailContent
+import java.text.ParseException
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -245,8 +246,8 @@ fun formatIsoToPrettyDate(iso: String): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
         val date = sdf.parse(iso)
         val out = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
-        out.format(date!!)
-    } catch (e: Exception) {
+        date?.let { out.format(it) } ?: iso.take(10)
+    } catch (e: ParseException) {
         iso.take(10)
     }
 }
@@ -316,7 +317,7 @@ fun resolveImageUrl(rawUrl: String?): String? {
             }
             else -> rawUrl
         }
-    } catch (e: Exception) {
+    } catch (e: IllegalArgumentException) {
         "$baseUrl/${rawUrl.trimStart('/')}"
     }
 }

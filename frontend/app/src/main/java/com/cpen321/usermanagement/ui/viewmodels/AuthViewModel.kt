@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.cpen321.usermanagement.data.remote.dto.AuthData
 import com.cpen321.usermanagement.data.remote.dto.User
 import com.cpen321.usermanagement.data.repository.AuthRepository
+import com.cpen321.usermanagement.data.repository.RepositoryException
 import com.cpen321.usermanagement.ui.navigation.NavRoutes
 import com.cpen321.usermanagement.ui.navigation.NavigationStateManager
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -16,6 +17,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import java.io.IOException
+import retrofit2.HttpException
 
 data class AuthUiState(
     // Loading states
@@ -182,8 +185,14 @@ class AuthViewModel @Inject constructor(
                     shouldSkipAuthCheck = true // Skip auth check after manual sign out
                 )
                 navigationStateManager.navigateToAuthWithMessage("You have been logged out.")
-            } catch (e: Exception) {
+            } catch (e: RepositoryException) {
                 Log.e(TAG, "Logout failed", e)
+                _uiState.value = _uiState.value.copy(errorMessage = e.message ?: "Logout failed. Please try again.")
+            } catch (e: IOException) {
+                Log.e(TAG, "Logout failed due to network error", e)
+                _uiState.value = _uiState.value.copy(errorMessage = "Network error. Please try again.")
+            } catch (e: HttpException) {
+                Log.e(TAG, "Logout failed with HTTP ${e.code()}", e)
                 _uiState.value = _uiState.value.copy(errorMessage = "Logout failed. Please try again.")
             }
         }

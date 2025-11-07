@@ -148,8 +148,17 @@ class ProfileRepositoryImpl @Inject constructor(
                 Log.e(TAG, "Failed to add favorite species: $errorMessage")
                 Result.failure(Exception(errorMessage))
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error while adding favorite species", e)
+        } catch (e: SocketTimeoutException) {
+            Log.e(TAG, "Network timeout while adding favorite species", e)
+            Result.failure(e)
+        } catch (e: UnknownHostException) {
+            Log.e(TAG, "Network failure while adding favorite species", e)
+            Result.failure(e)
+        } catch (e: IOException) {
+            Log.e(TAG, "IO error while adding favorite species", e)
+            Result.failure(e)
+        } catch (e: HttpException) {
+            Log.e(TAG, "HTTP error while adding favorite species: ${e.code()}", e)
             Result.failure(e)
         }
     }
@@ -167,8 +176,17 @@ class ProfileRepositoryImpl @Inject constructor(
                 Log.e(TAG, "Failed to remove favorite species: $errorMessage")
                 Result.failure(Exception(errorMessage))
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error while removing favorite species", e)
+        } catch (e: SocketTimeoutException) {
+            Log.e(TAG, "Network timeout while removing favorite species", e)
+            Result.failure(e)
+        } catch (e: UnknownHostException) {
+            Log.e(TAG, "Network failure while removing favorite species", e)
+            Result.failure(e)
+        } catch (e: IOException) {
+            Log.e(TAG, "IO error while removing favorite species", e)
+            Result.failure(e)
+        } catch (e: HttpException) {
+            Log.e(TAG, "HTTP error while removing favorite species: ${e.code()}", e)
             Result.failure(e)
         }
     }
