@@ -5,8 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,6 +30,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.cpen321.usermanagement.data.model.CatalogShareEntry
 import com.cpen321.usermanagement.data.model.CatalogEntry as RemoteCatalogEntry
 import com.cpen321.usermanagement.data.model.RecentObservation
 import com.cpen321.usermanagement.ui.components.ObservationListItem
@@ -55,7 +57,9 @@ import com.cpen321.usermanagement.ui.components.toCatalogEntry
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
 import com.cpen321.usermanagement.ui.viewmodels.CatalogShareViewModel
 import com.cpen321.usermanagement.ui.navigation.NavRoutes
+import com.cpen321.usermanagement.ui.viewmodels.MainUiState
 import com.cpen321.usermanagement.ui.viewmodels.MainViewModel
+import com.cpen321.usermanagement.ui.viewmodels.ProfileUiState
 import com.cpen321.usermanagement.ui.viewmodels.ProfileViewModel
 import kotlinx.coroutines.launch
 
@@ -69,9 +73,87 @@ fun MainScreen(
     val profileUiState by profileViewModel.uiState.collectAsState()
     val catalogShareViewModel: CatalogShareViewModel = hiltViewModel()
     val shareUiState by catalogShareViewModel.uiState.collectAsState()
-    val snackBarHostState: SnackbarHostState = remember { SnackbarHostState() }
+    val catalogViewModel: CatalogViewModel = hiltViewModel()
+    val snackBarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    val entryDialogState = rememberEntryDialogState()
+    val navigateToRoute = rememberNavigateToRoute(navController)
+    val additionalCatalogOptions = rememberSharedCatalogOptions(shareUiState.sharedCatalogs)
 
-    val navigateToRoute = remember(navController) {
+    HandleMainScreenSideEffects(
+        mainViewModel = mainViewModel,
+        profileViewModel = profileViewModel,
+        catalogShareViewModel = catalogShareViewModel,
+        catalogViewModel = catalogViewModel,
+        snackBarHostState = snackBarHostState,
+        mainUiState = mainUiState,
+        profileUiState = profileUiState,
+        entryDialogState = entryDialogState
+    )
+
+    val summary = MainScreenSummary(
+        name = profileUiState.user?.name ?: "Explorer",
+        location = profileUiState.user?.region?.takeIf { it.isNotBlank() }
+            ?: profileUiState.user?.location?.takeIf { it.isNotBlank() }
+            ?: "Unknown location",
+        observations = profileUiState.stats?.observationCount
+            ?: profileUiState.user?.observationCount
+            ?: 0,
+        friends = profileUiState.stats?.friendCount ?: profileUiState.user?.friendCount ?: 0
+    )
+
+    val recentUi = RecentObservationsUi(
+        observations = mainUiState.recentObservations,
+        isLoading = mainUiState.isLoadingRecent,
+        errorMessage = mainUiState.recentError
+    )
+
+    MainScreenContent(
+        snackBarHostState = snackBarHostState,
+        summary = summary,
+        recentUi = recentUi,
+        onIdentifyClick = { navigateToRoute(NavRoutes.IDENTIFY) },
+        onViewCatalogs = { navigateToRoute(NavRoutes.CATALOGS) },
+        onViewAll = { navigateToRoute(NavRoutes.CATALOG_ENTRIES) },
+        onRetry = { mainViewModel.loadRecentObservations() },
+        onSelectObservation = { observation ->
+            if (observation.hasCoordinates) {
+                navController.navigate(NavRoutes.observationDetail(observation.id))
+            } else {
+                entryDialogState.showEntry(observation.toCatalogEntry())
+            }
+        }
+    )
+
+    AddEntryToCatalogDialog(
+        catalogViewModel = catalogViewModel,
+        state = entryDialogState,
+        additionalCatalogOptions = additionalCatalogOptions
+    ) {
+        mainViewModel.loadRecentObservations()
+        profileViewModel.refreshStats()
+        coroutineScope.launch {
+            snackBarHostState.showSnackbar("Observation added to catalog")
+        }
+    }
+
+    ObservationEntryDetailDialog(state = entryDialogState)
+
+    ConfirmEntryDeletionDialog(
+        catalogViewModel = catalogViewModel,
+        state = entryDialogState
+    ) {
+        mainViewModel.loadRecentObservations()
+        profileViewModel.refreshStats()
+        coroutineScope.launch {
+            snackBarHostState.showSnackbar("Observation deleted")
+        }
+    }
+}
+
+@Composable
+private fun rememberNavigateToRoute(navController: NavHostController): (String) -> Unit {
+    return remember(navController) {
         { route: String ->
             navController.navigate(route) {
                 popUpTo(NavRoutes.HOME) {
@@ -82,49 +164,40 @@ fun MainScreen(
             }
         }
     }
+}
 
-    LaunchedEffect(Unit) {
-        if (profileUiState.user == null) {
+@Composable
+private fun HandleMainScreenSideEffects(
+    mainViewModel: MainViewModel,
+    profileViewModel: ProfileViewModel,
+    catalogShareViewModel: CatalogShareViewModel,
+    catalogViewModel: CatalogViewModel,
+    snackBarHostState: SnackbarHostState,
+    mainUiState: MainUiState,
+    profileUiState: ProfileUiState,
+    entryDialogState: EntryDialogState
+) {
+    val user = profileUiState.user
+
+    LaunchedEffect(user) {
+        if (user == null) {
             profileViewModel.loadProfile()
         }
-        catalogShareViewModel.loadSharedWithMe()
     }
 
     LaunchedEffect(Unit) {
+        catalogShareViewModel.loadSharedWithMe()
         mainViewModel.loadRecentObservations()
     }
 
     LaunchedEffect(mainUiState.successMessage) {
-        val message = mainUiState.successMessage
-        if (message != null) {
-            snackBarHostState.showSnackbar(message)
-            mainViewModel.clearSuccessMessage()
-        }
+        val message = mainUiState.successMessage ?: return@LaunchedEffect
+        snackBarHostState.showSnackbar(message)
+        mainViewModel.clearSuccessMessage()
     }
 
-    val user = profileUiState.user
-    val stats = profileUiState.stats
-    val catalogViewModel: CatalogViewModel = hiltViewModel()
-    val coroutineScope = rememberCoroutineScope()
-
-    var showEntryDialog by remember { mutableStateOf(false) }
-    var showAddDialog by remember { mutableStateOf(false) }
-    var isDialogProcessing by remember { mutableStateOf(false) }
-    var detailErrorMessage by remember { mutableStateOf<String?>(null) }
-    var pendingEntryAction by remember { mutableStateOf<EntryAction?>(null) }
-    val additionalCatalogOptions = remember(shareUiState.sharedCatalogs) {
-        shareUiState.sharedCatalogs
-            .filter { it.status == "accepted" && it.role == "editor" && it.catalog?._id != null }
-            .map { CatalogOption(it.catalog!!._id, it.catalog.name ?: "Catalog") }
-    }
-    var selectedEntry by remember { mutableStateOf<RemoteCatalogEntry?>(null) }
-
-    LaunchedEffect(selectedEntry) {
-        detailErrorMessage = null
-    }
-
-    LaunchedEffect(showAddDialog) {
-        if (showAddDialog) {
+    LaunchedEffect(entryDialogState.showAddDialog) {
+        if (entryDialogState.showAddDialog) {
             catalogViewModel.loadCatalogs()
         }
     }
@@ -134,147 +207,289 @@ fun MainScreen(
             mainViewModel.loadRecentObservations()
         }
     }
+}
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackBarHostState) }
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                WelcomeCard(
-                    name = user?.name ?: "Explorer",
-                    location = user?.region?.takeIf { it.isNotBlank() }
-                        ?: user?.location?.takeIf { it.isNotBlank() }
-                        ?: "Unknown location",
-                    onIdentifyClick = { navigateToRoute(NavRoutes.IDENTIFY) },
-                    onViewCatalogs = { navigateToRoute(NavRoutes.CATALOGS) }
-                )
-            }
+@Composable
+private fun MainScreenContent(
+    snackBarHostState: SnackbarHostState,
+    summary: MainScreenSummary,
+    recentUi: RecentObservationsUi,
+    onIdentifyClick: () -> Unit,
+    onViewCatalogs: () -> Unit,
+    onViewAll: () -> Unit,
+    onRetry: () -> Unit,
+    onSelectObservation: (RecentObservation) -> Unit
+) {
+    Scaffold(snackbarHost = { SnackbarHost(snackBarHostState) }) { paddingValues ->
+        MainScreenList(
+            paddingValues = paddingValues,
+            summary = summary,
+            recentUi = recentUi,
+            onIdentifyClick = onIdentifyClick,
+            onViewCatalogs = onViewCatalogs,
+            onViewAll = onViewAll,
+            onRetry = onRetry,
+            onSelectObservation = onSelectObservation
+        )
+    }
+}
 
-            item {
-                StatsRow(
-                    observations = stats?.observationCount ?: user?.observationCount ?: 0,
-                    friends = stats?.friendCount ?: user?.friendCount ?: 0
-                )
-            }
-
-            item {
-                MonthlyGoalCard(current = stats?.observationCount ?: 0, goal = 50)
-            }
-
-            item {
-                RecentObservationsSection(
-                    observations = mainUiState.recentObservations,
-                    isLoading = mainUiState.isLoadingRecent,
-                    errorMessage = mainUiState.recentError,
-                    onRetry = { mainViewModel.loadRecentObservations() },
-                    onViewAll = { navigateToRoute(NavRoutes.CATALOG_ENTRIES) },
-                    onSelectObservation = { observation ->
-                        if (observation.hasCoordinates) {
-                            navController.navigate(NavRoutes.observationDetail(observation.id))
-                        } else {
-                            selectedEntry = observation.toCatalogEntry()
-                            detailErrorMessage = null
-                            showEntryDialog = true
-                        }
-                    }
-                )
-            }
-        }
-
-        if (showAddDialog && selectedEntry != null) {
-            AddToCatalogDialog(
-                viewModel = catalogViewModel,
-                isSaving = isDialogProcessing,
-                onSave = { catalogId ->
-                    val entryId = selectedEntry?.entry?._id ?: return@AddToCatalogDialog
-                    isDialogProcessing = true
-                    detailErrorMessage = null
-                    catalogViewModel.addEntryToCatalog(catalogId, entryId, null) { success, error ->
-                        isDialogProcessing = false
-                        if (success) {
-                            showAddDialog = false
-                            mainViewModel.loadRecentObservations()
-                            profileViewModel.refreshStats()
-                            coroutineScope.launch {
-                                snackBarHostState.showSnackbar("Observation added to catalog")
-                            }
-                        } else {
-                            detailErrorMessage = error ?: "Failed to add observation to catalog"
-                        }
-                    }
-                },
-                onDismiss = {
-                    if (!isDialogProcessing) {
-                        showAddDialog = false
-                    }
-                },
-                additionalCatalogs = additionalCatalogOptions
+@Composable
+private fun MainScreenList(
+    paddingValues: PaddingValues,
+    summary: MainScreenSummary,
+    recentUi: RecentObservationsUi,
+    onIdentifyClick: () -> Unit,
+    onViewCatalogs: () -> Unit,
+    onViewAll: () -> Unit,
+    onRetry: () -> Unit,
+    onSelectObservation: (RecentObservation) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .padding(paddingValues)
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            WelcomeCard(
+                name = summary.name,
+                location = summary.location,
+                onIdentifyClick = onIdentifyClick,
+                onViewCatalogs = onViewCatalogs
             )
         }
 
-        if (showEntryDialog && selectedEntry != null) {
-            EntryDetailDialog(
-                entry = selectedEntry!!,
-                isProcessing = isDialogProcessing,
-                errorMessage = detailErrorMessage,
-                canRemoveFromCatalog = false,
-                onDismiss = {
-                    if (!isDialogProcessing) {
-                        showEntryDialog = false
-                        showAddDialog = false
-                        selectedEntry = null
-                        detailErrorMessage = null
-                    }
-                },
-                onAddToCatalog = {
-                    showAddDialog = true
-                },
-                onRemoveFromCatalog = null,
-                onDeleteEntry = {
-                    pendingEntryAction = EntryAction.Delete(selectedEntry!!)
-                }
+        item {
+            StatsRow(
+                observations = summary.observations,
+                friends = summary.friends
             )
         }
 
-        val pendingAction = pendingEntryAction
-        if (pendingAction is EntryAction.Delete && !isDialogProcessing) {
-            ConfirmEntryActionDialog(
-                action = pendingAction,
-                onConfirm = {
-                    val entryId = pendingAction.entry.entry._id
-                    isDialogProcessing = true
-                    detailErrorMessage = null
-                    catalogViewModel.deleteEntry(entryId, null) { success, error ->
-                        isDialogProcessing = false
-                        pendingEntryAction = null
-                        if (success) {
-                            showEntryDialog = false
-                            showAddDialog = false
-                            selectedEntry = null
-                            mainViewModel.loadRecentObservations()
-                            profileViewModel.refreshStats()
-                            coroutineScope.launch {
-                                snackBarHostState.showSnackbar("Observation deleted")
-                            }
-                        } else {
-                            detailErrorMessage = error ?: "Failed to delete observation"
-                        }
-                    }
-                },
-                onDismiss = {
-                    if (!isDialogProcessing) {
-                        pendingEntryAction = null
-                    }
-                }
+        item {
+            MonthlyGoalCard(current = summary.observations, goal = 50)
+        }
+
+        item {
+            RecentObservationsSection(
+                observations = recentUi.observations,
+                isLoading = recentUi.isLoading,
+                errorMessage = recentUi.errorMessage,
+                onRetry = onRetry,
+                onViewAll = onViewAll,
+                onSelectObservation = onSelectObservation
             )
         }
     }
+}
+
+@Composable
+private fun AddEntryToCatalogDialog(
+    catalogViewModel: CatalogViewModel,
+    state: EntryDialogState,
+    additionalCatalogOptions: List<CatalogOption>,
+    onSuccess: () -> Unit
+) {
+    if (!state.showAddDialog || state.entry == null) return
+
+    AddToCatalogDialog(
+        viewModel = catalogViewModel,
+        isSaving = state.isProcessing,
+        onSave = { catalogId ->
+            performAddToCatalog(catalogId, catalogViewModel, state, onSuccess)
+        },
+        onDismiss = {
+            if (!state.isProcessing) {
+                state.hideAddDialog()
+            }
+        },
+        additionalCatalogs = additionalCatalogOptions
+    )
+}
+
+@Composable
+private fun ObservationEntryDetailDialog(state: EntryDialogState) {
+    val entry = state.entry
+    if (!state.showEntryDialog || entry == null) return
+
+    EntryDetailDialog(
+        entry = entry,
+        isProcessing = state.isProcessing,
+        errorMessage = state.errorMessage,
+        canRemoveFromCatalog = false,
+        onDismiss = {
+            if (!state.isProcessing) {
+                state.dismissAll()
+            }
+        },
+        onAddToCatalog = {
+            if (!state.isProcessing) {
+                state.openAddDialog()
+            }
+        },
+        onRemoveFromCatalog = null,
+        onDeleteEntry = {
+            if (!state.isProcessing) {
+                state.scheduleDelete()
+            }
+        }
+    )
+}
+
+@Composable
+private fun ConfirmEntryDeletionDialog(
+    catalogViewModel: CatalogViewModel,
+    state: EntryDialogState,
+    onSuccess: () -> Unit
+) {
+    val action = state.pendingAction
+    if (state.isProcessing || action !is EntryAction.Delete) return
+
+    ConfirmEntryActionDialog(
+        action = action,
+        onConfirm = {
+            performDeleteEntry(catalogViewModel, state, onSuccess)
+        },
+        onDismiss = { state.clearPendingAction() }
+    )
+}
+
+private fun performAddToCatalog(
+    catalogId: String,
+    catalogViewModel: CatalogViewModel,
+    state: EntryDialogState,
+    onSuccess: () -> Unit
+) {
+    val entryId = state.entry?.entry?._id ?: return
+    state.startProcessing()
+    state.clearError()
+    catalogViewModel.addEntryToCatalog(catalogId, entryId, null) { success, error ->
+        state.stopProcessing()
+        if (success) {
+            state.hideAddDialog()
+            onSuccess()
+        } else {
+            state.setError(error ?: "Failed to add observation to catalog")
+        }
+    }
+}
+
+private fun performDeleteEntry(
+    catalogViewModel: CatalogViewModel,
+    state: EntryDialogState,
+    onSuccess: () -> Unit
+) {
+    val entryId = state.entry?.entry?._id ?: return
+    state.startProcessing()
+    state.clearError()
+    catalogViewModel.deleteEntry(entryId, null) { success, error ->
+        state.stopProcessing()
+        if (success) {
+            state.clearPendingAction()
+            state.dismissAll()
+            onSuccess()
+        } else {
+            state.setError(error ?: "Failed to delete observation")
+        }
+    }
+}
+
+@Composable
+private fun rememberSharedCatalogOptions(
+    sharedCatalogs: List<CatalogShareEntry>
+): List<CatalogOption> {
+    return remember(sharedCatalogs) {
+        sharedCatalogs
+            .filter { it.status == "accepted" && it.role == "editor" && it.catalog?._id != null }
+            .map { CatalogOption(it.catalog!!._id, it.catalog.name ?: "Catalog") }
+    }
+}
+
+private data class MainScreenSummary(
+    val name: String,
+    val location: String,
+    val observations: Int,
+    val friends: Int
+)
+
+private data class RecentObservationsUi(
+    val observations: List<RecentObservation>,
+    val isLoading: Boolean,
+    val errorMessage: String?
+)
+
+@Stable
+private class EntryDialogState {
+    var showEntryDialog by mutableStateOf(false)
+        private set
+    var showAddDialog by mutableStateOf(false)
+        private set
+    var isProcessing by mutableStateOf(false)
+        private set
+    var errorMessage by mutableStateOf<String?>(null)
+        private set
+    var pendingAction by mutableStateOf<EntryAction?>(null)
+        private set
+    var entry by mutableStateOf<RemoteCatalogEntry?>(null)
+        private set
+
+    fun showEntry(entry: RemoteCatalogEntry) {
+        this.entry = entry
+        showEntryDialog = true
+        showAddDialog = false
+        errorMessage = null
+        pendingAction = null
+    }
+
+    fun openAddDialog() {
+        if (entry != null) {
+            showAddDialog = true
+            errorMessage = null
+        }
+    }
+
+    fun hideAddDialog() {
+        showAddDialog = false
+    }
+
+    fun dismissAll() {
+        showEntryDialog = false
+        showAddDialog = false
+        entry = null
+        errorMessage = null
+        pendingAction = null
+    }
+
+    fun startProcessing() {
+        isProcessing = true
+    }
+
+    fun stopProcessing() {
+        isProcessing = false
+    }
+
+    fun setError(message: String?) {
+        errorMessage = message
+    }
+
+    fun clearError() {
+        errorMessage = null
+    }
+
+    fun scheduleDelete() {
+        entry?.let { pendingAction = EntryAction.Delete(it) }
+    }
+
+    fun clearPendingAction() {
+        pendingAction = null
+    }
+}
+
+@Composable
+private fun rememberEntryDialogState(): EntryDialogState {
+    return remember { EntryDialogState() }
 }
 
 @Composable
@@ -302,51 +517,64 @@ private fun WelcomeCard(
                 .padding(20.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = "Welcome, $name!",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Color.White
-                    )
-                    Text(
-                        text = location,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.8f)
-                    )
-                }
-
-                Button(
-                    onClick = onIdentifyClick,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.CameraAlt,
-                        contentDescription = null,
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
-                    Text("Identify New Species")
-                }
-
-                Button(
-                    onClick = onViewCatalogs,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Collections,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
-                    Text(
-                        text = "View Catalogs"
-                    )
-                }
+                WelcomeCardHeader(name = name, location = location)
+                WelcomeCardActions(onIdentifyClick = onIdentifyClick, onViewCatalogs = onViewCatalogs)
             }
         }
+    }
+}
+
+@Composable
+private fun WelcomeCardHeader(
+    name: String,
+    location: String
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = "Welcome, $name!",
+            style = MaterialTheme.typography.titleLarge,
+            color = Color.White
+        )
+        Text(
+            text = location,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White.copy(alpha = 0.8f)
+        )
+    }
+}
+
+@Composable
+private fun WelcomeCardActions(
+    onIdentifyClick: () -> Unit,
+    onViewCatalogs: () -> Unit
+) {
+    Button(
+        onClick = onIdentifyClick,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.CameraAlt,
+            contentDescription = null,
+            modifier = Modifier.padding(end = 8.dp)
+        )
+        Text("Identify New Species")
+    }
+
+    Button(
+        onClick = onViewCatalogs,
+        modifier = Modifier.fillMaxWidth(),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Collections,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.padding(end = 8.dp)
+        )
+        Text(text = "View Catalogs")
     }
 }
 
@@ -470,74 +698,113 @@ private fun RecentObservationsSection(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Recent Observations",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                        .clickable(onClick = onViewAll)
-                ) {
-                    Text(
-                        text = "View All",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
+            RecentObservationsHeader(onViewAll = onViewAll)
+            RecentObservationsContent(
+                observations = observations,
+                isLoading = isLoading,
+                errorMessage = errorMessage,
+                onRetry = onRetry,
+                onSelectObservation = onSelectObservation
+            )
+        }
+    }
+}
 
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                when {
-                    isLoading -> {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                    }
-                    errorMessage != null -> {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = errorMessage,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                            Button(onClick = onRetry) {
-                                Text("Retry")
-                            }
-                        }
-                    }
-                    observations.isEmpty() -> {
-                        Text(
-                            text = "No recent observations",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    else -> {
-                        observations.forEachIndexed { index, observation ->
-                            ObservationListItem(
-                                observation = observation,
-                                onClick = { onSelectObservation(observation) }
-                            )
-                            if (index != observations.lastIndex) {
-                                HorizontalDivider()
-                            }
-                        }
-                    }
-                }
-            }
+@Composable
+private fun RecentObservationsHeader(onViewAll: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Recent Observations",
+            style = MaterialTheme.typography.titleMedium
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .padding(horizontal = 4.dp)
+                .clickable(onClick = onViewAll)
+        ) {
+            Text(
+                text = "View All",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecentObservationsContent(
+    observations: List<RecentObservation>,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onRetry: () -> Unit,
+    onSelectObservation: (RecentObservation) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        when {
+            isLoading -> RecentObservationsLoading()
+            errorMessage != null -> RecentObservationsError(errorMessage, onRetry)
+            observations.isEmpty() -> RecentObservationsEmpty()
+            else -> RecentObservationsList(observations, onSelectObservation)
+        }
+    }
+}
+
+@Composable
+private fun RecentObservationsLoading() {
+    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+}
+
+@Composable
+private fun RecentObservationsError(
+    errorMessage: String,
+    onRetry: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = errorMessage,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.error
+        )
+        Button(onClick = onRetry) {
+            Text("Retry")
+        }
+    }
+}
+
+@Composable
+private fun RecentObservationsEmpty() {
+    Text(
+        text = "No recent observations",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+@Composable
+private fun RecentObservationsList(
+    observations: List<RecentObservation>,
+    onSelectObservation: (RecentObservation) -> Unit
+) {
+    observations.forEachIndexed { index, observation ->
+        ObservationListItem(
+            observation = observation,
+            onClick = { onSelectObservation(observation) }
+        )
+        if (index != observations.lastIndex) {
+            HorizontalDivider()
         }
     }
 }
