@@ -15,6 +15,7 @@ export const connectDB = async (): Promise<void> => {
 
     mongoose.connection.on('error', error => {
       logger.error('❌ MongoDB connection error:', error);
+      process.exitCode = 1;
     });
 
     mongoose.connection.on('disconnected', () => {
