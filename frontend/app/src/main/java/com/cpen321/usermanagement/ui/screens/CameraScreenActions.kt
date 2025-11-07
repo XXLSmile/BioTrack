@@ -4,6 +4,7 @@ import android.content.Context
 import android.location.Location
 import android.net.Uri
 import com.cpen321.usermanagement.data.remote.api.RetrofitClient
+import com.cpen321.usermanagement.data.remote.dto.RecognizeAndSaveResponse
 import com.cpen321.usermanagement.data.remote.dto.SaveRecognitionRequest
 import com.cpen321.usermanagement.data.remote.dto.ScanData
 import com.cpen321.usermanagement.data.remote.dto.ScanResponse
@@ -19,6 +20,7 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.HttpException
+import retrofit2.Response
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -117,27 +119,7 @@ private suspend fun recognizeImage(
         val response = withContext(Dispatchers.IO) {
             RetrofitClient.wildlifeApi.recognizeAnimal(imagePart, latitudeBody, longitudeBody)
         }
-
-        if (response.isSuccessful) {
-            val body = response.body()
-            val payload = body?.data
-            val recognitionData = payload?.recognition
-            if (recognitionData != null) {
-                val message = formatRecognitionMessage(recognitionData)
-                val saveHint = if (payload.imagePath.isNullOrBlank()) {
-                    "\n⚠️ Unable to save this recognition because the image reference is missing."
-                } else {
-                    null
-                }
-                val finalMessage = saveHint?.let { "$message$it" } ?: message
-                finalMessage to body
-            } else {
-                "⚠️ No species identified. Try again!" to null
-            }
-        } else {
-            val errorMessage = response.errorBody()?.string()?.takeIf { it.isNotBlank() }
-            "❌ Error: ${errorMessage ?: response.message()}" to null
-        }
+        buildRecognitionResult(response)
     } catch (e: IOException) {
         "⚠️ Upload failed: ${e.localizedMessage ?: "Check your connection and try again."}" to null
     } catch (e: HttpException) {
@@ -155,9 +137,7 @@ private suspend fun saveRecognitionToCatalog(
     location: Location?
 ): Pair<Boolean, String> {
     val imagePath = recognitionResponse.data.imagePath
-    if (imagePath.isNullOrBlank()) {
-        return false to "⚠️ Cannot save this observation because the image reference is missing."
-    }
+        ?: return false to "⚠️ Cannot save this observation because the image reference is missing."
 
     val request = SaveRecognitionRequest(
         imagePath = imagePath,
@@ -171,26 +151,7 @@ private suspend fun saveRecognitionToCatalog(
         val response = withContext(Dispatchers.IO) {
             RetrofitClient.wildlifeApi.recognizeAndSave(request)
         }
-
-        if (response.isSuccessful) {
-            val body = response.body()
-            if (body?.data?.entry?._id != null) {
-                val speciesName =
-                    body.data.recognition?.species?.commonName
-                        ?: body.data.recognition?.species?.scientificName
-                        ?: recognitionResponse.data.recognition?.species?.commonName
-                        ?: recognitionResponse.data.recognition?.species?.scientificName
-
-                val message = speciesName?.let { "✅ Saved $it to catalog." }
-                    ?: (body.message?.takeIf { it.isNotBlank() } ?: "✅ Saved observation to catalog.")
-                true to message
-            } else {
-                false to (body?.message ?: "Failed to save observation.")
-            }
-        } else {
-            val errorMessage = response.errorBody()?.string()?.takeIf { it.isNotBlank() }
-            false to ("❌ Error: ${errorMessage ?: response.message()}")
-        }
+        interpretSaveResponse(response, recognitionResponse)
     } catch (e: IOException) {
         false to ("⚠️ Save failed: ${e.localizedMessage ?: "Check your connection and try again."}")
     } catch (e: HttpException) {
@@ -229,6 +190,45 @@ private fun formatRecognitionMessage(data: ScanData): String {
     }
     builder.append("\nConfidence: $confidencePercent%")
     return builder.toString()
+}
+
+private fun buildRecognitionResult(response: Response<ScanResponse>): Pair<String, ScanResponse?> {
+    if (!response.isSuccessful) {
+        val errorMessage = response.errorBody()?.string()?.takeIf { it.isNotBlank() }
+        return "❌ Error: ${errorMessage ?: response.message()}" to null
+    }
+    val body = response.body() ?: return "⚠️ No species identified. Try again!" to null
+    val recognitionData = body.data.recognition
+    val message = formatRecognitionMessage(recognitionData)
+    val saveHint = body.data.imagePath.takeIf { it.isNullOrBlank() }?.let {
+        "\n⚠️ Unable to save this recognition because the image reference is missing."
+    }
+    val finalMessage = saveHint?.let { "$message$it" } ?: message
+    return finalMessage to body
+}
+
+private fun interpretSaveResponse(
+    response: Response<RecognizeAndSaveResponse>,
+    recognitionResponse: ScanResponse
+): Pair<Boolean, String> {
+    if (!response.isSuccessful) {
+        val errorMessage = response.errorBody()?.string()?.takeIf { it.isNotBlank() }
+        return false to ("❌ Error: ${errorMessage ?: response.message()}")
+    }
+    val body = response.body()
+    val entry = body?.data?.entry
+    if (entry?._id != null) {
+        val speciesName =
+            body?.data?.recognition?.species?.commonName
+                ?: body?.data?.recognition?.species?.scientificName
+                ?: recognitionResponse.data.recognition?.species?.commonName
+                ?: recognitionResponse.data.recognition?.species?.scientificName
+
+        val message = speciesName?.let { "✅ Saved $it to catalog." }
+            ?: (body?.message?.takeIf { it.isNotBlank() } ?: "✅ Saved observation to catalog.")
+        return true to message
+    }
+    return false to (body?.message ?: "Failed to save observation.")
 }
 
 private fun Double.toTextRequestBody() =

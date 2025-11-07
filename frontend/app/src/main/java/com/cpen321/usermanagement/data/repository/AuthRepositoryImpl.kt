@@ -12,6 +12,7 @@ import com.cpen321.usermanagement.data.local.preferences.TokenManager
 import com.cpen321.usermanagement.data.remote.api.AuthInterface
 import com.cpen321.usermanagement.data.remote.api.RetrofitClient
 import com.cpen321.usermanagement.data.remote.api.UserInterface
+import com.cpen321.usermanagement.data.remote.dto.ApiResponse
 import com.cpen321.usermanagement.data.remote.dto.AuthData
 import com.cpen321.usermanagement.data.remote.dto.GoogleLoginRequest
 import com.cpen321.usermanagement.data.remote.dto.User
@@ -28,6 +29,7 @@ import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.tasks.await
 import java.io.IOException
 import retrofit2.HttpException
+import retrofit2.Response
 import kotlinx.coroutines.CancellationException
 
 @Singleton
@@ -260,34 +262,14 @@ class AuthRepositoryImpl @Inject constructor(
         val authToken = getStoredToken()
         RetrofitClient.setAuthToken(authToken)
         return try {
-            if (!authToken.isNullOrBlank()) {
-                try {
-                    val clearResponse = RetrofitClient.userInterface.clearFcmToken()
-                    if (!clearResponse.isSuccessful) {
-                        Log.w(TAG, "Failed to clear FCM token on server during logout: ${clearResponse.errorBody()?.string()}")
-                    }
-                } catch (e: IOException) {
-                    Log.w(TAG, "Network error clearing FCM token during logout", e)
-                } catch (e: HttpException) {
-                    Log.w(TAG, "HTTP error clearing FCM token during logout: ${e.code()}", e)
-                }
-            }
-
-            val response = authInterface.logout()
-            if (response.isSuccessful) {
+            authToken?.let { clearServerFcmToken() }
+            val result = handleLogoutResponse(authInterface.logout())
+            if (result.isSuccess) {
                 tokenManager.clearToken()
                 RetrofitClient.setAuthToken(null)
                 catalogSocketService.disconnect()
-                Result.success(Unit)
-            } else {
-                val errorBodyString = response.errorBody()?.string()
-                val errorMessage = JsonUtils.parseErrorMessage(
-                    errorBodyString,
-                    response.body()?.message ?: "Logout failed."
-                )
-                Log.e(TAG, "Logout failed: $errorMessage")
-                Result.failure(Exception(errorMessage))
             }
+            result
         } catch (e: IOException) {
             Log.e(TAG, "Logout failed due to network error", e)
             Result.failure(e)
@@ -305,5 +287,32 @@ class AuthRepositoryImpl @Inject constructor(
         } catch (e: HttpException) {
             Log.e(TAG, "Delete account failed with HTTP ${e.code()}", e)
         }
+    }
+
+    private suspend fun clearServerFcmToken() {
+        try {
+            val clearResponse = RetrofitClient.userInterface.clearFcmToken()
+            if (!clearResponse.isSuccessful) {
+                Log.w(TAG, "Failed to clear FCM token on server during logout: ${clearResponse.errorBody()?.string()}")
+            }
+        } catch (e: IOException) {
+            Log.w(TAG, "Network error clearing FCM token during logout", e)
+        } catch (e: HttpException) {
+            Log.w(TAG, "HTTP error clearing FCM token during logout: ${e.code()}", e)
+        }
+    }
+
+    private fun handleLogoutResponse(response: Response<ApiResponse<Unit>>): Result<Unit> {
+        if (response.isSuccessful) {
+            return Result.success(Unit)
+        }
+
+        val errorBodyString = response.errorBody()?.string()
+        val errorMessage = JsonUtils.parseErrorMessage(
+            errorBodyString,
+            response.body()?.message ?: "Logout failed."
+        )
+        Log.e(TAG, "Logout failed: $errorMessage")
+        return Result.failure(Exception(errorMessage))
     }
 }
