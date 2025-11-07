@@ -30,28 +30,21 @@ import android.os.Build
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject lateinit var authRepository: AuthRepositoryImpl
-    override fun onCreate(savedInstanceState: Bundle?) {
 
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
-            ) {
-                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1001)
-            }
-            if(checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)
-            {
-                requestPermissions(arrayOf(android.Manifest.permission.CAMERA), 1001)
-            }
+        // Detect if we are running a test
+        val isTest = intent.getBooleanExtra("isTest", false)
+
+        // Only request runtime permissions if not testing
+        if (!isTest) {
+            requestPermissionsIfNeeded()
         }
 
-
         setContent {
-            UserManagementTheme {
-                UserManagementApp()
-            }
+            UserManagementApp(isTest = isTest)
         }
 
         // Send FCM token if user is already logged in
@@ -62,27 +55,50 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    private fun requestPermissionsIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1001)
+            }
+            if (checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(android.Manifest.permission.CAMERA), 1001)
+            }
+        }
+    }
 }
 
+
+
 @Composable
-fun UserManagementApp() {
+fun UserManagementApp(
+    isTest: Boolean = false
+) {
     ProvideSpacing {
         ProvideFontSizes {
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background
             ) {
-                var showSplash by remember { mutableStateOf(true) }
-
-                if (showSplash) {
-                    //Animated splash before main nav appears
-                    SplashScreen(onTimeout = { showSplash = false })
-                } else {
-                    //Once splash fades out, show your app normally
+                if (isTest) {
+                    // Directly show main navigation for tests
                     AppNavigation()
+                } else {
+                    var showSplash by remember { mutableStateOf(true) }
+
+                    if (showSplash) {
+                        SplashScreen(onTimeout = { showSplash = false })
+                    } else {
+                        AppNavigation()
+                    }
                 }
             }
         }
     }
 }
+
+
+
 

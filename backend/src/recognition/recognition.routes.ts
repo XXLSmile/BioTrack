@@ -43,15 +43,6 @@ router.get(
   asyncHandler(recognitionController.getRecentEntries.bind(recognitionController))
 );
 
-/**
- * GET /api/recognition/image/:entryId
- * Get image from database by catalog entry ID
- */
-router.get(
-  '/image/:entryId',
-  asyncHandler(recognitionController.getImageFromDatabase.bind(recognitionController))
-);
-
 router.delete(
   '/entry/:entryId',
   authenticateToken,

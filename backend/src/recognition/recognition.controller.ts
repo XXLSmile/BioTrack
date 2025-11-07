@@ -630,50 +630,6 @@ export class RecognitionController {
     }
   }
 
-  /**
-   * GET /api/recognition/image/:entryId
-   * Get image from database by catalog entry ID
-   */
-  async getImageFromDatabase(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ) {
-    try {
-      const { entryId } = req.params;
-      
-      if (!entryId) {
-        return res.status(400).json({
-          message: 'Entry ID is required',
-        });
-      }
-
-      const entry = await catalogRepository.findById(entryId);
-
-      if (!entry) {
-        return res.status(404).json({
-          message: 'Catalog entry not found',
-        });
-      }
-
-      if (!entry.imageData) {
-        return res.status(404).json({
-          message: 'Image data not found in database. Image may only exist on disk.',
-        });
-      }
-
-      // Set appropriate content type
-      const contentType = entry.imageMimeType ?? 'image/jpeg';
-      res.set('Content-Type', contentType);
-      res.set('Content-Length', entry.imageData.length.toString());
-
-      return res.send(entry.imageData);
-    } catch (error) {
-      logger.error('Error fetching image from database:', error);
-      next(error);
-    }
-  }
-
   async deleteEntry(
     req: Request<{ entryId: string }>,
     res: Response,

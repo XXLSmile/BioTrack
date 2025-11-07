@@ -48,12 +48,17 @@ import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.tasks.await
 import android.annotation.SuppressLint
+import com.cpen321.usermanagement.util.ImagePicker
+import com.cpen321.usermanagement.util.RealImagePicker
+
+
 
 
 @Composable
 fun CameraScreen(
     onBack: () -> Unit,
-    viewModel: CatalogViewModel = hiltViewModel()
+    viewModel: CatalogViewModel = hiltViewModel(),
+    imagePicker: ImagePicker = RealImagePicker() // default for app
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -150,18 +155,10 @@ fun CameraScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                ElevatedButton(onClick = { cameraLauncher.launch(null) }) {
-                    Icon(Icons.Default.CameraAlt, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Take Photo")
-                }
-
-                OutlinedButton(onClick = { galleryLauncher.launch("image/*") }) {
-                    Icon(Icons.Default.Image, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Gallery")
-                }
+                imagePicker.CameraButton { uri -> imageUri = uri }
+                imagePicker.GalleryButton { uri -> imageUri = uri }
             }
+
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -348,15 +345,17 @@ private suspend fun saveRecognitionToCatalog(
         if (response.isSuccessful) {
             val body = response.body()
             if (body?.data?.entry?._id != null) {
-                val speciesName = body.data.recognition?.species?.let {
-                    it.commonName ?: it.scientificName
-                } ?: recognitionResponse.data.recognition.species?.let {
-                    it.commonName ?: it.scientificName
-                }
+                val speciesName =
+                    body?.data?.recognition?.species?.commonName
+                        ?: body?.data?.recognition?.species?.scientificName
+                        ?: recognitionResponse.data.recognition?.species?.commonName
+                        ?: recognitionResponse.data.recognition?.species?.scientificName
+
                 val message = speciesName?.let { "✅ Saved $it to catalog." }
                     ?: (body?.message?.takeIf { it.isNotBlank() } ?: "✅ Saved observation to catalog.")
                 true to message
-            } else {
+            }
+            else {
                 false to (body?.message ?: "Failed to save observation.")
             }
         } else {

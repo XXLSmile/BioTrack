@@ -5,6 +5,8 @@
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
 | 2025-02-14 | Section 2 (Back-end Test Specification) | Documented Jest-based API testing setup and execution flow. |
+| 2025-02-15 | Section 2 (Back-end Test Specification) | Added unit-test coverage details for auth layer. |
+| 2025-02-15 | Section 2 (Back-end Test Specification) | Rebuilt auth test suites with mocked/unmocked coverage. |
 
 ---
 
@@ -16,12 +18,10 @@
 
 | **Interface**                 | **Describe Group Location, No Mocks**                | **Describe Group Location, With Mocks**            | **Mocked Components**              |
 | ----------------------------- | ---------------------------------------------------- | -------------------------------------------------- | ---------------------------------- |
-| **Auth API** | [`backend/tests/auth/auth.routes.spec.ts`](../backend/tests/auth/auth.routes.spec.ts#L36) | [`backend/tests/auth/auth.routes.spec.ts`](../backend/tests/auth/auth.routes.spec.ts#L49) | `authService.*` |
-| **User API** | [`backend/tests/user/user.routes.spec.ts`](../backend/tests/user/user.routes.spec.ts#L21) | [`backend/tests/user/user.routes.spec.ts`](../backend/tests/user/user.routes.spec.ts#L48) | `userModel.*` |
-| **Friends API** | [`backend/tests/friends/friend.routes.spec.ts`](../backend/tests/friends/friend.routes.spec.ts#L18) | [`backend/tests/friends/friend.routes.spec.ts`](../backend/tests/friends/friend.routes.spec.ts#L39) | `friendshipModel.*` |
-| **Catalog API** | [`backend/tests/catalog/catalog.routes.spec.ts`](../backend/tests/catalog/catalog.routes.spec.ts#L25) | [`backend/tests/catalog/catalog.routes.spec.ts`](../backend/tests/catalog/catalog.routes.spec.ts#L57) | `catalogModel`, `catalogShareModel`, `catalogEntryLinkModel`, socket events |
-| **Recognition API** | [`backend/tests/recognition/recognition.routes.spec.ts`](../backend/tests/recognition/recognition.routes.spec.ts#L52) | [`backend/tests/recognition/recognition.routes.spec.ts`](../backend/tests/recognition/recognition.routes.spec.ts#L73) | `recognitionService`, fs helpers |
-| **Admin API** | [`backend/tests/admin/admin.routes.spec.ts`](../backend/tests/admin/admin.routes.spec.ts#L17) | [`backend/tests/admin/admin.routes.spec.ts`](../backend/tests/admin/admin.routes.spec.ts#L33) | `userModel`, `mongoose.Model` |
+| **Auth Routes** | [`backend/tests/unmock/auth/auth.routes.spec.ts`](../backend/tests/unmock/auth/auth.routes.spec.ts#L1) | [`backend/tests/mocked/auth/auth.routes.spec.ts`](../backend/tests/mocked/auth/auth.routes.spec.ts#L1) | Mocked suite overrides `authService`, Firebase messaging |
+| **Auth Controller** | [`backend/tests/unmock/auth/auth.controller.spec.ts`](../backend/tests/unmock/auth/auth.controller.spec.ts#L1) | [`backend/tests/mocked/auth/auth.controller.spec.ts`](../backend/tests/mocked/auth/auth.controller.spec.ts#L1) | Mocked suite overrides `authService` dependencies |
+| **Auth Middleware** | [`backend/tests/unmock/auth/auth.middleware.spec.ts`](../backend/tests/unmock/auth/auth.middleware.spec.ts#L1) | [`backend/tests/mocked/auth/auth.middleware.spec.ts`](../backend/tests/mocked/auth/auth.middleware.spec.ts#L1) | Mocked suite stubs `jsonwebtoken.verify`, `userModel.findById` |
+| **Auth Service** | [`backend/tests/unmock/auth/auth.service.spec.ts`](../backend/tests/unmock/auth/auth.service.spec.ts#L1) | [`backend/tests/mocked/auth/auth.service.spec.ts`](../backend/tests/mocked/auth/auth.service.spec.ts#L1) | Mocked suite replaces OAuth2Client, `userModel`, and JWT signing |
 
 #### 2.1.2. Commit Hash Where Tests Run
 
@@ -34,12 +34,13 @@ The first successful run with the current suite has not yet been recorded. After
    cd backend
    npm install
    ```
-2. **Run the full Jest suite**
- ```bash
-  npm run test
-  ```
-   Uses an in-memory MongoDB instance (`mongodb-memory-server`) and the shared Express app factory, so no external services are required.
-   > _Offline note:_ the first run downloads a MongoDB binary. If your environment blocks outbound network access, pre-provision the binary or execute the suite on a machine with internet connectivity.
+2. **Run all tests**
+   ```bash
+   npm run test
+   ```
+   - The suites are split between `tests/unmock/**` (no dependency mocks) and `tests/mocked/**` (external collaborators mocked per requirement).
+   - Firebase Admin access is stubbed via local jest mocks; no service account file is required.
+   - Some environments block binding ephemeral ports; if you see `listen EPERM` locally, rerun with `SKIP_MONGO=true` to disable in-memory MongoDB hooks.
 3. **Watch mode (optional)**
    ```bash
    npm run test:watch
@@ -48,7 +49,6 @@ The first successful run with the current suite has not yet been recorded. After
    ```bash
    npm run test:coverage
    ```
-   Coverage artefacts are written to `backend/coverage/`. Open `backend/coverage/lcov-report/index.html` in a browser for the detailed report.
 
 ### 2.2. Jest Configuration Location
 

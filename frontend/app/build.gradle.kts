@@ -10,7 +10,6 @@ plugins {
     // secrets gradle plugin
     id("com.google.android.libraries.mapsplatform.secrets-gradle-plugin")
     id("com.google.gms.google-services")
-
 }
 
 val localProperties = Properties().apply {
@@ -34,7 +33,7 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.cpen321.usermanagement.HiltTestRunner"
 
         resValue("string", "google_maps_key", mapsApiKey)
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
@@ -66,6 +65,10 @@ android {
 
 dependencies {
 
+    // Hilt Instrumented Tests
+    androidTestImplementation("com.google.dagger:hilt-android-testing:2.52")
+    kspAndroidTest("com.google.dagger:hilt-compiler:2.52")
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -85,6 +88,7 @@ dependencies {
     
     // Hilt Dependency Injection
     implementation(libs.hilt.android)
+    implementation(libs.androidx.runner)
     ksp(libs.hilt.android.compiler)
     implementation(libs.hilt.navigation.compose)
     
@@ -149,4 +153,20 @@ dependencies {
     implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.maps.android:maps-compose:4.4.1")
     implementation("com.google.android.gms:play-services-location:21.3.0")
+
+    // --- Compose UI testing ---
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.7.4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest:1.7.4")
+
+    // --- AndroidX testing ---
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test:rules:1.5.0")
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
+
+    // --- Hilt (main + test) ---
+    implementation("com.google.dagger:hilt-android:2.52")
+
+
+
 }
