@@ -1,0 +1,213 @@
+package com.cpen321.usermanagement.ui.screens
+
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.Composable
+import com.cpen321.usermanagement.ui.components.ConfirmEntryActionDialog
+import com.cpen321.usermanagement.ui.components.EntryAction
+import com.cpen321.usermanagement.ui.components.EntryDetailDialog
+import com.cpen321.usermanagement.ui.components.EntryDetailDialogCallbacks
+import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
+import com.cpen321.usermanagement.ui.viewmodels.ProfileViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+
+@Composable
+fun CatalogEntryDialogs(
+    dialogState: CatalogEntryDialogState,
+    viewModel: CatalogViewModel,
+    profileViewModel: ProfileViewModel,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope,
+    permissions: CatalogEntryPermissions
+) {
+    AddEntryDialogHost(dialogState, viewModel, snackbarHostState, coroutineScope, permissions)
+    EntryDetailDialogHost(dialogState, permissions)
+    EntryActionConfirmationHost(
+        dialogState = dialogState,
+        viewModel = viewModel,
+        profileViewModel = profileViewModel,
+        snackbarHostState = snackbarHostState,
+        coroutineScope = coroutineScope,
+        permissions = permissions
+    )
+}
+
+@Composable
+private fun AddEntryDialogHost(
+    dialogState: CatalogEntryDialogState,
+    viewModel: CatalogViewModel,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope,
+    permissions: CatalogEntryPermissions
+) {
+    val entry = dialogState.entry ?: return
+    if (!dialogState.showAddDialog) return
+
+    AddToCatalogDialog(
+        viewModel = viewModel,
+        isSaving = dialogState.isProcessing,
+        onSave = { targetCatalogId ->
+            handleAddToCatalog(
+                targetCatalogId = targetCatalogId,
+                viewModel = viewModel,
+                dialogState = dialogState,
+                permissions = permissions,
+                snackbarHostState = snackbarHostState,
+                coroutineScope = coroutineScope
+            )
+        },
+        onDismiss = {
+            if (!dialogState.isProcessing) {
+                dialogState.closeAddDialog()
+            }
+        },
+        excludeCatalogId = permissions.currentCatalogId,
+        additionalCatalogs = permissions.additionalCatalogs
+    )
+}
+
+@Composable
+private fun EntryDetailDialogHost(
+    dialogState: CatalogEntryDialogState,
+    permissions: CatalogEntryPermissions
+) {
+    val entry = dialogState.entry ?: return
+    if (!dialogState.isDetailVisible) return
+
+    EntryDetailDialog(
+        entry = entry,
+        isProcessing = dialogState.isProcessing,
+        errorMessage = dialogState.errorMessage,
+        canRemoveFromCatalog = permissions.canRemoveFromCatalog && permissions.currentCatalogId != null,
+        callbacks = EntryDetailDialogCallbacks(
+            onDismiss = {
+                if (!dialogState.isProcessing) {
+                    dialogState.dismissDetail()
+                }
+            },
+            onAddToCatalog = permissions.takeIf { it.canAddToOtherCatalog }?.let { { dialogState.openAddDialog() } },
+            onRemoveFromCatalog = permissions.takeIf { it.canRemoveFromCatalog }?.let {
+                { dialogState.scheduleAction(EntryAction.Remove(entry)) }
+            },
+            onDeleteEntry = permissions.takeIf { it.canDeleteEntry }?.let {
+                { dialogState.scheduleAction(EntryAction.Delete(entry)) }
+            }
+        )
+    )
+}
+
+@Composable
+private fun EntryActionConfirmationHost(
+    dialogState: CatalogEntryDialogState,
+    viewModel: CatalogViewModel,
+    profileViewModel: ProfileViewModel,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope,
+    permissions: CatalogEntryPermissions
+) {
+    val action = dialogState.pendingAction ?: return
+    if (dialogState.isProcessing) return
+
+    ConfirmEntryActionDialog(
+        action = action,
+        onConfirm = {
+            when (action) {
+                is EntryAction.Remove -> handleRemoveFromCatalog(
+                    viewModel = viewModel,
+                    dialogState = dialogState,
+                    permissions = permissions,
+                    snackbarHostState = snackbarHostState,
+                    coroutineScope = coroutineScope
+                )
+                is EntryAction.Delete -> handleDeleteEntry(
+                    viewModel = viewModel,
+                    profileViewModel = profileViewModel,
+                    dialogState = dialogState,
+                    permissions = permissions,
+                    snackbarHostState = snackbarHostState,
+                    coroutineScope = coroutineScope
+                )
+            }
+        },
+        onDismiss = { dialogState.clearPendingAction() }
+    )
+}
+
+private fun handleAddToCatalog(
+    targetCatalogId: String,
+    viewModel: CatalogViewModel,
+    dialogState: CatalogEntryDialogState,
+    permissions: CatalogEntryPermissions,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope
+) {
+    val entryId = dialogState.entry?.entry?._id ?: return
+    dialogState.startProcessing()
+    dialogState.clearError()
+    viewModel.addEntryToCatalog(targetCatalogId, entryId, permissions.currentCatalogId) { success, error ->
+        dialogState.stopProcessing()
+        if (success) {
+            dialogState.closeAddDialog()
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Observation added to catalog")
+            }
+        } else {
+            dialogState.setError(error ?: "Failed to add observation to catalog")
+        }
+    }
+}
+
+private fun handleRemoveFromCatalog(
+    viewModel: CatalogViewModel,
+    dialogState: CatalogEntryDialogState,
+    permissions: CatalogEntryPermissions,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope
+) {
+    val catalogId = permissions.currentCatalogId ?: run {
+        dialogState.setError("Catalog unavailable")
+        dialogState.clearPendingAction()
+        return
+    }
+    val entryId = dialogState.entry?.entry?._id ?: return
+    dialogState.startProcessing()
+    dialogState.clearError()
+    viewModel.removeEntryFromCatalog(catalogId, entryId) { success, error ->
+        dialogState.stopProcessing()
+        dialogState.clearPendingAction()
+        if (success) {
+            dialogState.dismissDetail()
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Observation removed from catalog")
+            }
+        } else {
+            dialogState.setError(error ?: "Failed to remove observation")
+        }
+    }
+}
+
+private fun handleDeleteEntry(
+    viewModel: CatalogViewModel,
+    profileViewModel: ProfileViewModel,
+    dialogState: CatalogEntryDialogState,
+    permissions: CatalogEntryPermissions,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope
+) {
+    val entryId = dialogState.entry?.entry?._id ?: return
+    dialogState.startProcessing()
+    dialogState.clearError()
+    viewModel.deleteEntry(entryId, permissions.currentCatalogId) { success, error ->
+        dialogState.stopProcessing()
+        dialogState.clearPendingAction()
+        if (success) {
+            profileViewModel.refreshStats()
+            dialogState.dismissDetail()
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Observation deleted")
+            }
+        } else {
+            dialogState.setError(error ?: "Failed to delete observation")
+        }
+    }
+}
