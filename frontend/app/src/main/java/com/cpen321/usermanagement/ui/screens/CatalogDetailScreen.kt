@@ -3,10 +3,12 @@
 package com.cpen321.usermanagement.ui.screens
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.cpen321.usermanagement.data.model.Catalog
+import com.cpen321.usermanagement.data.model.CatalogData
 import com.cpen321.usermanagement.data.model.CatalogShareEntry
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
 import com.cpen321.usermanagement.data.model.CatalogEntry as RemoteCatalogEntry
@@ -45,8 +49,10 @@ import com.cpen321.usermanagement.ui.components.resolveImageUrl
 import com.cpen321.usermanagement.ui.components.toCatalogEntry
 import com.cpen321.usermanagement.ui.viewmodels.CatalogShareUiState
 import com.cpen321.usermanagement.ui.viewmodels.CatalogShareViewModel
+import com.cpen321.usermanagement.ui.viewmodels.ProfileUiState
 import com.cpen321.usermanagement.ui.viewmodels.ProfileViewModel
 import com.cpen321.usermanagement.data.remote.dto.FriendSummary
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 @Composable
@@ -55,41 +61,402 @@ fun CatalogDetailScreen(
     viewModel: CatalogViewModel,
     navController: NavController
 ) {
-    // Load detail when composable enters composition
-    LaunchedEffect(catalogId) {
-        viewModel.loadCatalogDetail(catalogId)
-    }
-
     val catalogDetailState by viewModel.catalogDetail.collectAsState()
     val catalogShareViewModel: CatalogShareViewModel = hiltViewModel()
     val shareUiState by catalogShareViewModel.uiState.collectAsState()
     val profileViewModel: ProfileViewModel = hiltViewModel()
     val profileUiState by profileViewModel.uiState.collectAsState()
-
-    val catalog = catalogDetailState?.catalog
-    val entries = catalogDetailState?.entries ?: emptyList()
-    val currentUserId = profileUiState.user?._id
-    val isOwner = catalog?.owner != null && catalog.owner == currentUserId
-    val userRole = remember(isOwner, shareUiState.sharedCatalogs, catalog) {
-        when {
-            isOwner -> "owner"
-            else -> shareUiState.sharedCatalogs.firstOrNull { it.catalog?._id == catalog?._id }?.role
-        }
-    }
-    val editorSharedCatalogOptions = remember(shareUiState.sharedCatalogs) {
-        shareUiState.sharedCatalogs
-            .filter { it.status == "accepted" && it.role == "editor" && it.catalog?._id != null }
-            .map { share -> CatalogOption(share.catalog!!._id, share.catalog.name ?: "Catalog") }
-    }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-
-    var selectedEntry by remember { mutableStateOf<RemoteCatalogEntry?>(null) }
-    var showAddDialog by remember { mutableStateOf(false) }
-    var isActionInProgress by remember { mutableStateOf(false) }
-    var detailErrorMessage by remember { mutableStateOf<String?>(null) }
-    var pendingAction by remember { mutableStateOf<EntryAction?>(null) }
+    val dialogState = rememberCatalogEntryDialogState()
     var showShareDialog by remember { mutableStateOf(false) }
+
+    val detailUi = rememberCatalogDetailUi(
+        detailState = catalogDetailState,
+        shareUiState = shareUiState,
+        profileUiState = profileUiState
+    )
+    val permissions = remember(detailUi) {
+        CatalogEntryPermissions(
+            canAddToOtherCatalog = detailUi.isOwner,
+            canRemoveFromCatalog = detailUi.isOwner || detailUi.userRole == "editor",
+            canDeleteEntry = detailUi.isOwner,
+            currentCatalogId = detailUi.currentCatalogId,
+            additionalCatalogs = if (detailUi.isOwner) emptyList() else detailUi.editorCatalogOptions
+        )
+    }
+
+    CatalogDetailSideEffects(
+        catalogId = catalogId,
+        isOwner = detailUi.isOwner,
+        profileUiState = profileUiState,
+        profileViewModel = profileViewModel,
+        viewModel = viewModel,
+        catalogShareViewModel = catalogShareViewModel,
+        dialogState = dialogState,
+        showShareDialog = showShareDialog,
+        shareUiState = shareUiState,
+        snackbarHostState = snackbarHostState
+    )
+
+    CatalogDetailLayout(
+        ui = detailUi,
+        snackbarHostState = snackbarHostState,
+        navController = navController,
+        onEntrySelected = dialogState::showEntry,
+        onShareClick = { showShareDialog = true }
+    )
+
+    CatalogEntryDialogs(
+        dialogState = dialogState,
+        viewModel = viewModel,
+        profileViewModel = profileViewModel,
+        snackbarHostState = snackbarHostState,
+        coroutineScope = coroutineScope,
+        permissions = permissions
+    )
+
+    CatalogShareDialogHost(
+        showDialog = showShareDialog && detailUi.isOwner,
+        catalogName = detailUi.catalog?.name,
+        state = shareUiState,
+        onInvite = { friendId, role -> catalogShareViewModel.inviteCollaborator(catalogId, friendId, role) },
+        onChangeRole = { shareId, role -> catalogShareViewModel.updateCollaboratorRole(catalogId, shareId, role) },
+        onRevoke = { shareId -> catalogShareViewModel.revokeCollaborator(catalogId, shareId) },
+        onDismiss = {
+            if (!shareUiState.isProcessing) {
+                showShareDialog = false
+                catalogShareViewModel.clearMessages()
+            }
+        }
+    )
+}
+
+@Composable
+private fun CatalogDetailLayout(
+    ui: CatalogDetailUi,
+    snackbarHostState: SnackbarHostState,
+    navController: NavController,
+    onEntrySelected: (RemoteCatalogEntry) -> Unit,
+    onShareClick: () -> Unit
+) {
+    Scaffold(
+        topBar = {
+            CatalogDetailTopBar(
+                title = ui.catalog?.name ?: "Catalog",
+                canShare = ui.isOwner,
+                onBack = { navController.popBackStack() },
+                onShareClick = onShareClick
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { paddingValues ->
+        CatalogEntriesContent(
+            ui = ui,
+            paddingValues = paddingValues,
+            onEntrySelected = onEntrySelected
+        )
+    }
+}
+
+@Composable
+private fun CatalogDetailTopBar(
+    title: String,
+    canShare: Boolean,
+    onBack: () -> Unit,
+    onShareClick: () -> Unit
+) {
+    TopAppBar(
+        title = { Text(title) },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
+        },
+        actions = {
+            if (canShare) {
+                IconButton(onClick = onShareClick) {
+                    Icon(Icons.Outlined.Share, contentDescription = "Share catalog")
+                }
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+    )
+}
+
+@Composable
+private fun CatalogEntriesContent(
+    ui: CatalogDetailUi,
+    paddingValues: PaddingValues,
+    onEntrySelected: (RemoteCatalogEntry) -> Unit
+) {
+    when {
+        ui.catalog == null -> CatalogLoadingState(paddingValues)
+        ui.entries.isEmpty() -> CatalogEmptyState(paddingValues)
+        else -> CatalogEntriesGrid(ui.entries, paddingValues, onEntrySelected)
+    }
+}
+
+@Composable
+private fun CatalogEntriesGrid(
+    entries: List<RemoteCatalogEntry>,
+    paddingValues: PaddingValues,
+    onEntrySelected: (RemoteCatalogEntry) -> Unit
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 150.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(entries) { entry ->
+            EntryCard(entry = entry, onClick = { onEntrySelected(entry) })
+        }
+    }
+}
+
+@Composable
+private fun CatalogLoadingState(paddingValues: PaddingValues) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator()
+    }
+}
+
+@Composable
+private fun CatalogEmptyState(paddingValues: PaddingValues) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "No wildlife added yet.\nScan and save your discoveries 🌿",
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun CatalogShareDialogHost(
+    showDialog: Boolean,
+    catalogName: String?,
+    state: CatalogShareUiState,
+    onInvite: (String, String) -> Unit,
+    onChangeRole: (String, String) -> Unit,
+    onRevoke: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (showDialog) {
+        ShareCatalogDialog(
+            catalogName = catalogName,
+            state = state,
+            onInvite = onInvite,
+            onChangeRole = onChangeRole,
+            onRevoke = onRevoke,
+            onDismiss = onDismiss
+        )
+    }
+}
+
+@Composable
+private fun CatalogEntryDialogs(
+    dialogState: CatalogEntryDialogState,
+    viewModel: CatalogViewModel,
+    profileViewModel: ProfileViewModel,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope,
+    permissions: CatalogEntryPermissions
+) {
+    val entry = dialogState.entry
+    if (dialogState.showAddDialog && entry != null) {
+        AddToCatalogDialog(
+            viewModel = viewModel,
+            isSaving = dialogState.isProcessing,
+            onSave = { targetCatalogId ->
+                handleAddToCatalog(
+                    targetCatalogId = targetCatalogId,
+                    viewModel = viewModel,
+                    dialogState = dialogState,
+                    permissions = permissions,
+                    snackbarHostState = snackbarHostState,
+                    coroutineScope = coroutineScope
+                )
+            },
+            onDismiss = {
+                if (!dialogState.isProcessing) {
+                    dialogState.closeAddDialog()
+                }
+            },
+            excludeCatalogId = permissions.currentCatalogId,
+            additionalCatalogs = permissions.additionalCatalogs
+        )
+    }
+
+    if (dialogState.isDetailVisible && entry != null) {
+        EntryDetailDialog(
+            entry = entry,
+            isProcessing = dialogState.isProcessing,
+            errorMessage = dialogState.errorMessage,
+            canRemoveFromCatalog = permissions.canRemoveFromCatalog && permissions.currentCatalogId != null,
+            onDismiss = {
+                if (!dialogState.isProcessing) {
+                    dialogState.dismissDetail()
+                }
+            },
+            onAddToCatalog = if (permissions.canAddToOtherCatalog) {
+                { dialogState.openAddDialog() }
+            } else {
+                null
+            },
+            onRemoveFromCatalog = if (permissions.canRemoveFromCatalog) {
+                { dialogState.scheduleAction(EntryAction.Remove(entry)) }
+            } else {
+                null
+            },
+            onDeleteEntry = if (permissions.canDeleteEntry) {
+                { dialogState.scheduleAction(EntryAction.Delete(entry)) }
+            } else {
+                null
+            }
+        )
+    }
+
+    val pendingAction = dialogState.pendingAction
+    if (pendingAction != null && !dialogState.isProcessing) {
+        ConfirmEntryActionDialog(
+            action = pendingAction,
+            onConfirm = {
+                when (pendingAction) {
+                    is EntryAction.Remove -> handleRemoveFromCatalog(
+                        viewModel = viewModel,
+                        dialogState = dialogState,
+                        permissions = permissions,
+                        snackbarHostState = snackbarHostState,
+                        coroutineScope = coroutineScope
+                    )
+                    is EntryAction.Delete -> handleDeleteEntry(
+                        viewModel = viewModel,
+                        profileViewModel = profileViewModel,
+                        dialogState = dialogState,
+                        permissions = permissions,
+                        snackbarHostState = snackbarHostState,
+                        coroutineScope = coroutineScope
+                    )
+                }
+            },
+            onDismiss = { dialogState.clearPendingAction() }
+        )
+    }
+}
+
+private fun handleAddToCatalog(
+    targetCatalogId: String,
+    viewModel: CatalogViewModel,
+    dialogState: CatalogEntryDialogState,
+    permissions: CatalogEntryPermissions,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope
+) {
+    val entryId = dialogState.entry?.entry?._id ?: return
+    dialogState.startProcessing()
+    dialogState.clearError()
+    viewModel.addEntryToCatalog(targetCatalogId, entryId, permissions.currentCatalogId) { success, error ->
+        dialogState.stopProcessing()
+        if (success) {
+            dialogState.closeAddDialog()
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Observation added to catalog")
+            }
+        } else {
+            dialogState.setError(error ?: "Failed to add observation to catalog")
+        }
+    }
+}
+
+private fun handleRemoveFromCatalog(
+    viewModel: CatalogViewModel,
+    dialogState: CatalogEntryDialogState,
+    permissions: CatalogEntryPermissions,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope
+) {
+    val catalogId = permissions.currentCatalogId ?: run {
+        dialogState.setError("Catalog unavailable")
+        dialogState.clearPendingAction()
+        return
+    }
+    val entryId = dialogState.entry?.entry?._id ?: return
+    dialogState.startProcessing()
+    dialogState.clearError()
+    viewModel.removeEntryFromCatalog(catalogId, entryId) { success, error ->
+        dialogState.stopProcessing()
+        dialogState.clearPendingAction()
+        if (success) {
+            dialogState.dismissDetail()
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Observation removed from catalog")
+            }
+        } else {
+            dialogState.setError(error ?: "Failed to remove observation")
+        }
+    }
+}
+
+private fun handleDeleteEntry(
+    viewModel: CatalogViewModel,
+    profileViewModel: ProfileViewModel,
+    dialogState: CatalogEntryDialogState,
+    permissions: CatalogEntryPermissions,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope
+) {
+    val entryId = dialogState.entry?.entry?._id ?: return
+    dialogState.startProcessing()
+    dialogState.clearError()
+    viewModel.deleteEntry(entryId, permissions.currentCatalogId) { success, error ->
+        dialogState.stopProcessing()
+        dialogState.clearPendingAction()
+        if (success) {
+            profileViewModel.refreshStats()
+            dialogState.dismissDetail()
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Observation deleted")
+            }
+        } else {
+            dialogState.setError(error ?: "Failed to delete observation")
+        }
+    }
+}
+
+@Composable
+private fun CatalogDetailSideEffects(
+    catalogId: String,
+    isOwner: Boolean,
+    profileUiState: ProfileUiState,
+    profileViewModel: ProfileViewModel,
+    viewModel: CatalogViewModel,
+    catalogShareViewModel: CatalogShareViewModel,
+    dialogState: CatalogEntryDialogState,
+    showShareDialog: Boolean,
+    shareUiState: CatalogShareUiState,
+    snackbarHostState: SnackbarHostState
+) {
+    LaunchedEffect(catalogId) {
+        viewModel.loadCatalogDetail(catalogId)
+    }
 
     LaunchedEffect(profileUiState.user) {
         if (profileUiState.user == null) {
@@ -97,12 +464,8 @@ fun CatalogDetailScreen(
         }
     }
 
-    LaunchedEffect(selectedEntry) {
-        detailErrorMessage = null
-    }
-
-    LaunchedEffect(showAddDialog) {
-        if (showAddDialog) {
+    LaunchedEffect(dialogState.showAddDialog) {
+        if (dialogState.showAddDialog) {
             viewModel.loadCatalogs()
         }
     }
@@ -113,7 +476,7 @@ fun CatalogDetailScreen(
         }
     }
 
-    LaunchedEffect(showShareDialog) {
+    LaunchedEffect(showShareDialog, isOwner) {
         if (showShareDialog && isOwner) {
             catalogShareViewModel.loadCollaborators(catalogId)
             catalogShareViewModel.loadFriendsIfNeeded()
@@ -127,211 +490,125 @@ fun CatalogDetailScreen(
             catalogShareViewModel.clearMessages()
         }
     }
+}
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(catalog?.name ?: "Catalog") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    if (isOwner) {
-                        IconButton(onClick = {
-                            showShareDialog = true
-                        }) {
-                            Icon(Icons.Outlined.Share, contentDescription = "Share catalog")
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { padding ->
-        when {
-            catalog == null -> {
-                // Catalog not found or still loading
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            }
+@Composable
+private fun rememberCatalogDetailUi(
+    detailState: CatalogData?,
+    shareUiState: CatalogShareUiState,
+    profileUiState: ProfileUiState
+): CatalogDetailUi {
+    val catalog = detailState?.catalog
+    val entries = detailState?.entries ?: emptyList()
+    val currentUserId = profileUiState.user?._id
+    val isOwner = catalog?.owner != null && catalog.owner == currentUserId
+    val userRole = when {
+        isOwner -> "owner"
+        else -> shareUiState.sharedCatalogs.firstOrNull { it.catalog?._id == catalog?._id }?.role
+    }
+    val editorOptions = shareUiState.sharedCatalogs
+        .filter { it.status == "accepted" && it.role == "editor" && it.catalog?._id != null }
+        .map { share -> CatalogOption(share.catalog!!._id, share.catalog.name ?: "Catalog") }
 
-            entries.isEmpty() -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No wildlife added yet.\nScan and save your discoveries 🌿",
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+    return remember(catalog, entries, isOwner, userRole, editorOptions) {
+        CatalogDetailUi(
+            catalog = catalog,
+            entries = entries,
+            isOwner = isOwner,
+            userRole = userRole,
+            editorCatalogOptions = editorOptions
+        )
+    }
+}
 
-            else -> {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 150.dp),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(entries) { entry -> // entry: RemoteCatalogEntry
-                        EntryCard(entry = entry, onClick = { selectedEntry = entry })
-                    }
-                }
-            }
+private data class CatalogDetailUi(
+    val catalog: Catalog?,
+    val entries: List<RemoteCatalogEntry>,
+    val isOwner: Boolean,
+    val userRole: String?,
+    val editorCatalogOptions: List<CatalogOption>
+) {
+    val currentCatalogId: String? get() = catalog?._id
+}
+
+private data class CatalogEntryPermissions(
+    val canAddToOtherCatalog: Boolean,
+    val canRemoveFromCatalog: Boolean,
+    val canDeleteEntry: Boolean,
+    val currentCatalogId: String?,
+    val additionalCatalogs: List<CatalogOption>
+)
+
+@Stable
+private class CatalogEntryDialogState {
+    var entry by mutableStateOf<RemoteCatalogEntry?>(null)
+        private set
+    var isDetailVisible by mutableStateOf(false)
+        private set
+    var showAddDialog by mutableStateOf(false)
+        private set
+    var isProcessing by mutableStateOf(false)
+        private set
+    var errorMessage by mutableStateOf<String?>(null)
+        private set
+    var pendingAction by mutableStateOf<EntryAction?>(null)
+        private set
+
+    fun showEntry(entry: RemoteCatalogEntry) {
+        this.entry = entry
+        isDetailVisible = true
+        showAddDialog = false
+        errorMessage = null
+        pendingAction = null
+    }
+
+    fun dismissDetail() {
+        entry = null
+        isDetailVisible = false
+        showAddDialog = false
+        errorMessage = null
+        pendingAction = null
+    }
+
+    fun openAddDialog() {
+        if (entry != null) {
+            showAddDialog = true
+            errorMessage = null
         }
     }
 
-    val currentCatalogId = catalog?._id
-
-    if (showAddDialog && selectedEntry != null) {
-        AddToCatalogDialog(
-            viewModel = viewModel,
-            isSaving = isActionInProgress,
-            onSave = { targetCatalogId ->
-                val entryId = selectedEntry?.entry?._id ?: return@AddToCatalogDialog
-                isActionInProgress = true
-                detailErrorMessage = null
-                viewModel.addEntryToCatalog(targetCatalogId, entryId, currentCatalogId) { success, error ->
-                    isActionInProgress = false
-                    if (success) {
-                        showAddDialog = false
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Observation added to catalog")
-                        }
-                    } else {
-                        detailErrorMessage = error ?: "Failed to add observation to catalog"
-                    }
-                }
-            },
-            onDismiss = {
-                if (!isActionInProgress) {
-                    showAddDialog = false
-                }
-            },
-            excludeCatalogId = currentCatalogId,
-            additionalCatalogs = if (isOwner) emptyList() else editorSharedCatalogOptions
-        )
+    fun closeAddDialog() {
+        showAddDialog = false
     }
 
-    selectedEntry?.let { entry ->
-        val canRemoveFromCatalog = currentCatalogId != null && (isOwner || userRole == "editor")
-        val canAddToOtherCatalog = isOwner
-        val canDeleteEntryPermanently = isOwner
-        EntryDetailDialog(
-            entry = entry,
-            isProcessing = isActionInProgress,
-            errorMessage = detailErrorMessage,
-            canRemoveFromCatalog = canRemoveFromCatalog,
-            onDismiss = {
-                if (!isActionInProgress) {
-                    selectedEntry = null
-                    showAddDialog = false
-                }
-            },
-            onAddToCatalog = if (canAddToOtherCatalog) { { showAddDialog = true } } else null,
-            onRemoveFromCatalog = if (canRemoveFromCatalog) { { pendingAction = EntryAction.Remove(entry) } } else null,
-            onDeleteEntry = if (canDeleteEntryPermanently) { { pendingAction = EntryAction.Delete(entry) } } else null
-        )
+    fun startProcessing() {
+        isProcessing = true
     }
 
-    val action = pendingAction
-    if (action != null && !isActionInProgress) {
-        ConfirmEntryActionDialog(
-            action = action,
-            onConfirm = {
-                val entryId = action.entry.entry._id
-                when (action) {
-                    is EntryAction.Remove -> {
-                        val catalogId = currentCatalogId
-                        if (catalogId == null) {
-                            detailErrorMessage = "Catalog unavailable"
-                            pendingAction = null
-                            return@ConfirmEntryActionDialog
-                        }
-                        isActionInProgress = true
-                        detailErrorMessage = null
-                        viewModel.removeEntryFromCatalog(catalogId, entryId) { success, error ->
-                            isActionInProgress = false
-                            pendingAction = null
-                            if (success) {
-                                selectedEntry = null
-                                showAddDialog = false
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("Observation removed from catalog")
-                                }
-                            } else {
-                                detailErrorMessage = error ?: "Failed to remove observation"
-                            }
-                        }
-                    }
-                    is EntryAction.Delete -> {
-                        isActionInProgress = true
-                        detailErrorMessage = null
-                        viewModel.deleteEntry(entryId, currentCatalogId) { success, error ->
-                            isActionInProgress = false
-                            pendingAction = null
-                            if (success) {
-                                selectedEntry = null
-                                showAddDialog = false
-                                profileViewModel.refreshStats()
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("Observation deleted")
-                                }
-                            } else {
-                                detailErrorMessage = error ?: "Failed to delete observation"
-                            }
-                        }
-                    }
-                }
-            },
-            onDismiss = {
-                if (!isActionInProgress) {
-                    pendingAction = null
-                }
-            }
-        )
+    fun stopProcessing() {
+        isProcessing = false
     }
 
-    if (showShareDialog && isOwner) {
-        ShareCatalogDialog(
-            catalogName = catalog?.name,
-            state = shareUiState,
-            onInvite = { friendId, role ->
-                catalogShareViewModel.inviteCollaborator(catalogId, friendId, role)
-            },
-            onChangeRole = { shareId, role ->
-                catalogShareViewModel.updateCollaboratorRole(catalogId, shareId, role)
-            },
-            onRevoke = { shareId ->
-                catalogShareViewModel.revokeCollaborator(catalogId, shareId)
-            },
-            onDismiss = {
-                if (!shareUiState.isProcessing) {
-                    showShareDialog = false
-                    catalogShareViewModel.clearMessages()
-                }
-            }
-        )
+    fun setError(message: String?) {
+        errorMessage = message
     }
+
+    fun clearError() {
+        errorMessage = null
+    }
+
+    fun scheduleAction(action: EntryAction) {
+        pendingAction = action
+    }
+
+    fun clearPendingAction() {
+        pendingAction = null
+    }
+}
+
+@Composable
+private fun rememberCatalogEntryDialogState(): CatalogEntryDialogState {
+    return remember { CatalogEntryDialogState() }
 }
 
 @Composable
@@ -401,20 +678,7 @@ private fun ShareCatalogDialog(
     onDismiss: () -> Unit
 ) {
     val scrollState = rememberScrollState()
-    var friendMenuExpanded by remember { mutableStateOf(false) }
-    var selectedFriend by remember(state.friends) { mutableStateOf(state.friends.firstOrNull()) }
-    var roleMenuExpanded by remember { mutableStateOf(false) }
-    var selectedRole by remember { mutableStateOf("viewer") }
-    val roleOptions = listOf("viewer", "editor")
-
-    fun friendDisplay(friend: FriendSummary?): String {
-        if (friend == null) return "Select friend"
-        val user = friend.user
-        return user?.name?.takeIf { it.isNotBlank() }
-            ?: user?.username?.takeIf { it.isNotBlank() }
-            ?: "Select friend"
-    }
-
+    val inviteState = rememberShareInviteState(state)
     AlertDialog(
         onDismissRequest = { if (!state.isProcessing) onDismiss() },
         confirmButton = {
@@ -425,131 +689,206 @@ private fun ShareCatalogDialog(
                 Text("Close")
             }
         },
-        title = {
-            Text(
-                text = buildString {
-                    append("Share Catalog")
-                    if (!catalogName.isNullOrBlank()) {
-                        append(": ")
-                        append(catalogName)
-                    }
-                },
-                style = MaterialTheme.typography.titleLarge
-            )
-        },
+        title = { ShareDialogTitle(catalogName) },
         text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(scrollState),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = "Invite a friend",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    if (state.friends.isEmpty()) {
-                        Text(
-                            text = "Add friends to invite them to your catalog.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(
-                                onClick = { friendMenuExpanded = true },
-                                enabled = !state.isProcessing,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(friendDisplay(selectedFriend))
-                            }
-                            DropdownMenu(
-                                expanded = friendMenuExpanded,
-                                onDismissRequest = { friendMenuExpanded = false }
-                            ) {
-                                state.friends.forEach { friend ->
-                                    DropdownMenuItem(
-                                        text = { Text(friendDisplay(friend)) },
-                                        onClick = {
-                                            selectedFriend = friend
-                                            friendMenuExpanded = false
-                                        }
-                                    )
-                                }
-                            }
-
-                            OutlinedButton(
-                                onClick = { roleMenuExpanded = true },
-                                enabled = !state.isProcessing,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                val roleLabel = selectedRole.replaceFirstChar { it.uppercase() }
-                                Text("Role: $roleLabel")
-                            }
-                            DropdownMenu(
-                                expanded = roleMenuExpanded,
-                                onDismissRequest = { roleMenuExpanded = false }
-                            ) {
-                                roleOptions.forEach { role ->
-                                    DropdownMenuItem(
-                                        text = { Text(role.replaceFirstChar { it.uppercase() }) },
-                                        onClick = {
-                                            selectedRole = role
-                                            roleMenuExpanded = false
-                                        }
-                                    )
-                                }
-                            }
-
-                            Button(
-                                onClick = {
-                                    selectedFriend?.user?._id?.let { userId ->
-                                        onInvite(userId, selectedRole)
-                                    }
-                                },
-                                enabled = selectedFriend != null && !state.isProcessing,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Send invitation")
-                            }
-                        }
-                    }
-                }
-
-                HorizontalDivider()
-
-                Text(
-                    text = "Collaborators",
-                    style = MaterialTheme.typography.titleMedium
-                )
-
-                if (state.isLoading) {
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                } else if (state.collaborators.isEmpty()) {
-                    Text(
-                        text = "No collaborators yet.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    state.collaborators
-                        .sortedWith(compareBy<CatalogShareEntry> { it.status != "accepted" }.thenBy { it.invitee?.name ?: "" })
-                        .forEach { share ->
-                            CollaboratorRow(
-                                share = share,
-                                isProcessing = state.isProcessing,
-                                onChangeRole = { role -> onChangeRole(share._id, role) },
-                                onRevoke = { onRevoke(share._id) }
-                            )
-                        }
-                }
-            }
+            ShareDialogBody(
+                state = state,
+                scrollState = scrollState,
+                inviteState = inviteState,
+                onInvite = onInvite,
+                onChangeRole = onChangeRole,
+                onRevoke = onRevoke
+            )
         }
     )
+}
+
+@Composable
+private fun ShareDialogTitle(catalogName: String?) {
+    Text(
+        text = buildString {
+            append("Share Catalog")
+            if (!catalogName.isNullOrBlank()) {
+                append(": ")
+                append(catalogName)
+            }
+        },
+        style = MaterialTheme.typography.titleLarge
+    )
+}
+
+@Composable
+private fun ShareDialogBody(
+    state: CatalogShareUiState,
+    scrollState: ScrollState,
+    inviteState: ShareInviteState,
+    onInvite: (String, String) -> Unit,
+    onChangeRole: (String, String) -> Unit,
+    onRevoke: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(scrollState),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        ShareDialogInviteSection(state, inviteState, onInvite)
+        HorizontalDivider()
+        ShareDialogCollaboratorsSection(state, onChangeRole, onRevoke)
+    }
+}
+
+@Composable
+private fun ShareDialogInviteSection(
+    state: CatalogShareUiState,
+    inviteState: ShareInviteState,
+    onInvite: (String, String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) column@{
+        Text(text = "Invite a friend", style = MaterialTheme.typography.titleMedium)
+        if (state.friends.isEmpty()) {
+            Text(
+                text = "Add friends to invite them to your catalog.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            return@column
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ShareDialogFriendSelector(
+                state = state,
+                inviteState = inviteState,
+                enabled = !state.isProcessing
+            )
+            ShareDialogRoleSelector(inviteState = inviteState, enabled = !state.isProcessing)
+            Button(
+                onClick = {
+                    inviteState.selectedFriend?.user?._id?.let { userId ->
+                        onInvite(userId, inviteState.selectedRole)
+                    }
+                },
+                enabled = inviteState.selectedFriend != null && !state.isProcessing,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Send invitation")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShareDialogFriendSelector(
+    state: CatalogShareUiState,
+    inviteState: ShareInviteState,
+    enabled: Boolean
+) {
+    OutlinedButton(
+        onClick = { inviteState.friendMenuExpanded = true },
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(inviteState.friendDisplay())
+    }
+    DropdownMenu(
+        expanded = inviteState.friendMenuExpanded,
+        onDismissRequest = { inviteState.friendMenuExpanded = false }
+    ) {
+        state.friends.forEach { friend ->
+            DropdownMenuItem(
+                text = { Text(inviteState.friendDisplay(friend)) },
+                onClick = {
+                    inviteState.selectedFriend = friend
+                    inviteState.friendMenuExpanded = false
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ShareDialogRoleSelector(
+    inviteState: ShareInviteState,
+    enabled: Boolean
+) {
+    OutlinedButton(
+        onClick = { inviteState.roleMenuExpanded = true },
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text("Role: ${inviteState.roleLabel}")
+    }
+    DropdownMenu(
+        expanded = inviteState.roleMenuExpanded,
+        onDismissRequest = { inviteState.roleMenuExpanded = false }
+    ) {
+        inviteState.roleOptions.forEach { role ->
+            DropdownMenuItem(
+                text = { Text(role.replaceFirstChar { it.uppercase() }) },
+                onClick = {
+                    inviteState.selectedRole = role
+                    inviteState.roleMenuExpanded = false
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ShareDialogCollaboratorsSection(
+    state: CatalogShareUiState,
+    onChangeRole: (String, String) -> Unit,
+    onRevoke: (String) -> Unit
+) {
+    Text(text = "Collaborators", style = MaterialTheme.typography.titleMedium)
+    when {
+        state.isLoading -> Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+
+        state.collaborators.isEmpty() -> Text(
+            text = "No collaborators yet.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        else -> state.collaborators
+            .sortedWith(compareBy<CatalogShareEntry> { it.status != "accepted" }.thenBy { it.invitee?.name ?: "" })
+            .forEach { share ->
+                CollaboratorRow(
+                    share = share,
+                    isProcessing = state.isProcessing,
+                    onChangeRole = { role -> onChangeRole(share._id, role) },
+                    onRevoke = { onRevoke(share._id) }
+                )
+            }
+    }
+}
+
+@Stable
+private class ShareInviteState(initialFriend: FriendSummary?) {
+    var friendMenuExpanded by mutableStateOf(false)
+    var selectedFriend by mutableStateOf(initialFriend)
+    var roleMenuExpanded by mutableStateOf(false)
+    var selectedRole by mutableStateOf("viewer")
+    val roleOptions = listOf("viewer", "editor")
+
+    val roleLabel: String
+        get() = selectedRole.replaceFirstChar { it.uppercase() }
+
+    fun friendDisplay(friend: FriendSummary? = selectedFriend): String {
+        val user = friend?.user ?: return "Select friend"
+        return user.name?.takeIf { it.isNotBlank() }
+            ?: user.username?.takeIf { it.isNotBlank() }
+            ?: "Select friend"
+    }
+}
+
+@Composable
+private fun rememberShareInviteState(state: CatalogShareUiState): ShareInviteState {
+    return remember(state.friends) {
+        ShareInviteState(state.friends.firstOrNull())
+    }
 }
 
 @Composable
@@ -559,88 +898,126 @@ private fun CollaboratorRow(
     onChangeRole: (String) -> Unit,
     onRevoke: () -> Unit
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CollaboratorInfo(share)
+            IconButton(onClick = { menuExpanded = true }, enabled = !isProcessing) {
+                Icon(Icons.Filled.MoreVert, contentDescription = "Collaborator actions")
+            }
+        }
+
+        CollaboratorMenu(
+            share = share,
+            menuExpanded = menuExpanded,
+            onMenuDismiss = { menuExpanded = false },
+            isProcessing = isProcessing,
+            onChangeRole = onChangeRole,
+            onRevoke = onRevoke
+        )
+    }
+}
+
+@Composable
+private fun CollaboratorInfo(share: CatalogShareEntry) {
     val inviteeName = share.invitee?.name?.takeIf { it.isNotBlank() }
         ?: share.invitee?.username?.takeIf { it.isNotBlank() }
         ?: "Unknown user"
     val statusLabel = share.status.replaceFirstChar { it.uppercase() }
     val roleLabel = share.role.replaceFirstChar { it.uppercase() }
 
-    var menuExpanded by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(inviteeName, style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = "Role: $roleLabel",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "Status: $statusLabel",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
 
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(inviteeName, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text = "Role: ${roleLabel}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "Status: ${statusLabel}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+@Composable
+private fun CollaboratorMenu(
+    share: CatalogShareEntry,
+    menuExpanded: Boolean,
+    onMenuDismiss: () -> Unit,
+    isProcessing: Boolean,
+    onChangeRole: (String) -> Unit,
+    onRevoke: () -> Unit
+) {
+    DropdownMenu(
+        expanded = menuExpanded,
+        onDismissRequest = onMenuDismiss
+    ) {
+        CollaboratorRoleActions(share, onMenuDismiss, onChangeRole)
+        DropdownMenuItem(
+            text = { Text("Revoke invitation", color = MaterialTheme.colorScheme.error) },
+            onClick = {
+                onMenuDismiss()
+                onRevoke()
+            },
+            enabled = !isProcessing
+        )
+    }
+}
 
-            IconButton(onClick = { menuExpanded = true }, enabled = !isProcessing) {
-                Icon(Icons.Filled.MoreVert, contentDescription = "Collaborator actions")
-            }
-
-            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                if (share.status == "accepted") {
-                    if (share.role != "viewer") {
-                        DropdownMenuItem(
-                            text = { Text("Set as viewer") },
-                            onClick = {
-                                menuExpanded = false
-                                onChangeRole("viewer")
-                            }
-                        )
-                    }
-                    if (share.role != "editor") {
-                        DropdownMenuItem(
-                            text = { Text("Set as editor") },
-                            onClick = {
-                                menuExpanded = false
-                                onChangeRole("editor")
-                            }
-                        )
-                    }
-                } else if (share.status == "pending") {
-                    DropdownMenuItem(
-                        text = { Text("Make viewer") },
-                        onClick = {
-                            menuExpanded = false
-                            onChangeRole("viewer")
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Make editor") },
-                        onClick = {
-                            menuExpanded = false
-                            onChangeRole("editor")
-                        }
-                    )
-                }
-
+@Composable
+private fun CollaboratorRoleActions(
+    share: CatalogShareEntry,
+    onMenuDismiss: () -> Unit,
+    onChangeRole: (String) -> Unit
+) {
+    when (share.status) {
+        "accepted" -> {
+            if (share.role != "viewer") {
                 DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = "Revoke invitation",
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    },
+                    text = { Text("Set as viewer") },
                     onClick = {
-                        menuExpanded = false
-                        onRevoke()
+                        onMenuDismiss()
+                        onChangeRole("viewer")
                     }
                 )
             }
+            if (share.role != "editor") {
+                DropdownMenuItem(
+                    text = { Text("Set as editor") },
+                    onClick = {
+                        onMenuDismiss()
+                        onChangeRole("editor")
+                    }
+                )
+            }
+        }
+
+        "pending" -> {
+            DropdownMenuItem(
+                text = { Text("Make viewer") },
+                onClick = {
+                    onMenuDismiss()
+                    onChangeRole("viewer")
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Make editor") },
+                onClick = {
+                    onMenuDismiss()
+                    onChangeRole("editor")
+                }
+            )
         }
     }
 }

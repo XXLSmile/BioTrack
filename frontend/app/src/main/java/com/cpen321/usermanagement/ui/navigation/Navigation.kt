@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -87,44 +88,59 @@ fun AppNavigation(
     val navigationStateManager = navigationViewModel.navigationStateManager
     val navigationEvent by navigationStateManager.navigationEvent.collectAsState()
 
-    // Initialize view models required for navigation-level scope
-    val authViewModel: AuthViewModel = hiltViewModel()
-    val profileViewModel: ProfileViewModel = hiltViewModel()
-    val mainViewModel: MainViewModel = hiltViewModel()
-    val friendViewModel: FriendViewModel = hiltViewModel()
+    val dependencies = rememberNavigationDependencies()
+    val bottomNavState = rememberBottomNavState()
 
-    val bottomNavItems = remember {
-        listOf(
-            BottomNavItem(NavRoutes.HOME, R.string.bottom_nav_home, Icons.Outlined.Home),
-            BottomNavItem(NavRoutes.CATALOGS, R.string.bottom_nav_catalogs, Icons.Outlined.Collections),
-            BottomNavItem(NavRoutes.IDENTIFY, R.string.bottom_nav_identify, Icons.Outlined.CameraAlt),
-            BottomNavItem(NavRoutes.FRIENDS, R.string.bottom_nav_friends, Icons.Outlined.Group),
-            BottomNavItem(NavRoutes.PROFILE, R.string.bottom_nav_profile, Icons.Outlined.Person)
-        )
-    }
-    val bottomRoutes = remember(bottomNavItems) { bottomNavItems.map(BottomNavItem::route).toSet() }
+    HandleNavigationEvents(
+        navigationEvent = navigationEvent,
+        navController = navController,
+        navigationStateManager = navigationStateManager,
+        dependencies = dependencies
+    )
 
-    // Handle navigation events from NavigationStateManager
+    AppNavigationScaffold(
+        navController = navController,
+        bottomNavState = bottomNavState,
+        dependencies = dependencies,
+        navigationStateManager = navigationStateManager
+    )
+}
+
+@Composable
+private fun HandleNavigationEvents(
+    navigationEvent: NavigationEvent,
+    navController: NavHostController,
+    navigationStateManager: NavigationStateManager,
+    dependencies: NavigationDependencies
+) {
     LaunchedEffect(navigationEvent) {
         handleNavigationEvent(
-            navigationEvent,
-            navController,
-            navigationStateManager,
-            authViewModel,
-            mainViewModel,
-            friendViewModel
+            navigationEvent = navigationEvent,
+            navController = navController,
+            navigationStateManager = navigationStateManager,
+            authViewModel = dependencies.authViewModel,
+            mainViewModel = dependencies.mainViewModel,
+            friendViewModel = dependencies.friendViewModel
         )
     }
+}
 
+@Composable
+private fun AppNavigationScaffold(
+    navController: NavHostController,
+    bottomNavState: BottomNavigationState,
+    dependencies: NavigationDependencies,
+    navigationStateManager: NavigationStateManager
+) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    val showBottomBar = currentRoute != null && currentRoute in bottomRoutes
+    val showBottomBar = currentRoute != null && currentRoute in bottomNavState.routes
 
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
                 BottomNavigationBar(
-                    items = bottomNavItems,
+                    items = bottomNavState.items,
                     currentRoute = currentRoute,
                     onItemSelected = { route ->
                         navController.navigate(route) {
@@ -141,15 +157,55 @@ fun AppNavigation(
     ) { innerPadding ->
         AppNavHost(
             navController = navController,
-            authViewModel = authViewModel,
-            profileViewModel = profileViewModel,
-            mainViewModel = mainViewModel,
-            friendViewModel = friendViewModel,
+            dependencies = dependencies,
             navigationStateManager = navigationStateManager,
             modifier = Modifier.padding(innerPadding)
         )
     }
 }
+
+@Composable
+private fun rememberNavigationDependencies(): NavigationDependencies {
+    val authViewModel: AuthViewModel = hiltViewModel()
+    val profileViewModel: ProfileViewModel = hiltViewModel()
+    val mainViewModel: MainViewModel = hiltViewModel()
+    val friendViewModel: FriendViewModel = hiltViewModel()
+    return remember(authViewModel, profileViewModel, mainViewModel, friendViewModel) {
+        NavigationDependencies(
+            authViewModel = authViewModel,
+            profileViewModel = profileViewModel,
+            mainViewModel = mainViewModel,
+            friendViewModel = friendViewModel
+        )
+    }
+}
+
+@Composable
+private fun rememberBottomNavState(): BottomNavigationState {
+    val items = remember {
+        listOf(
+            BottomNavItem(NavRoutes.HOME, R.string.bottom_nav_home, Icons.Outlined.Home),
+            BottomNavItem(NavRoutes.CATALOGS, R.string.bottom_nav_catalogs, Icons.Outlined.Collections),
+            BottomNavItem(NavRoutes.IDENTIFY, R.string.bottom_nav_identify, Icons.Outlined.CameraAlt),
+            BottomNavItem(NavRoutes.FRIENDS, R.string.bottom_nav_friends, Icons.Outlined.Group),
+            BottomNavItem(NavRoutes.PROFILE, R.string.bottom_nav_profile, Icons.Outlined.Person)
+        )
+    }
+    val routes = remember(items) { items.map(BottomNavItem::route).toSet() }
+    return remember(items, routes) { BottomNavigationState(items = items, routes = routes) }
+}
+
+private data class NavigationDependencies(
+    val authViewModel: AuthViewModel,
+    val profileViewModel: ProfileViewModel,
+    val mainViewModel: MainViewModel,
+    val friendViewModel: FriendViewModel
+)
+
+private data class BottomNavigationState(
+    val items: List<BottomNavItem>,
+    val routes: Set<String>
+)
 
 private fun handleNavigationEvent(
     navigationEvent: NavigationEvent,
@@ -222,10 +278,7 @@ private fun handleNavigationEvent(
 @Composable
 private fun AppNavHost(
     navController: NavHostController,
-    authViewModel: AuthViewModel,
-    profileViewModel: ProfileViewModel,
-    mainViewModel: MainViewModel,
-    friendViewModel: FriendViewModel,
+    dependencies: NavigationDependencies,
     navigationStateManager: NavigationStateManager,
     modifier: Modifier = Modifier
 ) {
@@ -234,97 +287,148 @@ private fun AppNavHost(
         startDestination = NavRoutes.LOADING,
         modifier = modifier
     ) {
-        composable(NavRoutes.LOADING) {
-            LoadingScreen(message = stringResource(R.string.checking_authentication))
-        }
+        addAuthenticationRoutes(
+            authViewModel = dependencies.authViewModel,
+            profileViewModel = dependencies.profileViewModel
+        )
+        addHomeRoutes(
+            navController = navController,
+            mainViewModel = dependencies.mainViewModel,
+            profileViewModel = dependencies.profileViewModel
+        )
+        addCatalogRoutes(navController)
+        addIdentifyAndCameraRoutes(navController)
+        addFriendRoutes(navController, dependencies.friendViewModel)
+        addProfileRoutes(dependencies, navigationStateManager)
+        addObservationRoutes(navController, dependencies.mainViewModel)
+    }
+}
 
-        composable(NavRoutes.AUTH) {
-            AuthScreen(authViewModel = authViewModel, profileViewModel = profileViewModel)
-        }
+private fun NavGraphBuilder.addAuthenticationRoutes(
+    authViewModel: AuthViewModel,
+    profileViewModel: ProfileViewModel
+) {
+    composable(NavRoutes.LOADING) {
+        LoadingScreen(message = stringResource(R.string.checking_authentication))
+    }
 
-        composable(NavRoutes.HOME) {
-            MainScreen(
-                mainViewModel = mainViewModel,
-                profileViewModel = profileViewModel,
-                navController = navController
-            )
-        }
+    composable(NavRoutes.AUTH) {
+        AuthScreen(authViewModel = authViewModel, profileViewModel = profileViewModel)
+    }
+}
 
-        composable(NavRoutes.CATALOGS) {
-            val catalogViewModel: CatalogViewModel = hiltViewModel()
-            CatalogListScreen(viewModel = catalogViewModel, navController = navController, showNavigationIcon = false)
-        }
+private fun NavGraphBuilder.addHomeRoutes(
+    navController: NavHostController,
+    mainViewModel: MainViewModel,
+    profileViewModel: ProfileViewModel
+) {
+    composable(NavRoutes.HOME) {
+        MainScreen(
+            mainViewModel = mainViewModel,
+            profileViewModel = profileViewModel,
+            navController = navController
+        )
+    }
+}
 
-        composable(NavRoutes.CATALOG_ENTRIES) {
-            val viewModel: CatalogEntriesViewModel = hiltViewModel()
-            CatalogEntriesScreen(navController = navController, viewModel = viewModel)
-        }
+private fun NavGraphBuilder.addCatalogRoutes(navController: NavHostController) {
+    composable(NavRoutes.CATALOGS) {
+        val catalogViewModel: CatalogViewModel = hiltViewModel()
+        CatalogListScreen(
+            viewModel = catalogViewModel,
+            navController = navController,
+            showNavigationIcon = false
+        )
+    }
 
-        composable(NavRoutes.IDENTIFY) {
-            IdentifyScreen(onOpenCamera = { navController.navigate(NavRoutes.CAMERA) })
-        }
+    composable(NavRoutes.CATALOG_ENTRIES) {
+        val viewModel: CatalogEntriesViewModel = hiltViewModel()
+        CatalogEntriesScreen(navController = navController, viewModel = viewModel)
+    }
 
-        composable(NavRoutes.FRIENDS) {
-            FriendsScreen(
-                viewModel = friendViewModel,
-                onUserSelected = { user ->
-                    user.username?.let { username ->
-                        navController.navigate(NavRoutes.publicProfile(Uri.encode(username)))
-                    }
+    composable(NavRoutes.CATALOG_DETAIL) { backStackEntry ->
+        val catalogId = backStackEntry.arguments?.getString("catalogId") ?: return@composable
+        val catalogViewModel: CatalogViewModel = hiltViewModel()
+        CatalogDetailScreen(
+            catalogId = catalogId,
+            viewModel = catalogViewModel,
+            navController = navController
+        )
+    }
+}
+
+private fun NavGraphBuilder.addIdentifyAndCameraRoutes(navController: NavHostController) {
+    composable(NavRoutes.IDENTIFY) {
+        IdentifyScreen(onOpenCamera = { navController.navigate(NavRoutes.CAMERA) })
+    }
+
+    composable(NavRoutes.CAMERA) {
+        CameraScreen(onBack = { navController.popBackStack() })
+    }
+}
+
+private fun NavGraphBuilder.addFriendRoutes(
+    navController: NavHostController,
+    friendViewModel: FriendViewModel
+) {
+    composable(NavRoutes.FRIENDS) {
+        FriendsScreen(
+            viewModel = friendViewModel,
+            onUserSelected = { user ->
+                user.username?.let { username ->
+                    navController.navigate(NavRoutes.publicProfile(Uri.encode(username)))
                 }
-            )
-        }
+            }
+        )
+    }
 
-        composable(NavRoutes.PROFILE) {
-            ProfileScreen(
-                authViewModel = authViewModel,
-                profileViewModel = profileViewModel,
-                actions = ProfileScreenActions(
-                    onManageProfileClick = { navigationStateManager.navigateToManageProfile() },
-                    onAccountDeleted = { navigationStateManager.handleAccountDeletion() },
-                    onLogoutClick = { authViewModel.logout() }
-                )
-            )
-        }
+    composable(NavRoutes.PUBLIC_PROFILE) { backStackEntry ->
+        val usernameParam = backStackEntry.arguments?.getString("username") ?: return@composable
+        val username = Uri.decode(usernameParam)
+        val publicProfileViewModel: PublicProfileViewModel = hiltViewModel()
+        PublicProfileScreen(
+            username = username,
+            viewModel = publicProfileViewModel,
+            onBack = { navController.popBackStack() }
+        )
+    }
+}
 
-        composable(NavRoutes.MANAGE_PROFILE) {
-            ManageProfileScreen(
-                profileViewModel = profileViewModel,
-                onBackClick = { navigationStateManager.navigateBack() }
+private fun NavGraphBuilder.addProfileRoutes(
+    dependencies: NavigationDependencies,
+    navigationStateManager: NavigationStateManager
+) {
+    composable(NavRoutes.PROFILE) {
+        ProfileScreen(
+            authViewModel = dependencies.authViewModel,
+            profileViewModel = dependencies.profileViewModel,
+            actions = ProfileScreenActions(
+                onManageProfileClick = { navigationStateManager.navigateToManageProfile() },
+                onAccountDeleted = { navigationStateManager.handleAccountDeletion() },
+                onLogoutClick = { dependencies.authViewModel.logout() }
             )
-        }
+        )
+    }
 
-        composable(NavRoutes.CAMERA) {
-            CameraScreen(
-                onBack = { navController.popBackStack() }
-            )
-        }
+    composable(NavRoutes.MANAGE_PROFILE) {
+        ManageProfileScreen(
+            profileViewModel = dependencies.profileViewModel,
+            onBackClick = { navigationStateManager.navigateBack() }
+        )
+    }
+}
 
-        composable(NavRoutes.CATALOG_DETAIL) { backStackEntry ->
-            val catalogId = backStackEntry.arguments?.getString("catalogId") ?: return@composable
-            val catalogViewModel: CatalogViewModel = hiltViewModel()
-            CatalogDetailScreen(catalogId = catalogId, viewModel = catalogViewModel, navController = navController)
-        }
-
-        composable(NavRoutes.OBSERVATION_DETAIL) { backStackEntry ->
-            val entryId = backStackEntry.arguments?.getString("entryId") ?: return@composable
-            ObservationDetailScreen(
-                observationId = entryId,
-                mainViewModel = mainViewModel,
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(NavRoutes.PUBLIC_PROFILE) { backStackEntry ->
-            val usernameParam = backStackEntry.arguments?.getString("username") ?: return@composable
-            val username = Uri.decode(usernameParam)
-            val publicProfileViewModel: PublicProfileViewModel = hiltViewModel()
-            PublicProfileScreen(
-                username = username,
-                viewModel = publicProfileViewModel,
-                onBack = { navController.popBackStack() }
-            )
-        }
+private fun NavGraphBuilder.addObservationRoutes(
+    navController: NavHostController,
+    mainViewModel: MainViewModel
+) {
+    composable(NavRoutes.OBSERVATION_DETAIL) { backStackEntry ->
+        val entryId = backStackEntry.arguments?.getString("entryId") ?: return@composable
+        ObservationDetailScreen(
+            observationId = entryId,
+            mainViewModel = mainViewModel,
+            onBack = { navController.popBackStack() }
+        )
     }
 }
 
