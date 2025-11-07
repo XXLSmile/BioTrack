@@ -744,7 +744,7 @@ private fun ShareDialogInviteSection(
     inviteState: ShareInviteState,
     onInvite: (String, String) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) column@{
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(text = "Invite a friend", style = MaterialTheme.typography.titleMedium)
         if (state.friends.isEmpty()) {
             Text(
@@ -752,26 +752,25 @@ private fun ShareDialogInviteSection(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            return@column
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ShareDialogFriendSelector(
-                state = state,
-                inviteState = inviteState,
-                enabled = !state.isProcessing
-            )
-            ShareDialogRoleSelector(inviteState = inviteState, enabled = !state.isProcessing)
-            Button(
-                onClick = {
-                    inviteState.selectedFriend?.user?._id?.let { userId ->
-                        onInvite(userId, inviteState.selectedRole)
-                    }
-                },
-                enabled = inviteState.selectedFriend != null && !state.isProcessing,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Send invitation")
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ShareDialogFriendSelector(
+                    state = state,
+                    inviteState = inviteState,
+                    enabled = !state.isProcessing
+                )
+                ShareDialogRoleSelector(inviteState = inviteState, enabled = !state.isProcessing)
+                Button(
+                    onClick = {
+                        inviteState.selectedFriend?.user?._id?.let { userId ->
+                            onInvite(userId, inviteState.selectedRole)
+                        }
+                    },
+                    enabled = inviteState.selectedFriend != null && !state.isProcessing,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Send invitation")
+                }
             }
         }
     }

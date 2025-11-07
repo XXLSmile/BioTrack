@@ -191,9 +191,11 @@ private fun HandleMainScreenSideEffects(
     }
 
     LaunchedEffect(mainUiState.successMessage) {
-        val message = mainUiState.successMessage ?: return@LaunchedEffect
-        snackBarHostState.showSnackbar(message)
-        mainViewModel.clearSuccessMessage()
+        val message = mainUiState.successMessage
+        if (message != null) {
+            snackBarHostState.showSnackbar(message)
+            mainViewModel.clearSuccessMessage()
+        }
     }
 
     LaunchedEffect(entryDialogState.showAddDialog) {

@@ -301,35 +301,37 @@ private fun SharedCatalogsSection(
             style = MaterialTheme.typography.titleMedium
         )
         shares.forEach { share ->
-            val catalogId = share.catalog?._id ?: return@forEach
-            val catalogName = share.catalog?.name?.takeIf { it.isNotBlank() } ?: "Catalog"
-            val roleLabel = share.role.replaceFirstChar { it.uppercase() }
+            val catalogId = share.catalog?._id
+            if (catalogId != null) {
+                val catalogName = share.catalog?.name?.takeIf { it.isNotBlank() } ?: "Catalog"
+                val roleLabel = share.role.replaceFirstChar { it.uppercase() }
 
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { onOpenCatalog(catalogId) }
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { onOpenCatalog(catalogId) }
                 ) {
-                    Text(catalogName, style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        text = "Role: $roleLabel",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    share.invitedBy?.let { inviter ->
-                        val inviterName = inviter.name?.takeIf { it.isNotBlank() }
-                            ?: inviter.username?.takeIf { it.isNotBlank() }
-                        inviterName?.let {
-                            Text(
-                                text = "Shared by $it",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(catalogName, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = "Role: $roleLabel",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        share.invitedBy?.let { inviter ->
+                            val inviterName = inviter.name?.takeIf { it.isNotBlank() }
+                                ?: inviter.username?.takeIf { it.isNotBlank() }
+                            inviterName?.let {
+                                Text(
+                                    text = "Shared by $it",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }

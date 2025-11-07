@@ -246,19 +246,23 @@ fun CatalogEntriesScreen(
             viewModel = catalogViewModel,
             isSaving = isActionInProgress,
             onSave = { catalogId ->
-                val entryId = selectedEntry?.entry?._id ?: return@AddToCatalogDialog
-                isActionInProgress = true
-                detailErrorMessage = null
-                catalogViewModel.addEntryToCatalog(catalogId, entryId, null) { success, error ->
-                    isActionInProgress = false
-                    if (success) {
-                        showAddDialog = false
-                        viewModel.refresh()
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Observation added to catalog")
+                val entryId = selectedEntry?.entry?._id
+                if (entryId == null) {
+                    detailErrorMessage = "Entry unavailable"
+                } else {
+                    isActionInProgress = true
+                    detailErrorMessage = null
+                    catalogViewModel.addEntryToCatalog(catalogId, entryId, null) { success, error ->
+                        isActionInProgress = false
+                        if (success) {
+                            showAddDialog = false
+                            viewModel.refresh()
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Observation added to catalog")
+                            }
+                        } else {
+                            detailErrorMessage = error ?: "Failed to add observation to catalog"
                         }
-                    } else {
-                        detailErrorMessage = error ?: "Failed to add observation to catalog"
                     }
                 }
             },

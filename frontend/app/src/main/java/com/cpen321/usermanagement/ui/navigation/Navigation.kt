@@ -347,13 +347,15 @@ private fun NavGraphBuilder.addCatalogRoutes(navController: NavHostController) {
     }
 
     composable(NavRoutes.CATALOG_DETAIL) { backStackEntry ->
-        val catalogId = backStackEntry.arguments?.getString("catalogId") ?: return@composable
-        val catalogViewModel: CatalogViewModel = hiltViewModel()
-        CatalogDetailScreen(
-            catalogId = catalogId,
-            viewModel = catalogViewModel,
-            navController = navController
-        )
+        val catalogId = backStackEntry.arguments?.getString("catalogId")
+        if (catalogId != null) {
+            val catalogViewModel: CatalogViewModel = hiltViewModel()
+            CatalogDetailScreen(
+                catalogId = catalogId,
+                viewModel = catalogViewModel,
+                navController = navController
+            )
+        }
     }
 }
 
@@ -383,14 +385,16 @@ private fun NavGraphBuilder.addFriendRoutes(
     }
 
     composable(NavRoutes.PUBLIC_PROFILE) { backStackEntry ->
-        val usernameParam = backStackEntry.arguments?.getString("username") ?: return@composable
-        val username = Uri.decode(usernameParam)
-        val publicProfileViewModel: PublicProfileViewModel = hiltViewModel()
-        PublicProfileScreen(
-            username = username,
-            viewModel = publicProfileViewModel,
-            onBack = { navController.popBackStack() }
-        )
+        val usernameParam = backStackEntry.arguments?.getString("username")
+        if (usernameParam != null) {
+            val username = Uri.decode(usernameParam)
+            val publicProfileViewModel: PublicProfileViewModel = hiltViewModel()
+            PublicProfileScreen(
+                username = username,
+                viewModel = publicProfileViewModel,
+                onBack = { navController.popBackStack() }
+            )
+        }
     }
 }
 
@@ -423,12 +427,14 @@ private fun NavGraphBuilder.addObservationRoutes(
     mainViewModel: MainViewModel
 ) {
     composable(NavRoutes.OBSERVATION_DETAIL) { backStackEntry ->
-        val entryId = backStackEntry.arguments?.getString("entryId") ?: return@composable
-        ObservationDetailScreen(
-            observationId = entryId,
-            mainViewModel = mainViewModel,
-            onBack = { navController.popBackStack() }
-        )
+        val entryId = backStackEntry.arguments?.getString("entryId")
+        if (entryId != null) {
+            ObservationDetailScreen(
+                observationId = entryId,
+                mainViewModel = mainViewModel,
+                onBack = { navController.popBackStack() }
+            )
+        }
     }
 }
 

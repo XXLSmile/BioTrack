@@ -3,34 +3,72 @@
 package com.cpen321.usermanagement.ui.screens
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import android.location.Location
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.rememberAsyncImagePainter
 import com.cpen321.usermanagement.data.remote.api.RetrofitClient
+import com.cpen321.usermanagement.data.remote.dto.SaveRecognitionRequest
+import com.cpen321.usermanagement.data.remote.dto.ScanData
+import com.cpen321.usermanagement.data.remote.dto.ScanResponse
+import com.cpen321.usermanagement.ui.viewmodels.CatalogShareViewModel
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
 import com.cpen321.usermanagement.ui.viewmodels.ProfileViewModel
-import com.cpen321.usermanagement.ui.viewmodels.CatalogShareViewModel
+import com.cpen321.usermanagement.util.ImagePicker
+import com.cpen321.usermanagement.util.RealImagePicker
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -38,27 +76,12 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.FileOutputStream
-import androidx.hilt.navigation.compose.hiltViewModel
-import com.cpen321.usermanagement.data.remote.dto.SaveRecognitionRequest
-import com.cpen321.usermanagement.data.remote.dto.ScanData
-import com.cpen321.usermanagement.data.remote.dto.ScanResponse
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
-import com.google.android.gms.tasks.CancellationTokenSource
-import kotlinx.coroutines.tasks.await
-import android.annotation.SuppressLint
-import com.cpen321.usermanagement.util.ImagePicker
-import com.cpen321.usermanagement.util.RealImagePicker
-
-
-
 
 @Composable
 fun CameraScreen(
     onBack: () -> Unit,
     viewModel: CatalogViewModel = hiltViewModel(),
-    imagePicker: ImagePicker = RealImagePicker() // default for app
+    imagePicker: ImagePicker = RealImagePicker()
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -67,23 +90,17 @@ fun CameraScreen(
     val shareUiState by catalogShareViewModel.uiState.collectAsState()
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var currentLocation by remember { mutableStateOf<Location?>(null) }
+    val uiState = rememberCameraUiState()
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         if (granted) {
             scope.launch {
                 currentLocation = fetchCurrentLocation(fusedLocationClient)
             }
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        catalogShareViewModel.loadSharedWithMe()
-        if (hasLocationPermission(context)) {
-            currentLocation = fetchCurrentLocation(fusedLocationClient)
         }
     }
 
@@ -93,32 +110,87 @@ fun CameraScreen(
             .map { CatalogOption(it.catalog!!._id, it.catalog.name ?: "Catalog") }
     }
 
-    var imageUri by remember { mutableStateOf<Uri?>(null) }
-    var resultText by remember { mutableStateOf<String?>(null) }
-    var showCatalogDialog by remember { mutableStateOf(false) }
-    var recognitionResult by remember { mutableStateOf<ScanResponse?>(null) }
-    var isSaving by remember { mutableStateOf(false) }
+    CameraScreenSideEffects(
+        catalogShareViewModel = catalogShareViewModel,
+        viewModel = viewModel,
+        uiState = uiState,
+        context = context,
+        fusedLocationClient = fusedLocationClient,
+        onLocationUpdated = { currentLocation = it }
+    )
 
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicturePreview()
-    ) { bitmap ->
-        bitmap?.let {
-            val uri = saveBitmapToCache(context, it)
-            imageUri = uri
+    CameraScreenLayout(
+        onBack = onBack,
+        imageUri = uiState.imageUri,
+        resultText = uiState.resultText,
+        isSaving = uiState.isSaving,
+        imagePicker = imagePicker,
+        onImageSelected = uiState::updateImage,
+        onRecognizeClick = {
+            performRecognition(
+                context = context,
+                scope = scope,
+                uiState = uiState,
+                fusedLocationClient = fusedLocationClient,
+                currentLocation = currentLocation,
+                onLocationUpdated = { currentLocation = it },
+                hasLocationPermission = { hasLocationPermission(context) },
+                requestLocationPermission = {
+                    locationPermissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        )
+                    )
+                }
+            )
         }
+    )
+
+    if (uiState.showCatalogDialog && uiState.recognitionResult != null) {
+        AddToCatalogDialog(
+            viewModel = viewModel,
+            isSaving = uiState.isSaving,
+            onSave = { catalogId ->
+                handleCatalogSave(
+                    catalogId = catalogId,
+                    uiState = uiState,
+                    hasLocationPermission = hasLocationPermission(context),
+                    fusedLocationClient = fusedLocationClient,
+                    currentLocation = currentLocation,
+                    onLocationUpdated = { currentLocation = it },
+                    viewModel = viewModel,
+                    profileViewModel = profileViewModel,
+                    scope = scope
+                )
+            },
+            onDismiss = {
+                if (!uiState.isSaving) {
+                    uiState.dismissCatalogDialog()
+                }
+            },
+            additionalCatalogs = additionalCatalogOptions
+        )
     }
+}
 
-    val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? -> imageUri = uri }
-
+@Composable
+private fun CameraScreenLayout(
+    onBack: () -> Unit,
+    imageUri: Uri?,
+    resultText: String?,
+    isSaving: Boolean,
+    imagePicker: ImagePicker,
+    onImageSelected: (Uri?) -> Unit,
+    onRecognizeClick: () -> Unit
+) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Scan Wildlife") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -127,154 +199,246 @@ fun CameraScreen(
                 )
             )
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            imageUri?.let {
-                Card(
-                    shape = MaterialTheme.shapes.medium,
-                    elevation = CardDefaults.cardElevation(6.dp),
-                    modifier = Modifier
-                        .size(250.dp)
-                        .padding(8.dp)
-                ) {
-                    Image(
-                        painter = rememberAsyncImagePainter(it),
-                        contentDescription = "Selected image",
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                imagePicker.CameraButton { uri -> imageUri = uri }
-                imagePicker.GalleryButton { uri -> imageUri = uri }
-            }
-
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Button(
-                onClick = {
-                    val hasPermission = hasLocationPermission(context)
-                    if (!hasPermission) {
-                        locationPermissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION
-                            )
-                        )
-                        resultText = "Grant location permission to attach coordinates."
-                        return@Button
-                    }
-
-                    imageUri?.let { uri ->
-                        scope.launch {
-                            val locationToUse = currentLocation ?: fetchCurrentLocation(fusedLocationClient).also {
-                                currentLocation = it
-                            }
-
-                            resultText = "Recognizing..."
-                            val (message, response) = recognizeImage(context, uri, locationToUse)
-                            resultText = message
-                            recognitionResult = response
-                            showCatalogDialog = response?.data?.imagePath?.isNotBlank() == true
-                        }
-                    }
-                },
-                enabled = imageUri != null && !isSaving,
-                modifier = Modifier.fillMaxWidth(0.8f)
-            ) {
-                Icon(Icons.Default.Search, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Recognize Animal")
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            resultText?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-    }
-
-    LaunchedEffect(showCatalogDialog) {
-        if (showCatalogDialog) {
-            viewModel.loadCatalogs()
-        }
-    }
-
-    // Show Add to Catalog dialog after a successful scan
-    if (showCatalogDialog && recognitionResult != null) {
-        AddToCatalogDialog(
-            viewModel = viewModel,
+    ) { paddingValues ->
+        CameraScreenBody(
+            paddingValues = paddingValues,
+            imageUri = imageUri,
+            resultText = resultText,
             isSaving = isSaving,
-            onSave = { catalogId ->
-                if (isSaving) return@AddToCatalogDialog
-                val pendingRecognition = recognitionResult
-                if (pendingRecognition == null) {
-                    resultText = "⚠️ Run recognition before saving."
-                    return@AddToCatalogDialog
-                }
-                if (pendingRecognition.data.imagePath.isNullOrBlank()) {
-                    resultText = "⚠️ Unable to save because the image reference is missing."
-                    return@AddToCatalogDialog
-                }
-                isSaving = true
-                scope.launch {
-                    val locationToUse = if (hasLocationPermission(context)) {
-                        currentLocation ?: fetchCurrentLocation(fusedLocationClient).also {
-                            currentLocation = it
-                        }
-                    } else {
-                        currentLocation
-                    }
-
-                    val (success, message) = saveRecognitionToCatalog(
-                        pendingRecognition,
-                        catalogId,
-                        locationToUse
-                    )
-                    resultText = message
-                    if (success) {
-                        showCatalogDialog = false
-                        recognitionResult = null
-                        imageUri = null
-                        viewModel.loadCatalogs()
-                        profileViewModel.refreshStats()
-                    }
-                    isSaving = false
-                }
-            },
-            onDismiss = {
-                if (!isSaving) {
-                    showCatalogDialog = false
-                    recognitionResult = null
-                }
-            },
-            additionalCatalogs = additionalCatalogOptions
+            imagePicker = imagePicker,
+            onImageSelected = onImageSelected,
+            onRecognizeClick = onRecognizeClick
         )
     }
 }
 
-private fun saveBitmapToCache(context: Context, bitmap: Bitmap): Uri {
-    val file = File(context.cacheDir, "captured_image.jpg")
-    FileOutputStream(file).use { out ->
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)
+@Composable
+private fun CameraScreenBody(
+    paddingValues: PaddingValues,
+    imageUri: Uri?,
+    resultText: String?,
+    isSaving: Boolean,
+    imagePicker: ImagePicker,
+    onImageSelected: (Uri?) -> Unit,
+    onRecognizeClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        CameraPreview(imageUri)
+        Spacer(modifier = Modifier.height(16.dp))
+        CameraActionButtons(imagePicker = imagePicker, onImageSelected = onImageSelected)
+        Spacer(modifier = Modifier.height(24.dp))
+        RecognizeButton(
+            enabled = imageUri != null && !isSaving,
+            onClick = onRecognizeClick
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        resultText?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
     }
-    return Uri.fromFile(file)
+}
+
+@Composable
+private fun CameraPreview(imageUri: Uri?) {
+    if (imageUri == null) {
+        return
+    }
+
+    Card(
+        shape = MaterialTheme.shapes.medium,
+        elevation = CardDefaults.cardElevation(6.dp),
+        modifier = Modifier
+            .size(250.dp)
+            .padding(8.dp)
+    ) {
+        Image(
+            painter = rememberAsyncImagePainter(imageUri),
+            contentDescription = "Selected image",
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+@Composable
+private fun CameraActionButtons(
+    imagePicker: ImagePicker,
+    onImageSelected: (Uri?) -> Unit
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        imagePicker.CameraButton { uri -> onImageSelected(uri) }
+        imagePicker.GalleryButton { uri -> onImageSelected(uri) }
+    }
+}
+
+@Composable
+private fun RecognizeButton(
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth(0.8f)
+    ) {
+        Icon(Icons.Default.Search, contentDescription = null)
+        Spacer(Modifier.width(8.dp))
+        Text("Recognize Animal")
+    }
+}
+
+@Composable
+private fun CameraScreenSideEffects(
+    catalogShareViewModel: CatalogShareViewModel,
+    viewModel: CatalogViewModel,
+    uiState: CameraUiState,
+    context: Context,
+    fusedLocationClient: FusedLocationProviderClient,
+    onLocationUpdated: (Location?) -> Unit
+) {
+    LaunchedEffect(Unit) {
+        catalogShareViewModel.loadSharedWithMe()
+        if (hasLocationPermission(context)) {
+            onLocationUpdated(fetchCurrentLocation(fusedLocationClient))
+        }
+    }
+
+    LaunchedEffect(uiState.showCatalogDialog) {
+        if (uiState.showCatalogDialog) {
+            viewModel.loadCatalogs()
+        }
+    }
+}
+
+private fun performRecognition(
+    context: Context,
+    scope: CoroutineScope,
+    uiState: CameraUiState,
+    fusedLocationClient: FusedLocationProviderClient,
+    currentLocation: Location?,
+    onLocationUpdated: (Location?) -> Unit,
+    hasLocationPermission: () -> Boolean,
+    requestLocationPermission: () -> Unit
+) {
+    if (!hasLocationPermission()) {
+        requestLocationPermission()
+        uiState.updateResult("Grant location permission to attach coordinates.")
+        return
+    }
+
+    val uri = uiState.imageUri
+    if (uri == null) {
+        uiState.updateResult("Select a photo before scanning.")
+        return
+    }
+
+    scope.launch {
+        val locationToUse = currentLocation ?: fetchCurrentLocation(fusedLocationClient).also {
+            onLocationUpdated(it)
+        }
+        uiState.updateResult("Recognizing...")
+        val (message, response) = recognizeImage(context, uri, locationToUse)
+        uiState.showRecognitionResult(message, response)
+    }
+}
+
+private fun handleCatalogSave(
+    catalogId: String,
+    uiState: CameraUiState,
+    hasLocationPermission: Boolean,
+    fusedLocationClient: FusedLocationProviderClient,
+    currentLocation: Location?,
+    onLocationUpdated: (Location?) -> Unit,
+    viewModel: CatalogViewModel,
+    profileViewModel: ProfileViewModel,
+    scope: CoroutineScope
+) {
+    if (uiState.isSaving) return
+    val recognition = uiState.recognitionResult
+    if (recognition == null) {
+        uiState.updateResult("⚠️ Run recognition before saving.")
+        return
+    }
+    if (recognition.data.imagePath.isNullOrBlank()) {
+        uiState.updateResult("⚠️ Unable to save because the image reference is missing.")
+        return
+    }
+
+    uiState.setSavingState(true)
+    scope.launch {
+        val locationToUse = if (hasLocationPermission) {
+            currentLocation ?: fetchCurrentLocation(fusedLocationClient).also(onLocationUpdated)
+        } else {
+            currentLocation
+        }
+
+        val (success, message) = saveRecognitionToCatalog(recognition, catalogId, locationToUse)
+        uiState.updateResult(message)
+        if (success) {
+            uiState.resetAfterSave()
+            viewModel.loadCatalogs()
+            profileViewModel.refreshStats()
+        }
+        uiState.setSavingState(false)
+    }
+}
+
+@Stable
+private class CameraUiState {
+    var imageUri by mutableStateOf<Uri?>(null)
+        private set
+    var resultText by mutableStateOf<String?>(null)
+        private set
+    var recognitionResult by mutableStateOf<ScanResponse?>(null)
+        private set
+    var showCatalogDialog by mutableStateOf(false)
+        private set
+    var isSaving by mutableStateOf(false)
+        private set
+
+    fun updateImage(uri: Uri?) {
+        imageUri = uri
+    }
+
+    fun updateResult(message: String?) {
+        resultText = message
+    }
+
+    fun showRecognitionResult(message: String, response: ScanResponse?) {
+        resultText = message
+        recognitionResult = response
+        showCatalogDialog = response?.data?.imagePath?.isNotBlank() == true
+    }
+
+    fun dismissCatalogDialog() {
+        showCatalogDialog = false
+        recognitionResult = null
+    }
+
+    fun resetAfterSave() {
+        showCatalogDialog = false
+        recognitionResult = null
+        imageUri = null
+    }
+
+    fun setSavingState(value: Boolean) {
+        isSaving = value
+    }
+}
+
+@Composable
+private fun rememberCameraUiState(): CameraUiState {
+    return remember { CameraUiState() }
 }
 
 private suspend fun recognizeImage(
