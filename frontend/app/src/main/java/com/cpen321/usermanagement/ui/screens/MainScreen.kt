@@ -56,11 +56,13 @@ import com.cpen321.usermanagement.ui.components.ConfirmEntryActionDialog
 import com.cpen321.usermanagement.ui.components.toCatalogEntry
 import com.cpen321.usermanagement.ui.viewmodels.CatalogViewModel
 import com.cpen321.usermanagement.ui.viewmodels.CatalogShareViewModel
+import com.cpen321.usermanagement.ui.viewmodels.CatalogShareUiState
 import com.cpen321.usermanagement.ui.navigation.NavRoutes
 import com.cpen321.usermanagement.ui.viewmodels.MainUiState
 import com.cpen321.usermanagement.ui.viewmodels.MainViewModel
 import com.cpen321.usermanagement.ui.viewmodels.ProfileUiState
 import com.cpen321.usermanagement.ui.viewmodels.ProfileViewModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 @Composable
@@ -69,86 +71,8 @@ fun MainScreen(
     profileViewModel: ProfileViewModel,
     navController: NavHostController
 ) {
-    val mainUiState by mainViewModel.uiState.collectAsState()
-    val profileUiState by profileViewModel.uiState.collectAsState()
-    val catalogShareViewModel: CatalogShareViewModel = hiltViewModel()
-    val shareUiState by catalogShareViewModel.uiState.collectAsState()
-    val catalogViewModel: CatalogViewModel = hiltViewModel()
-    val snackBarHostState = remember { SnackbarHostState() }
-    val coroutineScope = rememberCoroutineScope()
-    val entryDialogState = rememberEntryDialogState()
-    val navigateToRoute = rememberNavigateToRoute(navController)
-    val additionalCatalogOptions = rememberSharedCatalogOptions(shareUiState.sharedCatalogs)
-
-    HandleMainScreenSideEffects(
-        mainViewModel = mainViewModel,
-        profileViewModel = profileViewModel,
-        catalogShareViewModel = catalogShareViewModel,
-        catalogViewModel = catalogViewModel,
-        snackBarHostState = snackBarHostState,
-        mainUiState = mainUiState,
-        profileUiState = profileUiState,
-        entryDialogState = entryDialogState
-    )
-
-    val summary = MainScreenSummary(
-        name = profileUiState.user?.name ?: "Explorer",
-        location = profileUiState.user?.region?.takeIf { it.isNotBlank() }
-            ?: profileUiState.user?.location?.takeIf { it.isNotBlank() }
-            ?: "Unknown location",
-        observations = profileUiState.stats?.observationCount
-            ?: profileUiState.user?.observationCount
-            ?: 0,
-        friends = profileUiState.stats?.friendCount ?: profileUiState.user?.friendCount ?: 0
-    )
-
-    val recentUi = RecentObservationsUi(
-        observations = mainUiState.recentObservations,
-        isLoading = mainUiState.isLoadingRecent,
-        errorMessage = mainUiState.recentError
-    )
-
-    MainScreenContent(
-        snackBarHostState = snackBarHostState,
-        summary = summary,
-        recentUi = recentUi,
-        onIdentifyClick = { navigateToRoute(NavRoutes.IDENTIFY) },
-        onViewCatalogs = { navigateToRoute(NavRoutes.CATALOGS) },
-        onViewAll = { navigateToRoute(NavRoutes.CATALOG_ENTRIES) },
-        onRetry = { mainViewModel.loadRecentObservations() },
-        onSelectObservation = { observation ->
-            if (observation.hasCoordinates) {
-                navController.navigate(NavRoutes.observationDetail(observation.id))
-            } else {
-                entryDialogState.showEntry(observation.toCatalogEntry())
-            }
-        }
-    )
-
-    AddEntryToCatalogDialog(
-        catalogViewModel = catalogViewModel,
-        state = entryDialogState,
-        additionalCatalogOptions = additionalCatalogOptions
-    ) {
-        mainViewModel.loadRecentObservations()
-        profileViewModel.refreshStats()
-        coroutineScope.launch {
-            snackBarHostState.showSnackbar("Observation added to catalog")
-        }
-    }
-
-    ObservationEntryDetailDialog(state = entryDialogState)
-
-    ConfirmEntryDeletionDialog(
-        catalogViewModel = catalogViewModel,
-        state = entryDialogState
-    ) {
-        mainViewModel.loadRecentObservations()
-        profileViewModel.refreshStats()
-        coroutineScope.launch {
-            snackBarHostState.showSnackbar("Observation deleted")
-        }
-    }
+    val state = rememberMainScreenState(mainViewModel, profileViewModel, navController)
+    MainScreenHost(state)
 }
 
 @Composable
@@ -167,46 +91,84 @@ private fun rememberNavigateToRoute(navController: NavHostController): (String) 
 }
 
 @Composable
-private fun HandleMainScreenSideEffects(
-    mainViewModel: MainViewModel,
-    profileViewModel: ProfileViewModel,
-    catalogShareViewModel: CatalogShareViewModel,
-    catalogViewModel: CatalogViewModel,
-    snackBarHostState: SnackbarHostState,
-    mainUiState: MainUiState,
-    profileUiState: ProfileUiState,
-    entryDialogState: EntryDialogState
-) {
-    val user = profileUiState.user
+private fun MainScreenHost(state: MainScreenState) {
+    HandleMainScreenSideEffects(state)
+
+    MainScreenContent(
+        snackBarHostState = state.snackBarHostState,
+        summary = state.summary,
+        recentUi = state.recentUi,
+        onIdentifyClick = { state.navigateToRoute(NavRoutes.IDENTIFY) },
+        onViewCatalogs = { state.navigateToRoute(NavRoutes.CATALOGS) },
+        onViewAll = { state.navigateToRoute(NavRoutes.CATALOG_ENTRIES) },
+        onRetry = { state.mainViewModel.loadRecentObservations() },
+        onSelectObservation = { observation ->
+            if (observation.hasCoordinates) {
+                state.navController.navigate(NavRoutes.observationDetail(observation.id))
+            } else {
+                state.entryDialogState.showEntry(observation.toCatalogEntry())
+            }
+        }
+    )
+
+    AddEntryToCatalogDialog(
+        catalogViewModel = state.catalogViewModel,
+        state = state.entryDialogState,
+        additionalCatalogOptions = state.additionalCatalogOptions
+    ) {
+        state.mainViewModel.loadRecentObservations()
+        state.profileViewModel.refreshStats()
+        state.coroutineScope.launch {
+            state.snackBarHostState.showSnackbar("Observation added to catalog")
+        }
+    }
+
+    ObservationEntryDetailDialog(state = state.entryDialogState)
+
+    ConfirmEntryDeletionDialog(
+        catalogViewModel = state.catalogViewModel,
+        state = state.entryDialogState
+    ) {
+        state.mainViewModel.loadRecentObservations()
+        state.profileViewModel.refreshStats()
+        state.coroutineScope.launch {
+            state.snackBarHostState.showSnackbar("Observation deleted")
+        }
+    }
+}
+
+@Composable
+private fun HandleMainScreenSideEffects(state: MainScreenState) {
+    val user = state.profileUiState.user
 
     LaunchedEffect(user) {
         if (user == null) {
-            profileViewModel.loadProfile()
+            state.profileViewModel.loadProfile()
         }
     }
 
     LaunchedEffect(Unit) {
-        catalogShareViewModel.loadSharedWithMe()
-        mainViewModel.loadRecentObservations()
+        state.catalogShareViewModel.loadSharedWithMe()
+        state.mainViewModel.loadRecentObservations()
     }
 
-    LaunchedEffect(mainUiState.successMessage) {
-        val message = mainUiState.successMessage
+    LaunchedEffect(state.mainUiState.successMessage) {
+        val message = state.mainUiState.successMessage
         if (message != null) {
-            snackBarHostState.showSnackbar(message)
-            mainViewModel.clearSuccessMessage()
+            state.snackBarHostState.showSnackbar(message)
+            state.mainViewModel.clearSuccessMessage()
         }
     }
 
-    LaunchedEffect(entryDialogState.showAddDialog) {
-        if (entryDialogState.showAddDialog) {
-            catalogViewModel.loadCatalogs()
+    LaunchedEffect(state.entryDialogState.showAddDialog) {
+        if (state.entryDialogState.showAddDialog) {
+            state.catalogViewModel.loadCatalogs()
         }
     }
 
-    LaunchedEffect(user?._id) {
-        if (user != null) {
-            mainViewModel.loadRecentObservations()
+    LaunchedEffect(state.profileUiState.user?._id) {
+        if (state.profileUiState.user != null) {
+            state.mainViewModel.loadRecentObservations()
         }
     }
 }
@@ -421,6 +383,90 @@ private data class RecentObservationsUi(
     val isLoading: Boolean,
     val errorMessage: String?
 )
+
+@Stable
+private class MainScreenState(
+    val mainViewModel: MainViewModel,
+    val profileViewModel: ProfileViewModel,
+    val catalogViewModel: CatalogViewModel,
+    val catalogShareViewModel: CatalogShareViewModel,
+    val navController: NavHostController,
+    val mainUiState: MainUiState,
+    val profileUiState: ProfileUiState,
+    val shareUiState: CatalogShareUiState,
+    val snackBarHostState: SnackbarHostState,
+    val coroutineScope: CoroutineScope,
+    val entryDialogState: EntryDialogState,
+    val navigateToRoute: (String) -> Unit,
+    val additionalCatalogOptions: List<CatalogOption>,
+    val summary: MainScreenSummary,
+    val recentUi: RecentObservationsUi
+)
+
+@Composable
+private fun rememberMainScreenState(
+    mainViewModel: MainViewModel,
+    profileViewModel: ProfileViewModel,
+    navController: NavHostController
+): MainScreenState {
+    val catalogViewModel: CatalogViewModel = hiltViewModel()
+    val catalogShareViewModel: CatalogShareViewModel = hiltViewModel()
+    val mainUiState by mainViewModel.uiState.collectAsState()
+    val profileUiState by profileViewModel.uiState.collectAsState()
+    val shareUiState by catalogShareViewModel.uiState.collectAsState()
+    val snackBarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    val entryDialogState = rememberEntryDialogState()
+    val navigateToRoute = rememberNavigateToRoute(navController)
+    val additionalCatalogOptions = rememberSharedCatalogOptions(shareUiState.sharedCatalogs)
+    val summary = remember(profileUiState.user, profileUiState.stats) {
+        buildMainScreenSummary(profileUiState)
+    }
+    val recentUi = remember(mainUiState) { buildRecentObservationsUi(mainUiState) }
+
+    return MainScreenState(
+        mainViewModel = mainViewModel,
+        profileViewModel = profileViewModel,
+        catalogViewModel = catalogViewModel,
+        catalogShareViewModel = catalogShareViewModel,
+        navController = navController,
+        mainUiState = mainUiState,
+        profileUiState = profileUiState,
+        shareUiState = shareUiState,
+        snackBarHostState = snackBarHostState,
+        coroutineScope = coroutineScope,
+        entryDialogState = entryDialogState,
+        navigateToRoute = navigateToRoute,
+        additionalCatalogOptions = additionalCatalogOptions,
+        summary = summary,
+        recentUi = recentUi
+    )
+}
+
+private fun buildMainScreenSummary(profileUiState: ProfileUiState): MainScreenSummary {
+    val user = profileUiState.user
+    val stats = profileUiState.stats
+    val name = user?.name ?: "Explorer"
+    val location = user?.region?.takeIf { it.isNotBlank() }
+        ?: user?.location?.takeIf { it.isNotBlank() }
+        ?: "Unknown location"
+    val observations = stats?.observationCount ?: user?.observationCount ?: 0
+    val friends = stats?.friendCount ?: user?.friendCount ?: 0
+    return MainScreenSummary(
+        name = name,
+        location = location,
+        observations = observations,
+        friends = friends
+    )
+}
+
+private fun buildRecentObservationsUi(mainUiState: MainUiState): RecentObservationsUi {
+    return RecentObservationsUi(
+        observations = mainUiState.recentObservations,
+        isLoading = mainUiState.isLoadingRecent,
+        errorMessage = mainUiState.recentError
+    )
+}
 
 @Stable
 private class EntryDialogState {

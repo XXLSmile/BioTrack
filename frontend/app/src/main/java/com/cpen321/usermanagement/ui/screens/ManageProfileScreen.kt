@@ -51,6 +51,7 @@ import com.cpen321.usermanagement.ui.theme.LocalSpacing
 import com.cpen321.usermanagement.ui.theme.Spacing
 import com.cpen321.usermanagement.ui.viewmodels.ProfileUiState
 import com.cpen321.usermanagement.ui.viewmodels.ProfileViewModel
+import com.cpen321.usermanagement.ui.viewmodels.UsernameAvailabilityResult
 
 private data class ProfileFormState(
     val name: String = "",
@@ -328,92 +329,134 @@ private fun ProfileInfoCard(
             modifier = Modifier.padding(spacing.large),
             verticalArrangement = Arrangement.spacedBy(spacing.medium)
         ) {
-            Text(
-                text = stringResource(R.string.manage_profile_details_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+            ProfileInfoHeader()
+            ProfileNameField(formState = formState, onFormChange = onFormChange)
+            ProfileEmailField(formState.email)
+            ProfileUsernameSection(
+                formState = formState,
+                onFormChange = onFormChange,
+                uiState = uiState,
+                usernameResult = usernameResult,
+                onCheckUsername = onCheckUsername,
+                onClearUsernameResult = onClearUsernameResult
             )
-
-            OutlinedTextField(
-                value = formState.name,
-                onValueChange = { onFormChange(formState.copy(name = it)) },
-                label = { Text(stringResource(R.string.profile_field_name)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = formState.email,
-                onValueChange = {},
-                enabled = false,
-                label = { Text(stringResource(R.string.profile_field_email)) },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = formState.username,
-                onValueChange = {
-                    onFormChange(formState.copy(username = it))
-                    onClearUsernameResult()
-                },
-                label = { Text(stringResource(R.string.profile_field_username)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(spacing.medium),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Button(
-                    fullWidth = false,
-                    onClick = { onCheckUsername(formState.username) },
-                    enabled = formState.username.isNotBlank() && !uiState.isCheckingUsername
-                ) {
-                    if (uiState.isCheckingUsername) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    } else {
-                        Text(stringResource(R.string.profile_check_username))
-                    }
-                }
-
-                usernameResult?.let {
-                    val color = if (it.isAvailable) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.error
-                    }
-
-                    Text(
-                        text = it.message,
-                        color = color,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-
-            OutlinedTextField(
-                value = formState.location,
-                onValueChange = { onFormChange(formState.copy(location = it)) },
-                label = { Text(stringResource(R.string.profile_field_location)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = formState.region,
-                onValueChange = { onFormChange(formState.copy(region = it)) },
-                label = { Text(stringResource(R.string.profile_field_region)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
+            ProfileLocationFields(formState = formState, onFormChange = onFormChange)
             PrivacyToggle(
                 isPublic = formState.isPublicProfile,
                 onValueChange = { onFormChange(formState.copy(isPublicProfile = it)) }
             )
         }
     }
+}
+
+@Composable
+private fun ProfileInfoHeader() {
+    Text(
+        text = stringResource(R.string.manage_profile_details_title),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold
+    )
+}
+
+@Composable
+private fun ProfileNameField(
+    formState: ProfileFormState,
+    onFormChange: (ProfileFormState) -> Unit
+) {
+    OutlinedTextField(
+        value = formState.name,
+        onValueChange = { onFormChange(formState.copy(name = it)) },
+        label = { Text(stringResource(R.string.profile_field_name)) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+@Composable
+private fun ProfileEmailField(email: String) {
+    OutlinedTextField(
+        value = email,
+        onValueChange = {},
+        enabled = false,
+        label = { Text(stringResource(R.string.profile_field_email)) },
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+@Composable
+private fun ProfileUsernameSection(
+    formState: ProfileFormState,
+    onFormChange: (ProfileFormState) -> Unit,
+    uiState: ProfileUiState,
+    usernameResult: UsernameAvailabilityResult?,
+    onCheckUsername: (String) -> Unit,
+    onClearUsernameResult: () -> Unit
+) {
+    val spacing = LocalSpacing.current
+
+    OutlinedTextField(
+        value = formState.username,
+        onValueChange = {
+            onFormChange(formState.copy(username = it))
+            onClearUsernameResult()
+        },
+        label = { Text(stringResource(R.string.profile_field_username)) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(spacing.medium),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Button(
+            fullWidth = false,
+            onClick = { onCheckUsername(formState.username) },
+            enabled = formState.username.isNotBlank() && !uiState.isCheckingUsername
+        ) {
+            if (uiState.isCheckingUsername) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            } else {
+                Text(stringResource(R.string.profile_check_username))
+            }
+        }
+
+        usernameResult?.let { result ->
+            val color = if (result.isAvailable) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.error
+            }
+
+            Text(
+                text = result.message,
+                color = color,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileLocationFields(
+    formState: ProfileFormState,
+    onFormChange: (ProfileFormState) -> Unit
+) {
+    OutlinedTextField(
+        value = formState.location,
+        onValueChange = { onFormChange(formState.copy(location = it)) },
+        label = { Text(stringResource(R.string.profile_field_location)) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
+
+    OutlinedTextField(
+        value = formState.region,
+        onValueChange = { onFormChange(formState.copy(region = it)) },
+        label = { Text(stringResource(R.string.profile_field_region)) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 @Composable

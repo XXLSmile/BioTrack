@@ -83,95 +83,12 @@ fun CameraScreen(
     viewModel: CatalogViewModel = hiltViewModel(),
     imagePicker: ImagePicker = RealImagePicker()
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val profileViewModel: ProfileViewModel = hiltViewModel()
-    val catalogShareViewModel: CatalogShareViewModel = hiltViewModel()
-    val shareUiState by catalogShareViewModel.uiState.collectAsState()
-    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
-    var currentLocation by remember { mutableStateOf<Location?>(null) }
-    val uiState = rememberCameraUiState()
-
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        if (granted) {
-            scope.launch {
-                currentLocation = fetchCurrentLocation(fusedLocationClient)
-            }
-        }
-    }
-
-    val additionalCatalogOptions = remember(shareUiState.sharedCatalogs) {
-        shareUiState.sharedCatalogs
-            .filter { it.status == "accepted" && it.role == "editor" && it.catalog?._id != null }
-            .map { CatalogOption(it.catalog!!._id, it.catalog.name ?: "Catalog") }
-    }
-
-    CameraScreenSideEffects(
-        catalogShareViewModel = catalogShareViewModel,
-        viewModel = viewModel,
-        uiState = uiState,
-        context = context,
-        fusedLocationClient = fusedLocationClient,
-        onLocationUpdated = { currentLocation = it }
-    )
-
-    CameraScreenLayout(
+    val controller = rememberCameraScreenController(viewModel)
+    CameraScreenHost(
+        controller = controller,
         onBack = onBack,
-        imageUri = uiState.imageUri,
-        resultText = uiState.resultText,
-        isSaving = uiState.isSaving,
-        imagePicker = imagePicker,
-        onImageSelected = uiState::updateImage,
-        onRecognizeClick = {
-            performRecognition(
-                context = context,
-                scope = scope,
-                uiState = uiState,
-                fusedLocationClient = fusedLocationClient,
-                currentLocation = currentLocation,
-                onLocationUpdated = { currentLocation = it },
-                hasLocationPermission = { hasLocationPermission(context) },
-                requestLocationPermission = {
-                    locationPermissionLauncher.launch(
-                        arrayOf(
-                            Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION
-                        )
-                    )
-                }
-            )
-        }
+        imagePicker = imagePicker
     )
-
-    if (uiState.showCatalogDialog && uiState.recognitionResult != null) {
-        AddToCatalogDialog(
-            viewModel = viewModel,
-            isSaving = uiState.isSaving,
-            onSave = { catalogId ->
-                handleCatalogSave(
-                    catalogId = catalogId,
-                    uiState = uiState,
-                    hasLocationPermission = hasLocationPermission(context),
-                    fusedLocationClient = fusedLocationClient,
-                    currentLocation = currentLocation,
-                    onLocationUpdated = { currentLocation = it },
-                    viewModel = viewModel,
-                    profileViewModel = profileViewModel,
-                    scope = scope
-                )
-            },
-            onDismiss = {
-                if (!uiState.isSaving) {
-                    uiState.dismissCatalogDialog()
-                }
-            },
-            additionalCatalogs = additionalCatalogOptions
-        )
-    }
 }
 
 @Composable
@@ -441,6 +358,53 @@ private fun rememberCameraUiState(): CameraUiState {
     return remember { CameraUiState() }
 }
 
+@Stable
+private class CameraScreenController(
+    val viewModel: CatalogViewModel,
+    val profileViewModel: ProfileViewModel,
+    val catalogShareViewModel: CatalogShareViewModel,
+    val context: Context,
+    val scope: CoroutineScope,
+    val fusedLocationClient: FusedLocationProviderClient,
+    val uiState: CameraUiState
+) {
+    var currentLocation by mutableStateOf<Location?>(null)
+    var additionalCatalogOptions by mutableStateOf<List<CatalogOption>>(emptyList())
+}
+
+@Composable
+private fun rememberCameraScreenController(
+    viewModel: CatalogViewModel
+): CameraScreenController {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val profileViewModel: ProfileViewModel = hiltViewModel()
+    val catalogShareViewModel: CatalogShareViewModel = hiltViewModel()
+    val shareUiState by catalogShareViewModel.uiState.collectAsState()
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    val uiState = rememberCameraUiState()
+
+    val controller = remember(viewModel, profileViewModel, catalogShareViewModel, fusedLocationClient) {
+        CameraScreenController(
+            viewModel = viewModel,
+            profileViewModel = profileViewModel,
+            catalogShareViewModel = catalogShareViewModel,
+            context = context,
+            scope = scope,
+            fusedLocationClient = fusedLocationClient,
+            uiState = uiState
+        )
+    }
+
+    controller.additionalCatalogOptions = remember(shareUiState.sharedCatalogs) {
+        shareUiState.sharedCatalogs
+            .filter { it.status == "accepted" && it.role == "editor" && it.catalog?._id != null }
+            .map { CatalogOption(it.catalog!!._id, it.catalog.name ?: "Catalog") }
+    }
+
+    return controller
+}
+
 private suspend fun recognizeImage(
     context: Context,
     uri: Uri,
@@ -596,3 +560,84 @@ private suspend fun fetchCurrentLocation(
 
 private fun Double.toTextRequestBody() =
     toString().toRequestBody("text/plain".toMediaTypeOrNull())
+@Composable
+private fun CameraScreenHost(
+    controller: CameraScreenController,
+    onBack: () -> Unit,
+    imagePicker: ImagePicker
+) {
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (granted) {
+            controller.scope.launch {
+                controller.currentLocation = fetchCurrentLocation(controller.fusedLocationClient)
+            }
+        }
+    }
+
+    CameraScreenSideEffects(
+        catalogShareViewModel = controller.catalogShareViewModel,
+        viewModel = controller.viewModel,
+        uiState = controller.uiState,
+        context = controller.context,
+        fusedLocationClient = controller.fusedLocationClient,
+        onLocationUpdated = { controller.currentLocation = it }
+    )
+
+    CameraScreenLayout(
+        onBack = onBack,
+        imageUri = controller.uiState.imageUri,
+        resultText = controller.uiState.resultText,
+        isSaving = controller.uiState.isSaving,
+        imagePicker = imagePicker,
+        onImageSelected = controller.uiState::updateImage,
+        onRecognizeClick = {
+            performRecognition(
+                context = controller.context,
+                scope = controller.scope,
+                uiState = controller.uiState,
+                fusedLocationClient = controller.fusedLocationClient,
+                currentLocation = controller.currentLocation,
+                onLocationUpdated = { controller.currentLocation = it },
+                hasLocationPermission = { hasLocationPermission(controller.context) },
+                requestLocationPermission = {
+                    locationPermissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        )
+                    )
+                }
+            )
+        }
+    )
+
+    if (controller.uiState.showCatalogDialog && controller.uiState.recognitionResult != null) {
+        AddToCatalogDialog(
+            viewModel = controller.viewModel,
+            isSaving = controller.uiState.isSaving,
+            onSave = { catalogId ->
+                handleCatalogSave(
+                    catalogId = catalogId,
+                    uiState = controller.uiState,
+                    hasLocationPermission = hasLocationPermission(controller.context),
+                    fusedLocationClient = controller.fusedLocationClient,
+                    currentLocation = controller.currentLocation,
+                    onLocationUpdated = { controller.currentLocation = it },
+                    viewModel = controller.viewModel,
+                    profileViewModel = controller.profileViewModel,
+                    scope = controller.scope
+                )
+            },
+            onDismiss = {
+                if (!controller.uiState.isSaving) {
+                    controller.uiState.dismissCatalogDialog()
+                }
+            },
+            additionalCatalogs = controller.additionalCatalogOptions
+        )
+    }
+}

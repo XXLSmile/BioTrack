@@ -90,7 +90,7 @@ fun FriendsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    FriendsScreenContent(
+    FriendsScreenHost(
         uiState = uiState,
         onSearchQueryChange = viewModel::updateSearchQuery,
         onSearch = viewModel::searchUsers,
@@ -108,7 +108,7 @@ fun FriendsScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FriendsScreenContent(
+private fun FriendsScreenHost(
     uiState: FriendUiState,
     onSearchQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
@@ -138,6 +138,38 @@ private fun FriendsScreenContent(
         }
     }
 
+    FriendsScreenContent(
+        uiState = uiState,
+        onSearchQueryChange = onSearchQueryChange,
+        onSearch = onSearch,
+        onTabSelected = onTabSelected,
+        onSendRequest = onSendRequest,
+        onAcceptRequest = onAcceptRequest,
+        onDeclineRequest = onDeclineRequest,
+        onRemoveFriend = onRemoveFriend,
+        onCancelRequest = onCancelRequest,
+        onRefreshRecommendations = onRefreshRecommendations,
+        onUserSelected = onUserSelected,
+        snackbarHostState = snackbarHostState
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FriendsScreenContent(
+    uiState: FriendUiState,
+    onSearchQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    onTabSelected: (FriendUiTab) -> Unit,
+    onSendRequest: (String) -> Unit,
+    onAcceptRequest: (String) -> Unit,
+    onDeclineRequest: (String) -> Unit,
+    onRemoveFriend: (String) -> Unit,
+    onCancelRequest: (String) -> Unit,
+    onRefreshRecommendations: () -> Unit,
+    onUserSelected: (PublicUserSummary) -> Unit,
+    snackbarHostState: SnackbarHostState
+) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -158,78 +190,20 @@ private fun FriendsScreenContent(
 
             FriendTabRow(selected = uiState.selectedTab, onTabSelected = onTabSelected)
 
-            when (uiState.selectedTab) {
-                FriendUiTab.FRIENDS -> FriendListSection(
-                    friends = uiState.friends,
-                    isLoading = uiState.isLoadingFriends,
-                    onRemoveFriend = onRemoveFriend,
-                    emptyMessage = "No friends yet\nSearch above to connect with other users",
-                    onUserSelected = onUserSelected
-                )
-                FriendUiTab.REQUESTS -> FriendRequestSection(
-                    requests = uiState.incomingRequests,
-                    isLoading = uiState.isLoadingRequests,
-                    onAccept = onAcceptRequest,
-                    onDecline = onDeclineRequest,
-                    emptyMessage = "No new requests",
-                    primaryActionText = "Accept",
-                    secondaryActionText = "Decline",
-                    primaryActionEnabled = true,
-                    userResolver = { it.requester },
-                    onUserSelected = onUserSelected
-                )
-                FriendUiTab.SENT -> FriendRequestSection(
-                    requests = uiState.sentRequests,
-                    isLoading = uiState.isLoadingSentRequests,
-                    onAccept = {},
-                    onDecline = onCancelRequest,
-                    emptyMessage = "No pending requests",
-                    primaryActionText = "Pending",
-                    secondaryActionText = "Cancel",
-                    primaryActionEnabled = false,
-                    userResolver = { it.addressee },
-                    onUserSelected = onUserSelected
-                )
-            }
+            FriendTabContent(
+                uiState = uiState,
+                onRemoveFriend = onRemoveFriend,
+                onAcceptRequest = onAcceptRequest,
+                onDeclineRequest = onDeclineRequest,
+                onCancelRequest = onCancelRequest,
+                onUserSelected = onUserSelected
+            )
 
-            if (uiState.searchResults.isNotEmpty()) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    shape = RoundedCornerShape(24.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text(
-                            text = "Search results",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                        HorizontalDivider(
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                            thickness = 1.dp
-                        )
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.heightIn(max = 280.dp)
-                        ) {
-                            items(uiState.searchResults) { user ->
-                                SearchResultRow(
-                                    user = user,
-                                    onSendRequest = onSendRequest,
-                                    isActionEnabled = uiState.canSendRequest(user._id),
-                                    onUserSelected = onUserSelected
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            SearchResultsCard(
+                uiState = uiState,
+                onSendRequest = onSendRequest,
+                onUserSelected = onUserSelected
+            )
 
             RecommendationSection(
                 recommendations = uiState.recommendations,
@@ -238,6 +212,93 @@ private fun FriendsScreenContent(
                 onUserSelected = onUserSelected,
                 onRefresh = onRefreshRecommendations
             )
+        }
+    }
+}
+
+@Composable
+private fun FriendTabContent(
+    uiState: FriendUiState,
+    onRemoveFriend: (String) -> Unit,
+    onAcceptRequest: (String) -> Unit,
+    onDeclineRequest: (String) -> Unit,
+    onCancelRequest: (String) -> Unit,
+    onUserSelected: (PublicUserSummary) -> Unit
+) {
+    when (uiState.selectedTab) {
+        FriendUiTab.FRIENDS -> FriendListSection(
+            friends = uiState.friends,
+            isLoading = uiState.isLoadingFriends,
+            onRemoveFriend = onRemoveFriend,
+            emptyMessage = "No friends yet\nSearch above to connect with other users",
+            onUserSelected = onUserSelected
+        )
+        FriendUiTab.REQUESTS -> FriendRequestSection(
+            requests = uiState.incomingRequests,
+            isLoading = uiState.isLoadingRequests,
+            onAccept = onAcceptRequest,
+            onDecline = onDeclineRequest,
+            emptyMessage = "No new requests",
+            primaryActionText = "Accept",
+            secondaryActionText = "Decline",
+            primaryActionEnabled = true,
+            userResolver = { it.requester },
+            onUserSelected = onUserSelected
+        )
+        FriendUiTab.SENT -> FriendRequestSection(
+            requests = uiState.sentRequests,
+            isLoading = uiState.isLoadingSentRequests,
+            onAccept = {},
+            onDecline = onCancelRequest,
+            emptyMessage = "No pending requests",
+            primaryActionText = "Pending",
+            secondaryActionText = "Cancel",
+            primaryActionEnabled = false,
+            userResolver = { it.addressee },
+            onUserSelected = onUserSelected
+        )
+    }
+}
+
+@Composable
+private fun SearchResultsCard(
+    uiState: FriendUiState,
+    onSendRequest: (String) -> Unit,
+    onUserSelected: (PublicUserSummary) -> Unit
+) {
+    if (uiState.searchResults.isEmpty()) return
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Search results",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium
+            )
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                thickness = 1.dp
+            )
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.heightIn(max = 280.dp)
+            ) {
+                items(uiState.searchResults) { user ->
+                    SearchResultRow(
+                        user = user,
+                        onSendRequest = onSendRequest,
+                        isActionEnabled = uiState.canSendRequest(user._id),
+                        onUserSelected = onUserSelected
+                    )
+                }
+            }
         }
     }
 }
