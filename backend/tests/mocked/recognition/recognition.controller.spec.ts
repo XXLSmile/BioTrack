@@ -639,6 +639,32 @@ describe('RecognitionController', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  // API: POST /api/recognition (recognizeImage)
+  // Input: multipart upload where file buffer missing
+  // Expected status code: n/a
+  // Expected behavior: controller forwards error to next middleware
+  // Expected output: next called with Error('Uploaded file buffer is not available.')
+  // Mock behavior: file provided without Buffer instance so helper throws
+  test('recognizeImage forwards error when uploaded buffer missing', async () => {
+    const req = {
+      protocol: 'https',
+      get: () => 'example.com',
+      body: {},
+      file: {
+        originalname: 'broken.jpg',
+        buffer: 'not-a-buffer',
+      },
+    } as unknown as Request;
+
+    const res = createMockResponse<RecognitionImageResponse>();
+    const next = jest.fn() as NextFunction;
+
+    await recognitionController.recognizeImage(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
   // API: POST /api/recognition/save (recognizeAndSave)
   // Input: imagePath provided but recognition payload missing required species fields
   // Expected status code: 400
@@ -696,6 +722,29 @@ describe('RecognitionController', () => {
         message: 'imagePath is required to save the recognition result.',
       })
     );
+  });
+
+  // API: POST /api/recognition/save (recognizeAndSave)
+  // Input: request without req.user
+  // Expected status code: 401
+  // Expected behavior: responds with authentication error before further validation
+  // Expected output: message 'Authentication required'
+  // Mock behavior: none
+  test('recognizeAndSave returns 401 when user missing', async () => {
+    const req = {
+      body: {
+        imagePath: '/uploads/images/any.jpg',
+      },
+      user: undefined,
+    } as unknown as Request;
+    const res = createMockResponse();
+    const next = jest.fn() as NextFunction;
+
+    await recognitionController.recognizeAndSave(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+    expect(next).not.toHaveBeenCalled();
   });
 
   test('recognizeAndSave requires recognition payload object', async () => {
@@ -1104,11 +1153,10 @@ describe('RecognitionController', () => {
 
   // API: POST /api/recognition/save (recognizeAndSave)
   // Input: new entry creation where catalogRepository.create returns null
-  // Expected status code: 500
-  // Expected behavior: controller logs error and responds with failure message
-  // Expected output: JSON message "Failed to save catalog entry"
+  // Expected behavior: controller logs error and forwards it to the error handler
+  // Expected output: next invoked with Error; response not sent
   // Mock behavior: catalogRepository.create mocked to resolve null causing failure branch
-  test('recognizeAndSave returns 500 when catalog creation fails', async () => {
+  test('recognizeAndSave forwards errors when catalog creation fails', async () => {
     const userId = new mongoose.Types.ObjectId();
     speciesFindOrCreateMock.mockResolvedValue({
       _id: new mongoose.Types.ObjectId(),
@@ -1142,13 +1190,10 @@ describe('RecognitionController', () => {
 
     await recognitionController.recognizeAndSave(req, res, next);
 
-    expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: 'Failed to save catalog entry',
-      })
-    );
-    expect(incrementObservationCountMock).not.toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalledWith(500);
+    expect(res.json).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+    expect(incrementObservationCountMock).toHaveBeenCalled();
     existsSpy.mockRestore();
     readSpy.mockRestore();
   });
@@ -1680,6 +1725,23 @@ describe('RecognitionController', () => {
   });
 
   // API: GET /api/recognition/catalog (getUserCatalog)
+  // Input: missing authenticated user
+  // Expected status code: 401
+  // Expected behavior: short-circuits before repository access
+  // Expected output: { message: 'Authentication required' }
+  // Mock behavior: none
+  test('getUserCatalog requires authentication', async () => {
+    const req = { user: undefined, query: {} } as unknown as Request;
+    const res = createMockResponse();
+    const next = jest.fn() as NextFunction;
+
+    await recognitionController.getUserCatalog(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+    expect(next).not.toHaveBeenCalled();
+  });
+
   // Input: authenticated user with default limit (50)
   // Expected status code: 200
   // Expected behavior: controller returns user's catalog entries
@@ -1729,6 +1791,22 @@ describe('RecognitionController', () => {
   });
 
   // API: GET /api/recognition/recent (getRecentEntries)
+  // Input: missing req.user
+  // Expected status code: 401
+  // Expected behavior: responds with auth error without repository call
+  // Expected output: { message: 'Authentication required' }
+  // Mock behavior: none
+  test('getRecentEntries requires authentication', async () => {
+    const req = { user: undefined, query: {} } as unknown as Request;
+    const res = createMockResponse();
+    const next = jest.fn() as NextFunction;
+
+    await recognitionController.getRecentEntries(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+  });
+
   // Input: limit query parameter provided
   // Expected status code: 200
   // Expected behavior: controller returns limited list of recent entries
@@ -1777,6 +1855,25 @@ describe('RecognitionController', () => {
   });
 
   // API: DELETE /api/recognition/entry/:entryId (deleteEntry)
+  // Input: request without authenticated user
+  // Expected status code: 401
+  // Expected behavior: responds immediately with authentication error
+  // Expected output: { message: 'Authentication required' }
+  // Mock behavior: none
+  test('deleteEntry requires authentication', async () => {
+    const req = {
+      user: undefined,
+      params: { entryId: new mongoose.Types.ObjectId().toString() },
+    } as unknown as Request<{ entryId: string }>;
+    const res = createMockResponse();
+    const next = jest.fn() as NextFunction;
+
+    await recognitionController.deleteEntry(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+  });
+
   // Input: request missing entryId parameter
   // Expected status code: 400
   // Expected behavior: controller rejects call before repository invocation

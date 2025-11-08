@@ -1,10 +1,15 @@
-import fs from 'fs';
 import mongoose from 'mongoose';
 import path from 'path';
 import { afterEach, describe, expect, jest, test } from '@jest/globals';
 
-jest.mock('fs', () => ({
-  existsSync: jest.fn(),
+jest.mock('../../../src/utils/pathSafe', () => ({
+  __esModule: true,
+  ensurePathWithinRoot: jest.fn((_root: string, filePath: string) => filePath),
+  resolveWithinRoot: jest.fn(() => '/uploads/images'),
+}));
+
+jest.mock('../../../src/utils/safeFs', () => ({
+  __esModule: true,
   unlinkSync: jest.fn(),
 }));
 
@@ -31,11 +36,14 @@ import { CatalogModel, catalogRepository } from '../../../src/recognition/catalo
 import { catalogEntryLinkModel } from '../../../src/catalog/catalogEntryLink.model';
 import { userModel } from '../../../src/user/user.model';
 import logger from '../../../src/logger.util';
+import * as pathSafe from '../../../src/utils/pathSafe';
+import * as safeFs from '../../../src/utils/safeFs';
 
-const fsMock = fs as jest.Mocked<typeof fs>;
 const catalogEntryLinkModelMock = catalogEntryLinkModel as jest.Mocked<typeof catalogEntryLinkModel>;
 const userModelMock = userModel as jest.Mocked<typeof userModel>;
 const loggerMock = logger as unknown as { error: jest.Mock };
+const pathSafeMock = pathSafe as jest.Mocked<typeof pathSafe>;
+const safeFsMock = safeFs as jest.Mocked<typeof safeFs>;
 
 describe('Mocked: CatalogRepository core methods', () => {
   afterEach(() => {
@@ -328,7 +336,8 @@ describe('Mocked: CatalogRepository core methods', () => {
 
     jest.spyOn(CatalogModel, 'findById').mockResolvedValueOnce(entry as any);
     catalogEntryLinkModelMock.removeEntryFromAllCatalogs.mockResolvedValueOnce(undefined);
-    fsMock.existsSync.mockReturnValueOnce(true);
+    safeFsMock.unlinkSync.mockClear();
+    pathSafeMock.ensurePathWithinRoot.mockClear();
 
     const result = await catalogRepository.deleteById(entryId.toString(), ownerId.toString());
 
@@ -336,8 +345,11 @@ describe('Mocked: CatalogRepository core methods', () => {
     expect(catalogEntryLinkModelMock.removeEntryFromAllCatalogs).toHaveBeenCalledWith(entryId);
     expect(deleteOne).toHaveBeenCalledTimes(1);
     expect(userModelMock.recomputeObservationCount).toHaveBeenCalledWith(ownerId);
-    expect(fsMock.existsSync).toHaveBeenCalled();
-    expect(fsMock.unlinkSync).toHaveBeenCalledWith(expect.stringContaining(path.basename(entry.imageUrl)));
+    expect(pathSafeMock.ensurePathWithinRoot).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.stringContaining(path.basename(entry.imageUrl))
+    );
+    expect(safeFsMock.unlinkSync).toHaveBeenCalledWith(expect.stringContaining(path.basename(entry.imageUrl)));
   });
 
   // Interface CatalogRepository.deleteById
@@ -359,12 +371,51 @@ describe('Mocked: CatalogRepository core methods', () => {
 
     jest.spyOn(CatalogModel, 'findById').mockResolvedValueOnce(entry as any);
     catalogEntryLinkModelMock.removeEntryFromAllCatalogs.mockResolvedValueOnce(undefined);
-    fsMock.existsSync.mockReturnValueOnce(false);
+    safeFsMock.unlinkSync.mockImplementationOnce(() => {
+      const err = new Error('not found') as NodeJS.ErrnoException;
+      err.code = 'ENOENT';
+      throw err;
+    });
 
     const result = await catalogRepository.deleteById(entryId.toString(), ownerId.toString());
 
     expect(result).toBe('deleted');
-    expect(fsMock.unlinkSync).not.toHaveBeenCalled();
+    expect(safeFsMock.unlinkSync).toHaveBeenCalledTimes(1);
+  });
+
+  // Interface CatalogRepository.deleteById
+  test('rethrows when unlink fails with unexpected error', async () => {
+    // API: CatalogRepository.deleteById
+    // Input: entryId owned by userId where unlinkSync throws EPERM
+    // Expected status code: n/a, expectation is error propagates after logger call
+    // Expected behavior: logger.error invoked with context before rejection
+    // Expected output: promise rejects with original error
+    const ownerId = new mongoose.Types.ObjectId();
+    const entryId = new mongoose.Types.ObjectId();
+    const deleteOne = jest.fn();
+    const entry = {
+      _id: entryId,
+      userId: ownerId,
+      imageUrl: 'http://example.com/uploads/images/protected.jpg',
+      deleteOne,
+    };
+    const fsError = Object.assign(new Error('permission denied'), { code: 'EPERM' });
+
+    jest.spyOn(CatalogModel, 'findById').mockResolvedValueOnce(entry as any);
+    catalogEntryLinkModelMock.removeEntryFromAllCatalogs.mockResolvedValueOnce(undefined);
+    safeFsMock.unlinkSync.mockImplementationOnce(() => {
+      throw fsError;
+    });
+
+    await expect(
+      catalogRepository.deleteById(entryId.toString(), ownerId.toString())
+    ).rejects.toThrow('permission denied');
+
+    expect(loggerMock.error).toHaveBeenCalledWith('Failed to delete catalog entry', {
+      entryId: entryId.toString(),
+      error: fsError,
+    });
+    expect(deleteOne).not.toHaveBeenCalled();
   });
 
   // Interface CatalogRepository.deleteById
@@ -387,7 +438,7 @@ describe('Mocked: CatalogRepository core methods', () => {
 
     jest.spyOn(CatalogModel, 'findById').mockResolvedValueOnce(entry as any);
     catalogEntryLinkModelMock.removeEntryFromAllCatalogs.mockRejectedValueOnce(failure);
-    fsMock.existsSync.mockReturnValueOnce(false);
+    safeFsMock.unlinkSync.mockReset();
 
     await expect(
       catalogRepository.deleteById(entryId.toString(), ownerId.toString())

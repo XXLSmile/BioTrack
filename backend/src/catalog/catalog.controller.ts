@@ -47,6 +47,13 @@ export class CatalogController {
     } catch (error) {
       logger.error('Failed to create catalog:', error);
 
+      // Handle Zod validation errors
+      if (error && typeof error === 'object' && 'issues' in error) {
+        return res.status(400).json({
+          message: 'Invalid catalog data',
+        });
+      }
+
       if (error instanceof mongoose.Error.ValidationError) {
         return res.status(400).json({
           message: 'Invalid catalog data',

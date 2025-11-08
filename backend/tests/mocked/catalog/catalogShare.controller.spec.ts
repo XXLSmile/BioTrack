@@ -71,6 +71,90 @@ describe('Mocked: CatalogShareController', () => {
     jest.clearAllMocks();
   });
 
+  // API: GET /api/catalogs/:catalogId/share
+  // Input: missing authenticated user
+  // Expected status code: 401
+  test('listCollaborators requires authentication', async () => {
+    const req: any = { user: undefined, params: { catalogId: 'cat' } };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await controller.listCollaborators(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  // API: POST /api/catalogs/:catalogId/share
+  // Input: missing authenticated user
+  // Expected status code: 401
+  test('inviteCollaborator requires authenticated user', async () => {
+    const req: any = { user: undefined, params: { catalogId: 'cat' }, body: { inviteeId: 'id', role: 'viewer' } };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await controller.inviteCollaborator(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  // API: PATCH /api/catalogs/:catalogId/share/:shareId
+  // Input: missing authenticated user
+  // Expected status code: 401
+  test('updateCollaborator requires authenticated user', async () => {
+    const req: any = { user: undefined, params: { catalogId: 'cat', shareId: 'share' }, body: { role: 'viewer' } };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await controller.updateCollaborator(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  // API: PATCH /api/catalogs/share/:shareId/respond
+  // Input: missing authenticated user
+  // Expected status code: 401
+  test('respondToInvitation requires authenticated user', async () => {
+    const req: any = { user: undefined, params: { shareId: 'share' }, body: { action: 'accept' } };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await controller.respondToInvitation(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  // API: GET /api/catalog/share/pending
+  // Input: missing authenticated user
+  // Expected status code: 401
+  test('listPendingInvitations requires authenticated user', async () => {
+    const req: any = { user: undefined };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await controller.listPendingInvitations(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  // API: GET /api/catalog/shared-with/me
+  // Input: missing authenticated user
+  // Expected status code: 401
+  test('listSharedWithMe requires authenticated user', async () => {
+    const req: any = { user: undefined };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await controller.listSharedWithMe(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
   // API: GET /api/catalogs/:catalogId/collaborators (CatalogShareController.listCollaborators)
   // Input: owner requesting collaborators
   // Expected status code: 200

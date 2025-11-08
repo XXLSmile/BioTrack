@@ -12,6 +12,7 @@ describe('Mocked: CatalogModel', () => {
     find: jest.Mock;
     findOneAndUpdate: jest.Mock;
     deleteOne: jest.Mock;
+    deleteMany: jest.Mock;
   };
 
   beforeAll(() => {
@@ -26,6 +27,7 @@ describe('Mocked: CatalogModel', () => {
       find: jest.fn(),
       findOneAndUpdate: jest.fn(),
       deleteOne: jest.fn(),
+      deleteMany: jest.fn(),
     };
 
     (model as any).catalog = collectionMock;
@@ -216,5 +218,19 @@ describe('Mocked: CatalogModel', () => {
     expect(sort).toHaveBeenCalledWith({ updatedAt: -1, createdAt: -1 });
     expect(exec).toHaveBeenCalled();
     expect(result).toBe(execResult);
+  });
+
+  // Interface CatalogModel.deleteAllOwnedByUser
+  test('deleteAllOwnedByUser returns deleted count fallback', async () => {
+    const owner = new mongoose.Types.ObjectId();
+    collectionMock.deleteMany.mockImplementationOnce(async () => ({ deletedCount: 3 }));
+    collectionMock.deleteMany.mockImplementationOnce(async () => ({}));
+
+    const first = await model.deleteAllOwnedByUser(owner);
+    const second = await model.deleteAllOwnedByUser(owner);
+
+    expect(collectionMock.deleteMany).toHaveBeenCalledWith({ owner });
+    expect(first).toBe(3);
+    expect(second).toBe(0);
   });
 });
