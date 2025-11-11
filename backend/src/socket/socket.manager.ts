@@ -97,7 +97,10 @@ const extractToken = (
   return undefined;
 };
 
-const userHasCatalogAccess = async (userId: string, catalogId: string): Promise<boolean> => {
+export const userHasCatalogAccess = async (
+  userId: string,
+  catalogId: string
+): Promise<boolean> => {
   if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(catalogId)) {
     return false;
   }
@@ -262,13 +265,6 @@ export const initializeSocketServer = (
   return io;
 };
 
-const getServer = (): SocketServer => {
-  if (!isServerInitialized) {
-    throw new Error('Socket.IO server has not been initialized.');
-  }
-  return io;
-};
-
 const emitToCatalogRoom = <TEvent extends keyof ServerToClientEvents>(
   catalogId: mongoose.Types.ObjectId | string,
   event: TEvent,
@@ -282,7 +278,7 @@ const emitToCatalogRoom = <TEvent extends keyof ServerToClientEvents>(
     return;
   }
 
-  const server = getServer();
+  const server = io;
   const args = [payload] as Parameters<ServerToClientEvents[TEvent]>;
   server.to(buildCatalogRoom(catalogId.toString())).emit(event, ...args);
 };

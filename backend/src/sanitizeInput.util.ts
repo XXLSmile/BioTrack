@@ -1,5 +1,5 @@
 export const sanitizeArgs = (args: unknown[]): unknown[] => {
-  return args.map(arg => sanitizeInput(String(arg)));
+  return args.map(arg => (typeof arg === 'string' ? sanitizeInput(arg) : arg));
 };
 
 export const sanitizeInput = (input: string): string => {

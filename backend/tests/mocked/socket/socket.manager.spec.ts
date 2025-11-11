@@ -95,6 +95,23 @@ describe('Mocked: socket.manager', () => {
     delete process.env.JWT_SECRET;
   });
 
+  test('userHasCatalogAccess returns false for invalid identifiers', async () => {
+    const { userHasCatalogAccess } = loadSocketModule();
+    const result = await userHasCatalogAccess('bad-user', 'bad-catalog');
+    expect(result).toBe(false);
+  });
+
+  test('userHasCatalogAccess returns false when catalog missing', async () => {
+    const { userHasCatalogAccess } = loadSocketModule();
+    const userId = new mongoose.Types.ObjectId().toString();
+    const catalogId = new mongoose.Types.ObjectId().toString();
+    mockCatalogModel.findById.mockResolvedValueOnce(null);
+
+    const result = await userHasCatalogAccess(userId, catalogId);
+
+    expect(result).toBe(false);
+  });
+
   afterAll(() => {
     Object.assign(process.env, originalEnv);
   });
@@ -160,6 +177,26 @@ describe('Mocked: socket.manager', () => {
 
     expect(first).toBe(second);
     expect(ServerConstructor).toHaveBeenCalledTimes(1);
+  });
+
+  test('initializeSocketServer respects configured CORS origins', () => {
+    process.env.SOCKET_CORS_ORIGIN = 'https://app.example.com, ,https://api.example.com';
+    process.env.JWT_SECRET = 'secret';
+    jwtVerifyMock.mockReturnValue({ id: new mongoose.Types.ObjectId().toString() });
+    mockUserModel.findById.mockResolvedValue({ _id: new mongoose.Types.ObjectId() });
+
+    const { initializeSocketServer } = loadSocketModule();
+    initializeSocketServer({} as http.Server);
+
+    const callArgs = ServerConstructor.mock.calls[0] as unknown as [
+      unknown,
+      { cors?: { origin?: string[] | string } }
+    ];
+    const [, options] = callArgs;
+    expect(options?.cors?.origin).toEqual([
+      'https://app.example.com',
+      'https://api.example.com',
+    ]);
   });
 
   // API: socket authentication middleware
@@ -241,6 +278,198 @@ describe('Mocked: socket.manager', () => {
     expect(mockUserModel.findById).toHaveBeenCalled();
     expect(socket.data.user?.userId).toBeDefined();
     expect(next).toHaveBeenCalledWith();
+  });
+
+  test('auth middleware extracts token from query string', async () => {
+    const userId = new mongoose.Types.ObjectId().toString();
+    process.env.JWT_SECRET = 'secret';
+    jwtVerifyMock.mockReturnValue({ id: userId });
+    mockUserModel.findById.mockResolvedValue({ _id: new mongoose.Types.ObjectId(userId) });
+
+    const { initializeSocketServer } = loadSocketModule();
+    initializeSocketServer({} as http.Server);
+
+    const middleware = serverInstances[0].use.mock.calls[0][0] as (
+      socket: any,
+      next: (err?: Error) => void
+    ) => Promise<void>;
+    const socket: any = {
+      data: {},
+      handshake: { auth: {}, query: { token: 'query-token' }, headers: {} },
+    };
+    const next = jest.fn();
+
+    await middleware(socket, next);
+
+    expect(jwtVerifyMock).toHaveBeenCalledWith('query-token', 'secret');
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  test('auth middleware extracts token from authorization header', async () => {
+    const userId = new mongoose.Types.ObjectId().toString();
+    process.env.JWT_SECRET = 'secret';
+    jwtVerifyMock.mockReturnValue({ id: userId });
+    mockUserModel.findById.mockResolvedValue({ _id: new mongoose.Types.ObjectId(userId) });
+
+    const { initializeSocketServer } = loadSocketModule();
+    initializeSocketServer({} as http.Server);
+
+    const middleware = serverInstances[0].use.mock.calls[0][0] as (
+      socket: any,
+      next: (err?: Error) => void
+    ) => Promise<void>;
+    const socket: any = {
+      data: {},
+      handshake: { auth: {}, query: {}, headers: { authorization: 'Bearer header-token' } },
+    };
+    const next = jest.fn();
+
+    await middleware(socket, next);
+
+    expect(jwtVerifyMock).toHaveBeenCalledWith('header-token', 'secret');
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  test('auth middleware rejects when no token supplied', async () => {
+    process.env.JWT_SECRET = 'secret';
+
+    const { initializeSocketServer } = loadSocketModule();
+    initializeSocketServer({} as http.Server);
+
+    const middleware = serverInstances[0].use.mock.calls[0][0] as (
+      socket: any,
+      next: (err?: Error) => void
+    ) => Promise<void>;
+    const socket: any = { data: {}, handshake: { auth: {}, query: {}, headers: {} } };
+    const next = jest.fn();
+
+    await middleware(socket, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+    expect(jwtVerifyMock).not.toHaveBeenCalled();
+  });
+
+  test('auth middleware errors when JWT_SECRET missing', async () => {
+    const userId = new mongoose.Types.ObjectId().toString();
+    process.env.JWT_SECRET = '';
+    jwtVerifyMock.mockReturnValue({ id: userId });
+
+    const { initializeSocketServer } = loadSocketModule();
+    initializeSocketServer({} as http.Server);
+
+    const middleware = serverInstances[0].use.mock.calls[0][0] as (
+      socket: any,
+      next: (err?: Error) => void
+    ) => Promise<void>;
+    const socket: any = {
+      data: {},
+      handshake: { auth: { token: 'token' }, query: {}, headers: {} },
+    };
+    const next = jest.fn();
+
+    await middleware(socket, next);
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'JWT_SECRET is not configured. Socket authentication cannot proceed.'
+    );
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+  });
+
+  test('auth middleware rejects invalid string id', async () => {
+    process.env.JWT_SECRET = 'secret';
+    jwtVerifyMock.mockReturnValue({ id: 'not-an-object-id' });
+
+    const { initializeSocketServer } = loadSocketModule();
+    initializeSocketServer({} as http.Server);
+
+    const middleware = serverInstances[0].use.mock.calls[0][0] as (
+      socket: any,
+      next: (err?: Error) => void
+    ) => Promise<void>;
+    const socket: any = {
+      data: {},
+      handshake: { auth: { token: 'token' }, query: {}, headers: {} },
+    };
+    const next = jest.fn();
+
+    await middleware(socket, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+  });
+
+  test('auth middleware rejects raw id of unsupported type', async () => {
+    process.env.JWT_SECRET = 'secret';
+    jwtVerifyMock.mockReturnValue({ id: 123 });
+
+    const { initializeSocketServer } = loadSocketModule();
+    initializeSocketServer({} as http.Server);
+
+    const middleware = serverInstances[0].use.mock.calls[0][0] as (
+      socket: any,
+      next: (err?: Error) => void
+    ) => Promise<void>;
+    const socket: any = {
+      data: {},
+      handshake: { auth: { token: 'token' }, query: {}, headers: {} },
+    };
+    const next = jest.fn();
+
+    await middleware(socket, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+  });
+
+  test('auth middleware rejects when decoded user missing', async () => {
+    const userId = new mongoose.Types.ObjectId().toString();
+    process.env.JWT_SECRET = 'secret';
+    jwtVerifyMock.mockReturnValue({ id: userId });
+    mockUserModel.findById.mockResolvedValueOnce(null);
+
+    const { initializeSocketServer } = loadSocketModule();
+    initializeSocketServer({} as http.Server);
+
+    const middleware = serverInstances[0].use.mock.calls[0][0] as (
+      socket: any,
+      next: (err?: Error) => void
+    ) => Promise<void>;
+    const socket: any = {
+      data: {},
+      handshake: { auth: { token: 'token' }, query: {}, headers: {} },
+    };
+    const next = jest.fn();
+
+    await middleware(socket, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+  });
+
+  test('auth middleware logs and rejects when jwt.verify throws', async () => {
+    process.env.JWT_SECRET = 'secret';
+    const failure = new Error('boom');
+    jwtVerifyMock.mockImplementation(() => {
+      throw failure;
+    });
+
+    const { initializeSocketServer } = loadSocketModule();
+    initializeSocketServer({} as http.Server);
+
+    const middleware = serverInstances[0].use.mock.calls[0][0] as (
+      socket: any,
+      next: (err?: Error) => void
+    ) => Promise<void>;
+    const socket: any = {
+      data: {},
+      handshake: { auth: { token: 'token' }, query: {}, headers: {} },
+    };
+    const next = jest.fn();
+
+    await middleware(socket, next);
+
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      'Socket authentication failed',
+      expect.objectContaining({ error: failure })
+    );
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
   });
 
   // API: 'catalog:join' handler
@@ -340,6 +569,24 @@ describe('Mocked: socket.manager', () => {
     expect(socket.join).not.toHaveBeenCalled();
   });
 
+  test('catalog:join rejects missing catalog entries', async () => {
+    const { socket } = initializeConnectedSocket();
+    const joinHandler = (socket.on.mock.calls as [string, (...args: any[]) => void][])
+      .find(([event]) => event === 'catalog:join')?.[1] as (
+      catalogId: string,
+      ack?: (response: any) => void
+    ) => Promise<void>;
+
+    const catalogId = new mongoose.Types.ObjectId().toString();
+    mockCatalogModel.findById.mockResolvedValueOnce(null);
+
+    const ack = jest.fn();
+    await joinHandler(catalogId, ack);
+
+    expect(ack).toHaveBeenCalledWith({ ok: false, error: 'Access denied' });
+    expect(mockCatalogShareModel.getUserAccess).not.toHaveBeenCalled();
+  });
+
   // API: 'catalog:join' handler
   // Input: catalog lookup throws error
   // Expected status code: n/a
@@ -404,6 +651,37 @@ describe('Mocked: socket.manager', () => {
     expect(ack).toHaveBeenCalledWith({ ok: false, error: 'Invalid catalog ID' });
   });
 
+  test('disconnects sockets without user data', () => {
+    process.env.JWT_SECRET = 'secret';
+    jwtVerifyMock.mockReturnValue({ id: new mongoose.Types.ObjectId().toString() });
+    mockUserModel.findById.mockResolvedValue({ _id: new mongoose.Types.ObjectId() });
+
+    const { initializeSocketServer } = loadSocketModule();
+    initializeSocketServer({} as http.Server);
+
+    const connectionHandler = (serverInstances[0].on.mock.calls as [
+      string,
+      (...args: any[]) => void
+    ][]).find(([event]) => event === 'connection')?.[1] as (socket: any) => void;
+
+    const socket: any = {
+      id: 'no-user',
+      data: {},
+      handshake: { auth: {}, query: {}, headers: {} },
+      join: jest.fn(),
+      leave: jest.fn(),
+      on: jest.fn(),
+      disconnect: jest.fn(),
+    };
+
+    connectionHandler(socket);
+
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      'Socket connected without user data. Disconnecting.'
+    );
+    expect(socket.disconnect).toHaveBeenCalledWith(true);
+  });
+
   // API: 'catalog:leave' handler
   // Input: valid catalog ObjectId string
   // Expected status code: n/a
@@ -418,6 +696,30 @@ describe('Mocked: socket.manager', () => {
     leaveHandler(catalogId);
 
     expect(socket.leave).toHaveBeenCalledWith(`catalog:${catalogId}`);
+  });
+
+  test('catalog:leave ignores invalid ids', () => {
+    const { socket } = initializeConnectedSocket();
+    const leaveHandler = (socket.on.mock.calls as [string, (...args: any[]) => void][])
+      .find(([event]) => event === 'catalog:leave')?.[1] as (catalogId: string) => void;
+
+    leaveHandler('');
+
+    expect(socket.leave).not.toHaveBeenCalled();
+  });
+
+  test('disconnect handler logs when socket drops', () => {
+    const { socket, userId } = initializeConnectedSocket();
+    const disconnectHandler = (socket.on.mock.calls as [string, (...args: any[]) => void][])
+      .find(([event]) => event === 'disconnect')?.[1] as (reason: string) => void;
+
+    disconnectHandler('test-reason');
+
+    expect(mockLogger.info).toHaveBeenCalledWith('Socket disconnected', {
+      socketId: socket.id,
+      userId,
+      reason: 'test-reason',
+    });
   });
 
   // API: emitCatalogEntriesUpdated

@@ -33,6 +33,22 @@ beforeEach(() => {
 
 // Interface AuthController.signUp
 describe('Mocked: AuthController.signUp', () => {
+  test('returns 400 when idToken missing', async () => {
+    const req = createRequest({});
+    const res = createResponse();
+    const next = createNext();
+    const signUpSpy = jest.spyOn(authService, 'signUpWithGoogle');
+
+    await controller.signUp(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Google token is required',
+    });
+    expect(signUpSpy).not.toHaveBeenCalled();
+    signUpSpy.mockRestore();
+  });
+
   // Input: request body with Google ID token
   // Expected status code: 201
   // Expected behavior: controller returns success payload from mocked service
@@ -146,6 +162,22 @@ describe('Mocked: AuthController.signUp', () => {
 
 // Interface AuthController.signIn
 describe('Mocked: AuthController.signIn', () => {
+  test('returns 400 when idToken missing', async () => {
+    const req = createRequest({});
+    const res = createResponse();
+    const next = createNext();
+    const signInSpy = jest.spyOn(authService, 'signInWithGoogle');
+
+    await controller.signIn(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Google token is required',
+    });
+    expect(signInSpy).not.toHaveBeenCalled();
+    signInSpy.mockRestore();
+  });
+
   // Input: request body with valid token
   // Expected status code: 200
   // Expected behavior: controller returns auth payload

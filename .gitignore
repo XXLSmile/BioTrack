@@ -63,3 +63,5 @@ backend/firebase-adminsdk.json
 
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
+
+M2-hockey-prediction-app

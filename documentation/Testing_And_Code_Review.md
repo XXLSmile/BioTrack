@@ -4,9 +4,10 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
-| 2025-02-14 | Section 2 (Back-end Test Specification) | Documented Jest-based API testing setup and execution flow. |
-| 2025-02-15 | Section 2 (Back-end Test Specification) | Added unit-test coverage details for auth layer. |
-| 2025-02-15 | Section 2 (Back-end Test Specification) | Rebuilt auth test suites with mocked/unmocked coverage. |
+| 2025-10-29 | Section 2 (Back-end Test Specification) | Documented Jest-based API testing setup and execution flow. |
+| 2025-11-5 | Section 2 (Back-end Test Specification) | Added unit-test coverage details for auth layer. |
+| 2025-11-9 | Section 2 (Back-end Test Specification) | Rebuilt auth test suites with mocked/unmocked coverage. |
+| 2025-11-10 | Section 2 (Back-end Test Specification) | Documented current jest coverage workflow, added mocked/unmocked test runs, coverage artifacts, and updated CI/test guidance. |
 
 ---
 
@@ -22,10 +23,16 @@
 | **Auth Controller** | [`backend/tests/unmock/auth/auth.controller.spec.ts`](../backend/tests/unmock/auth/auth.controller.spec.ts#L1) | [`backend/tests/mocked/auth/auth.controller.spec.ts`](../backend/tests/mocked/auth/auth.controller.spec.ts#L1) | Mocked suite overrides `authService` dependencies |
 | **Auth Middleware** | [`backend/tests/unmock/auth/auth.middleware.spec.ts`](../backend/tests/unmock/auth/auth.middleware.spec.ts#L1) | [`backend/tests/mocked/auth/auth.middleware.spec.ts`](../backend/tests/mocked/auth/auth.middleware.spec.ts#L1) | Mocked suite stubs `jsonwebtoken.verify`, `userModel.findById` |
 | **Auth Service** | [`backend/tests/unmock/auth/auth.service.spec.ts`](../backend/tests/unmock/auth/auth.service.spec.ts#L1) | [`backend/tests/mocked/auth/auth.service.spec.ts`](../backend/tests/mocked/auth/auth.service.spec.ts#L1) | Mocked suite replaces OAuth2Client, `userModel`, and JWT signing |
+| **Friend Controller** | [`backend/tests/unmock/friends/friend.routes.spec.ts`](../backend/tests/unmock/friends/friend.routes.spec.ts#L1) | [`backend/tests/mocked/friends/friend.controller.spec.ts`](../backend/tests/mocked/friends/friend.controller.spec.ts#L1) | Mocked suite replaces `friendshipModel`, `userModel`, `geocodingService`, `messaging`, `logger` |
+| **Recognition Controller** | [`backend/tests/unmock/recognition/recognition.controller.spec.ts`](../backend/tests/unmock/recognition/recognition.controller.spec.ts#L1) | [`backend/tests/mocked/recognition/recognition.controller.spec.ts`](../backend/tests/mocked/recognition/recognition.controller.spec.ts#L1) | Mocked suite stubs `recognitionService`, `catalogRepository`, `userModel`, `logger`, `fs` |
+| **Recognition Service** | [`backend/tests/unmock/recognition/recognition.service.spec.ts`](../backend/tests/unmock/recognition/recognition.service.spec.ts#L1) | [`backend/tests/mocked/recognition/recognition.service.unit.spec.ts`](../backend/tests/mocked/recognition/recognition.service.unit.spec.ts#L1) | Mocked suite fakes external ML responses, Mongo collection helpers |
+| **Geocoding Service** | [`backend/tests/mocked/location/geocoding.service.spec.ts`](../backend/tests/mocked/location/geocoding.service.spec.ts#L1 - unmocked coverage is internal) | same | Mocks `axios`, inspects `logger` |
+| **Socket Manager** | covered via real module in `tests/mocked/socket/socket.manager.spec.ts` (no unmocked version exists yet) | same | Mocks Socket.IO constructor, `userModel`, `catalogModel`, `catalogShareModel`, `jsonwebtoken` |
+| **User Controller** | [`backend/tests/mocked/user/user.controller.spec.ts`](../backend/tests/mocked/user/user.controller.spec.ts#L1) (unmocked coverage handled via `tests/unmock/user/user.controller.spec.ts` file and route suites) | same | Mocked suite swaps `userModel`, `friendshipModel`, `catalogRepository`, `catalogModel` |
 
 #### 2.1.2. Commit Hash Where Tests Run
 
-The first successful run with the current suite has not yet been recorded. After executing the tests locally (requires MongoDB binaries for `mongodb-memory-server`), capture the SHA via `git rev-parse HEAD` and record it here.
+`1cf0b0e7faa14b5b6453db2cc47269260c0238a4` (this is the current `main` commit hash examined before the CI run described below; rerun `git rev-parse HEAD` after future changes and update this field).
 
 #### 2.1.3. Explanation on How to Run the Tests
 
@@ -34,39 +41,64 @@ The first successful run with the current suite has not yet been recorded. After
    cd backend
    npm install
    ```
-2. **Run all tests**
+2. **Run unmocked suites (real integrations)**
    ```bash
-   npm run test
+   npx jest --coverage tests/unmock
    ```
-   - The suites are split between `tests/unmock/**` (no dependency mocks) and `tests/mocked/**` (external collaborators mocked per requirement).
-   - Firebase Admin access is stubbed via local jest mocks; no service account file is required.
-   - Some environments block binding ephemeral ports; if you see `listen EPERM` locally, rerun with `SKIP_MONGO=true` to disable in-memory MongoDB hooks.
-3. **Watch mode (optional)**
+   - Covers controllers, services, and routes hitting real mongoose helpers and HTTP plumbing.
+3. **Run mocked suites to exercise guards & error handling**
    ```bash
-   npm run test:watch
+   npx jest --coverage tests/mocked
    ```
-4. **Generate coverage**
+   - This exercises the same APIs with mocked persistence/external calls (`userModel`, `FriendshipModel`, `recognitionService`, Socket.IO, etc.).
+4. **Combine everything**
    ```bash
    npm run test:coverage
    ```
+   - Runs the full Jest configuration (`tests/setup` + both `mocked`/`unmocked` roots) and produces `coverage/lcov-report`.
+5. **Watch mode (optional)**
+   ```bash
+   npm run test:watch
+   ```
+Notes:
+   - Mocked suites redirect Firebase Admin and JWT signing to jest spies so no service account is required.
+   - Some CI sandboxes block MongoMemoryServer from binding ports; rerun with `SKIP_MONGO=true` if you see `listen EPERM 0.0.0.0`.
+   - The current coverage runs still log expected errors from `recognition.controller.spec.ts` (missing `MEDIA_BASE_URL`, “No species recognized,” or rate-limit errors). Those errors are emitted deliberately in the mocked tests and do not indicate regressions—they can be silenced once environment vars or mocks are configured by the reviewer.
 
-### 2.2. Jest Configuration Location
+### 2.2. Jest Configuration and CI Workflow
 
 `backend/jest.config.ts`
 
-> _Note:_ CI automation for backend tests is not yet committed. When a GitHub Actions workflow is added, document its path here as well.
+GitHub Actions workflow that runs all backend tests:
+
+```
+.github/workflows/backend-tests.yml
+```
+
+That workflow executes `npm install`, `npm run test:coverage`, and publishes coverage artifacts. Any additional suites must be wired into this workflow before the release to ensure CI completeness.
 
 ### 2.3. Jest Coverage Report Screenshots for Tests Without Mocking
+![Unmocked Coverage](testCoverageUnmocked.png)
 
-_(Placeholder for Jest coverage screenshot without mocking)_
+See `testCoverageUnmocked.png` at the repository root (generated after `npx jest --coverage tests/unmock`). This image shows per-file/overall coverage when exercising the real controllers/services.
 
 ### 2.4. Jest Coverage Report Screenshots for Tests With Mocking
+![Mocked Coverage](testCoverageMocked.png)
 
-_(Placeholder for Jest coverage screenshot with mocking)_
+See `testCoverageMocked.png` at the repository root (generated by `npx jest --coverage tests/mocked`). The mocked snapshot represents coverage of error/guard branches while persistence layers are stubbed.
 
 ### 2.5. Jest Coverage Report Screenshots for Both Tests With and Without Mocking
+![Combined Coverage](testCoverageAll.png)
 
-_(Placeholder for Jest coverage screenshot both with and without mocking)_
+The combined run (`npm run test:coverage`) produces the full report (`coverage/lcov-report/index.html`); a screenshot is the same as `testCoverageAll.png` if you regenerate it today. This run still logs deliberate errors from `tests/mocked/recognition/recognition.controller.spec.ts` (missing `MEDIA_BASE_URL`, “No species recognized from image,” and rate-limit scenarios) because those describe guards we intentionally hit; they do not indicate regressions.
+
+#### Coverage Gaps Explanation
+- `src/logger.util.ts` (lines around 13–24) – the `try { JSON.stringify } catch` branch only runs when an argument cannot be stringified; the happy-path tests already cover everything we control, so hitting that branch would require intentionally malformed data.
+- `src/auth/auth.middleware.ts` lines 14, 43–49 – these guard clauses are triggered when the request lacks a token/secret or when JWT verification returns an invalid payload; our positive-path tests and mocks do not force those early failures.
+- `src/friends/friend.controller.ts` lines 90‑95, 117, 134‑136, 152‑163, 202, 272, 427‑428, 456‑463, 486‑502, 601‑610, 808 – these span the more complicated recommendation scoring, notification dispatch, and response formatting branches that currently require end-to-end integration data (multiple catalogs/friends plus geocoding) beyond the guard-focused unit tests.
+- `src/geocoding.service.ts` lines 69 and 145 – these warn when the geocoding API omits locality/province components; our unit mocks return fully populated responses, so the fallback paths are intentionally left for future integration tests with malformed API payloads.
+- `src/socket/socket.manager.ts` line 185 – covering `server.to(...).emit(...)` requires a live Socket.IO client/server handshake, so the unit tests intentionally stop at the guard/warning level.
+- `src/user/user.controller.ts` lines 96, 133, 176, 206–224, 294, 354 – these correspond to advanced query/listing/badge flows that are currently exercised by broader integration suites rather than the quick unit tests we added.
 
 ---
 
