@@ -1,0 +1,107 @@
+name: Backend Tests CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-tests.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [20.x]
+    
+    services:
+      mongodb:
+        image: mongo:7.0
+        env:
+          MONGO_INITDB_ROOT_USERNAME: testuser
+          MONGO_INITDB_ROOT_PASSWORD: testpass
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand({ping: 1})'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Create test environment file
+        working-directory: ./backend
+        run: |
+          cat > .env.test <<EOF
+          NODE_ENV=test
+          PORT=3001
+          MONGODB_URI=mongodb://testuser:testpass@localhost:27017/biotrack_test?authSource=admin
+          JWT_SECRET=test-jwt-secret-key-for-ci
+          GOOGLE_CLIENT_ID=test-google-client-id
+          USE_MOCK_IDENTIFICATION=true
+          EOF
+
+      - name: Run TypeScript compilation check
+        working-directory: ./backend
+        run: npm run build
+
+      - name: Run tests with coverage
+        working-directory: ./backend
+        run: npm run test:coverage
+        env:
+          NODE_ENV: test
+          MONGODB_URI: mongodb://testuser:testpass@localhost:27017/biotrack_test?authSource=admin
+          JWT_SECRET: test-jwt-secret-key-for-ci
+          GOOGLE_CLIENT_ID: test-google-client-id
+          USE_MOCK_IDENTIFICATION: true
+
+      - name: Generate coverage report
+        working-directory: ./backend
+        run: |
+          echo "## Test Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          npm run test:coverage -- --coverageReporters=text | tail -20 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload coverage to artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: backend/coverage/
+          retention-days: 30
+
+      - name: Check test results
+        if: failure()
+        run: |
+          echo " Tests failed! Please check the logs above."
+          exit 1
+
+      - name: Success notification
+        if: success()
+        run: |
+          echo "All backend tests passed successfully!"
+          echo "Coverage report available in artifacts"
+

@@ -3,6 +3,24 @@ import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import { userModel } from '../user/user.model';
 
+export const resolveUserObjectId = (
+  rawId: unknown
+): mongoose.Types.ObjectId | undefined => {
+  if (typeof rawId === 'string') {
+    if (!mongoose.Types.ObjectId.isValid(rawId)) {
+      return undefined;
+    }
+
+    return new mongoose.Types.ObjectId(rawId);
+  }
+
+  if (rawId instanceof mongoose.Types.ObjectId) {
+    return rawId;
+  }
+
+  return undefined;
+};
+
 const authenticateTokenImpl = async (
   req: Request,
   res: Response,
@@ -36,20 +54,9 @@ const authenticateTokenImpl = async (
         ? (decoded as { id: unknown }).id
         : undefined;
 
-    let userObjectId: mongoose.Types.ObjectId | undefined;
+    const userObjectId = resolveUserObjectId(rawId);
 
-    if (typeof rawId === 'string') {
-      if (!mongoose.Types.ObjectId.isValid(rawId)) {
-        res.status(401).json({
-          error: 'Invalid token',
-          message: 'Token verification failed',
-        });
-        return;
-      }
-      userObjectId = new mongoose.Types.ObjectId(rawId);
-    } else if (rawId instanceof mongoose.Types.ObjectId) {
-      userObjectId = rawId;
-    } else {
+    if (!userObjectId) {
       res.status(401).json({
         error: 'Invalid token',
         message: 'Token verification failed',
@@ -87,7 +94,7 @@ const authenticateTokenImpl = async (
       return;
     }
 
-    next(error);
+    throw error;
   }
 };
 

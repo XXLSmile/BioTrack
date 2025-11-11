@@ -524,6 +524,18 @@ describe('Mocked: FriendController', () => {
     expect(payload?.data?.recommendations?.[0]?.locationMatch).toBe(true);
   });
 
+  test('getRecommendations returns 401 when unauthenticated', async () => {
+    const req: any = { query: {} };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.getRecommendations(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+    expect(next).not.toHaveBeenCalled();
+  });
+
   // API: GET /api/friends (FriendController.listFriends)
   // Input: friendships containing valid, null, and unpopulated entries
   // Expected status code: 200
@@ -584,6 +596,18 @@ describe('Mocked: FriendController', () => {
     expect(res.status).not.toHaveBeenCalled();
   });
 
+  test('listFriends returns 401 when unauthenticated', async () => {
+    const req: any = { user: undefined };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.listFriends(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+    expect(next).not.toHaveBeenCalled();
+  });
+
   // API: POST /api/friends/requests (FriendController.sendRequest)
   // Input: targetUserId identical to authenticated user's _id
   // Expected status code: 400
@@ -603,6 +627,21 @@ describe('Mocked: FriendController', () => {
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json.mock.calls[0][0]?.message).toMatch(/cannot send a friend request to yourself/i);
+  });
+
+  test('sendRequest returns 401 when unauthenticated', async () => {
+    const req: any = {
+      user: undefined,
+      body: { targetUserId: new mongoose.Types.ObjectId().toString() },
+    };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.sendRequest(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+    expect(next).not.toHaveBeenCalled();
   });
 
   // API: POST /api/friends/requests (FriendController.sendRequest)
@@ -755,6 +794,22 @@ describe('Mocked: FriendController', () => {
     await friendController.respondToRequest(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test('respondToRequest returns 401 when unauthenticated', async () => {
+    const req: any = {
+      user: undefined,
+      params: { requestId: new mongoose.Types.ObjectId().toString() },
+      body: { action: 'accept' },
+    };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.respondToRequest(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+    expect(next).not.toHaveBeenCalled();
   });
 
   // API: PATCH /api/friends/requests/:requestId (FriendController.respondToRequest)
@@ -1010,6 +1065,21 @@ describe('Mocked: FriendController', () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
+  test('cancelRequest returns 401 when unauthenticated', async () => {
+    const req: any = {
+      user: undefined,
+      params: { requestId: new mongoose.Types.ObjectId().toString() },
+    };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.cancelRequest(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+    expect(next).not.toHaveBeenCalled();
+  });
+
   // API: DELETE /api/friends/:friendshipId (FriendController.removeFriend)
   // Input: user removes friend across failure and success cases
   // Expected status codes: 404 (missing friendship), 403 (unauthorized or not accepted), 200 (removed)
@@ -1068,6 +1138,21 @@ describe('Mocked: FriendController', () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
+  test('removeFriend returns 401 when unauthenticated', async () => {
+    const req: any = {
+      user: undefined,
+      params: { friendshipId: new mongoose.Types.ObjectId().toString() },
+    };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.removeFriend(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+    expect(next).not.toHaveBeenCalled();
+  });
+
   // API: GET /api/friends/requests (FriendController.listRequests)
   // Input: query.type = 'outgoing'
   // Expected status code: 200
@@ -1123,6 +1208,18 @@ describe('Mocked: FriendController', () => {
     await friendController.listRequests(req, res, next);
 
     expect(next).toHaveBeenCalledWith(error);
+  });
+
+  test('listRequests returns 401 when unauthenticated', async () => {
+    const req: any = { user: undefined, query: {} };
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await friendController.listRequests(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+    expect(next).not.toHaveBeenCalled();
   });
 
   // API: GET /api/friends/recommendations (FriendController.getRecommendations)

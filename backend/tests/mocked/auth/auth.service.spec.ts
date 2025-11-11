@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 
 type Payload = ReturnType<typeof buildBasePayload>;
 type MockTicket = { getPayload: () => Payload };
@@ -153,6 +154,21 @@ describe('Mocked: AuthService.signUpWithGoogle', () => {
     await expect(authService.signUpWithGoogle('token')).rejects.toThrow(
       'Invalid Google token'
     );
+  });
+
+  test('throws when JWT secret missing', async () => {
+    const originalSecret = process.env.JWT_SECRET;
+    delete process.env.JWT_SECRET;
+    const createdUser = { _id: new mongoose.Types.ObjectId() };
+    verifyIdTokenMock.mockResolvedValueOnce(resolveTicket(buildBasePayload()));
+    findByGoogleIdMock.mockResolvedValueOnce(null);
+    createUserMock.mockResolvedValueOnce(createdUser as any);
+
+    await expect(authService.signUpWithGoogle('token')).rejects.toThrow(
+      'JWT secret is not configured'
+    );
+
+    process.env.JWT_SECRET = originalSecret;
   });
 });
 

@@ -267,4 +267,109 @@ describe('Mocked: geocodingService', () => {
       expect.any(Error)
     );
   });
+
+  test('reverseGeocode reuses cached API key without re-reading env', async () => {
+    mockedAxios.get.mockResolvedValueOnce({
+      data: {
+        status: 'OK',
+        results: [
+          {
+            address_components: [
+              { long_name: 'City', types: ['locality'] },
+              { long_name: 'Province', types: ['administrative_area_level_1'] },
+            ],
+          },
+        ],
+      },
+    } as any);
+    (geocodingService as any).apiKey = 'cached-key';
+    (geocodingService as any).envChecked = true;
+
+    const result = await geocodingService.reverseGeocode(1, 2);
+
+    expect(result?.city).toBe('City');
+    expect(mockedAxios.get).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+      params: expect.objectContaining({ key: 'cached-key' }),
+    }));
+  });
+
+  test('reverseGeocode returns city from administrative_area_level_2 when locality missing', async () => {
+    mockedAxios.get.mockResolvedValueOnce({
+      data: {
+        status: 'OK',
+        results: [
+          {
+            address_components: [
+              { long_name: 'District', types: ['administrative_area_level_2'] },
+              { long_name: 'Province', types: ['administrative_area_level_1'] },
+            ],
+          },
+        ],
+      },
+    } as any);
+
+    const result = await geocodingService.reverseGeocode(1, 2);
+
+    expect(result).toEqual({ city: 'District', province: 'Province' });
+  });
+
+  test('reverseGeocode returns undefined when components lack city and province', async () => {
+    mockedAxios.get.mockResolvedValueOnce({
+      data: {
+        status: 'OK',
+        results: [
+          {
+            address_components: [{ long_name: 'Route', types: ['route'] }],
+          },
+        ],
+      },
+    } as any);
+
+    const result = await geocodingService.reverseGeocode(1, 2);
+
+    expect(result).toBeUndefined();
+  });
+
+  test('reverseGeocode logs axios errors when request fails', async () => {
+    const axiosError = Object.assign(new Error('timeout'), {
+      isAxiosError: true,
+      response: { status: 500, data: { message: 'oops' } },
+    });
+    mockedAxios.get.mockRejectedValueOnce(axiosError);
+
+    const result = await geocodingService.reverseGeocode(1, 2);
+
+    expect(result).toBeUndefined();
+    expect(mockedLogger.error).toHaveBeenCalledWith(
+      'Geocoding API request failed',
+      expect.objectContaining({
+        message: 'timeout',
+        status: 500,
+        data: { message: 'oops' },
+      })
+    );
+  });
+
+  test('forwardGeocode uses administrative_area_level_2 when locality is absent', async () => {
+    mockedAxios.get.mockResolvedValueOnce({
+      data: {
+        status: 'OK',
+        results: [
+          {
+            formatted_address: '123 Address',
+            geometry: { location: { lat: 1, lng: 2 } },
+            address_components: [
+              { long_name: 'District', types: ['administrative_area_level_2'] },
+              { long_name: 'Province', types: ['administrative_area_level_1'] },
+            ],
+          },
+        ],
+      },
+    } as any);
+
+    const result = await geocodingService.forwardGeocode('Address');
+
+    expect(result?.city).toBe('District');
+    expect(result?.province).toBe('Province');
+  });
 });

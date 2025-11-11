@@ -100,8 +100,48 @@ beforeEach(() => {
   mockedCatalogModel.deleteAllOwnedByUser.mockResolvedValue(0);
 });
 
+// Interface UserController.getProfile
+describe('Mocked: UserController.getProfile', () => {
+  test('returns profile when user is authenticated', () => {
+    const user = sampleUser();
+    const req = { user } as any;
+    const res = createResponse();
+    const next = createNext();
+
+    controller.getProfile(req, res as any);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Profile fetched successfully',
+      data: { user },
+    });
+  });
+
+  test('returns 401 when user missing', () => {
+    const req = { user: undefined } as any;
+    const res = createResponse();
+    const next = createNext();
+
+    controller.getProfile(req, res as any);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+  });
+});
+
 // Interface UserController.updateProfile
 describe('Mocked: UserController.updateProfile', () => {
+  test('returns 401 when user missing', async () => {
+    const req = { user: undefined, body: {} } as any;
+    const res = createResponse();
+    const next = createNext();
+
+    await controller.updateProfile(req, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+  });
+
   // Input: payload with unchanged username
   // Expected status code: 200
   // Expected behavior: controller updates profile without availability check failure
@@ -201,6 +241,32 @@ describe('Mocked: UserController.updateProfile', () => {
     });
     expect(res.status).toHaveBeenCalledWith(200);
     expect(next).not.toHaveBeenCalled();
+  });
+
+  test('updates location, region, and privacy when provided', async () => {
+    const user = sampleUser();
+    const updated = { ...user, location: 'Burnaby', region: 'BC', isPublicProfile: false } as any;
+    mockedUserModel.update.mockResolvedValueOnce(updated);
+
+    const req = {
+      user,
+      body: {
+        location: 'Burnaby',
+        region: 'BC',
+        isPublicProfile: false,
+      },
+    } as any;
+    const res = createResponse();
+    const next = createNext();
+
+    await controller.updateProfile(req, res as any, next);
+
+    expect(mockedUserModel.update).toHaveBeenCalledWith(user._id, {
+      location: 'Burnaby',
+      region: 'BC',
+      isPublicProfile: false,
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 
   // Input: payload causing duplicate key error

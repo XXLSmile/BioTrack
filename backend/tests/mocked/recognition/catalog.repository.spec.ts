@@ -451,4 +451,35 @@ describe('Mocked: CatalogRepository core methods', () => {
     expect(deleteOne).not.toHaveBeenCalled();
     expect(userModelMock.recomputeObservationCount).not.toHaveBeenCalled();
   });
+
+  test('deleteAllForUser returns number of deleted entries', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const entries = [
+      { _id: new mongoose.Types.ObjectId() },
+      { _id: new mongoose.Types.ObjectId() },
+    ];
+    jest.spyOn(CatalogModel, 'find').mockResolvedValueOnce(entries as any);
+    const deleteSpy = jest.spyOn(catalogRepository, 'deleteById');
+    deleteSpy.mockResolvedValueOnce('deleted');
+    deleteSpy.mockResolvedValueOnce('not_found');
+
+    const result = await catalogRepository.deleteAllForUser(userId);
+
+    expect(CatalogModel.find).toHaveBeenCalledWith({ userId });
+    expect(deleteSpy).toHaveBeenCalledTimes(2);
+    expect(result).toBe(1);
+    deleteSpy.mockRestore();
+  });
+
+  test('deleteAllForUser returns zero when no entries found', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    jest.spyOn(CatalogModel, 'find').mockResolvedValueOnce([]);
+    const deleteSpy = jest.spyOn(catalogRepository, 'deleteById');
+
+    const result = await catalogRepository.deleteAllForUser(userId);
+
+    expect(deleteSpy).not.toHaveBeenCalled();
+    expect(result).toBe(0);
+    deleteSpy.mockRestore();
+  });
 });

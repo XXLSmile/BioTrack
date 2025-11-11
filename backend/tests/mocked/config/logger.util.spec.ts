@@ -24,7 +24,9 @@ describe('Mocked: logger.util', () => {
   test('logger.info sanitizes args and writes to stdout', () => {
     logger.info('Hello\nWorld', { foo: 'bar' });
 
-    expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('[INFO] Hello\\nWorld [object Object]\n'));
+    expect(stdoutSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[INFO] Hello\\nWorld {"foo":"bar"}\n')
+    );
     expect(stderrSpy).not.toHaveBeenCalled();
   });
 
@@ -41,5 +43,22 @@ describe('Mocked: logger.util', () => {
     expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining('[ERROR] Something failed'));
     expect(stderrSpy.mock.calls[0][0]).toContain('boom');
     expect(stdoutSpy).not.toHaveBeenCalled();
+  });
+
+  test('logger.debug writes to stdout with prefixed level', () => {
+    logger.debug('Debug message', { flag: true });
+
+    expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('[DEBUG] Debug message'));
+    expect(stderrSpy).not.toHaveBeenCalled();
+  });
+
+  test('logger.info skips arguments that cannot be stringified', () => {
+    const circular: any = {};
+    circular.self = circular;
+
+    logger.info('Handles circular', circular);
+
+    expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('[INFO] Handles circular'));
+    expect(stderrSpy).not.toHaveBeenCalled();
   });
 });

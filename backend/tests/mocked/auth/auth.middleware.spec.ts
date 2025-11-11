@@ -14,7 +14,7 @@ jest.mock('../../../src/user/user.model', () => ({
   },
 }));
 
-import { authenticateToken } from '../../../src/auth/auth.middleware';
+import { authenticateToken, resolveUserObjectId } from '../../../src/auth/auth.middleware';
 import { userModel } from '../../../src/user/user.model';
 
 const createResponse = (): Response & {
@@ -177,5 +177,18 @@ describe('Mocked: authenticateToken', () => {
 
     expect(res.status).not.toHaveBeenCalled();
     expect(next).toHaveBeenCalledWith(boom);
+  });
+});
+
+describe('resolveUserObjectId helper', () => {
+  test('returns ObjectId when input is mongoose.Types.ObjectId', () => {
+    const objectId = new mongoose.Types.ObjectId();
+
+    expect(resolveUserObjectId(objectId)).toBe(objectId);
+  });
+
+  test('returns undefined for invalid inputs', () => {
+    expect(resolveUserObjectId('not-an-object-id')).toBeUndefined();
+    expect(resolveUserObjectId(123)).toBeUndefined();
   });
 });
