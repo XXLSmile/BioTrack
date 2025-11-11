@@ -4,10 +4,10 @@
 
 | **Change Date**   | **Modified Sections** | **Rationale** |
 | ----------------- | --------------------- | ------------- |
-| 2025-02-14 | Section 2 (Back-end Test Specification) | Documented Jest-based API testing setup and execution flow. |
-| 2025-02-15 | Section 2 (Back-end Test Specification) | Added unit-test coverage details for auth layer. |
-| 2025-02-15 | Section 2 (Back-end Test Specification) | Rebuilt auth test suites with mocked/unmocked coverage. |
-| 2025-11-18 | Section 2 (Back-end Test Specification) | Documented current jest coverage workflow, added mocked/unmocked test runs, coverage artifacts, and updated CI/test guidance. |
+| 2025-10-29 | Section 2 (Back-end Test Specification) | Documented Jest-based API testing setup and execution flow. |
+| 2025-11-5 | Section 2 (Back-end Test Specification) | Added unit-test coverage details for auth layer. |
+| 2025-11-9 | Section 2 (Back-end Test Specification) | Rebuilt auth test suites with mocked/unmocked coverage. |
+| 2025-11-10 | Section 2 (Back-end Test Specification) | Documented current jest coverage workflow, added mocked/unmocked test runs, coverage artifacts, and updated CI/test guidance. |
 
 ---
 
