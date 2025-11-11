@@ -32,9 +32,15 @@
   - There is a GitHub Actions workflow (`.github/workflows/backend-tests.yml`) that provisions MongoDB and runs `npm test -- --coverage`, which is good.
   - However, the tests rely on a locally running Mongo instance (see `.env.test`), so contributors must start Mongo manually; the README/test docs do not mention this prerequisite, which routinely causes failures outside CI.
 
-## 3. Testing_And_Code_Review report
+## 3. Automated code review
+- **Unapplicable, the team cut this part due to small team size**
 
-- **a. Documentation accuracy and completeness: 5/10**
-  - The API table (documentation/Testing_And_Code_Review.md:17-31) lists routes (`POST /api/friends/send`) that do not exist in the codebase, and it omits entire feature areas such as challenges or media.
-  - Non-functional and automated code-review sections (lines 77-212) are marked “skipped” without mitigation or follow-up tasks, so the document does not give stakeholders confidence that the omissions are tracked.
-  - The frontend use-case table (lines 201-206) claims the UI allows tapping bingo squares, but `TicketDetailScreen` lacks any clickable modifiers; the documentation is therefore inconsistent with the delivered product.
+## 4. One major issue
+
+- **It seems you cannot invite friend again after the challenge is created, and you can create a challenge without inviting any friends, which effectively casues the challeng to be pending forever.**
+
+![no invite](images/rinkrivals_no_invite.png)
+![pending](images/rinkrivals_pending.png)
+
+- **Also, I do not see any real time updating or push notifictaions from emulator testings.**
+  - The lack of real time updates might be due the fact that the team cut the feature of clicking to complete the grid.
