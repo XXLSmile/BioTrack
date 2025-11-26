@@ -12,7 +12,13 @@
 | 27/10/25 | 3.1, 3.2 | Highlighted Google Maps API usage in the use-case diagram and descriptions to make location handling explicit. |
 | 27/10/25 | 4.5 | Updated the dependency diagram to include Google Maps API on the frontend alongside Firebase. |
 | 13/10/25 | 3.7 | Replaced vague non-functional requirements with specific, measurable statements. |
-
+| 26/11/25 | 3.3 | Added google maps service as an actor to be consistent with use case diagram |
+| 26/11/25 | 3.4 | Added search for friends use case as the Add Friends use case was too coarse grained and needed to be split up |
+| 26/11/25 | 3.4 | Added Remove Friends use case. Once again, add friends was too coarse grained and needed to be split |
+| 26/11/25 | 3.4 | Added Edit shared catalog permissions use case. Key functionalitiy of the manage friends feature in our app that wasn't documented |
+| 26/11/25 | 3.4 | Removed Share scanned image use case. Wasn't something that we decided to implement in the app so removed it |
+| 26/11/25 | 3.2 | Updated use case diagram to match changes made to use cases |
+| 26/11/25 | 3.5 | Made minor change to formal use case spec based on M2 feedback |
 
 ## 2. Project Description
 
@@ -40,7 +46,8 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 1. **User**: The primary actor who interacts with the BioTrack app. Users can scan wildlife, view identifications, save observations to catalogs, manage their collections, and optionally share findings with friends or collaborators.
 2. **External Authentication Service**: A third-party provider that verifies a user’s identity and manages secure login and account syncing across devices.
 3. **External Image Recognition Service**: An API that processes photos uploaded by the user and returns likely species identifications along with confidence scores.
-4. **Push Notification Service**: A cloud-based service that delivers real-time alerts to users such as friend activity updates.
+4. **Google Maps Service**: An API that saves a users location using the phones built-in GPS.
+5. **Push Notification Service**: A cloud-based service that delivers real-time alerts to users such as friend activity updates.
 
 ### **3.4. Use Case Description**
 - Use cases for feature 1: Authentication
@@ -58,9 +65,11 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 10. **Edit Catalog**: The user can edit their catalog name, and remove entries from the catalog.
 11. **Catalog Scanned Picture**: After scanning, the user saves the identified species along with the time and location of the sighting via google maps as well as a description of the species to their catalog. 
 - Use cases for feature 4: Manage Friends
-12. **Add Friends**: The user can send or accept friend requests to connect with other app users. Users can search for usernames to add friends as well as remove friends from their friendslist. When users search for friends, there will be a reccommended list of friends the user can add based on catalog similarity.
-13. **Share Catalog**: The user can share one or multiple of their catalogs with friends. Friends can view the catalog or, if the catalog owner gives permission for collaboration, friends can contribute their own pictures to the catalog. The owner of the catalog can revoke collaboration permissions and remove friends from a catalog at any time.
-14. **Share Scanned Picture**: The user can share a single scanned wildlife picture as well a brief description of the scanned wildlife directly with friends. The users friends will get a push notification when a scanned picture is shared with them.
+12. **Search for Friends**: The user can search for other users on the app by typing their username into the searchbar.
+13. **Add Friends**: The user can send or accept friend requests to connect with other app users. There will be a reccommended list of users that the user can use to add friends based on catalog similarity.
+14. **Remove Friends**: The user can remove other users that they were previously friends with. When a user removes a friend, they will automatically be removed from the other users friend list as well as any catalogs they had previously shared with the Ex-friend.
+15. **Share Catalog**: The user can share one or multiple of their catalogs with friends. Friends can view the catalog or, if the catalog owner gives permission for collaboration, friends can contribute their own pictures to the catalog.
+16. **Edit Shared Catalog Permissions**: After sharing a catalog with friends, the owner of the catalog can change the permissions to view only or to collaborate for each friend the catalog is shared with, as well as remove friends from the shared catalog all together.
 
 ### **3.5. Formal Use Case Specifications (5 Most Major Use Cases)**
 <a name="uc1"></a>
@@ -97,9 +106,9 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 **Description**: The system analyzes the uploaded photo and identifies the wildlife using an external recognition API.
 
-**Primary actor(s)**: User 
+**Primary actor(s)**: User, External Recognition API
 
-**Preconditions**: The user has a photo stored in device storage.
+**Preconditions**: The user has a photo uploaded and displayed in the app.
 
 **Postconditions**: The identified wildlife and metadata are displayed to the user.
     
@@ -131,8 +140,10 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 **Postconditions**: The wildlife and encounter details are stored in the catalog.
     
 **Main success scenario**:
-1. The user chooses “Save to Catalog.”
-2. The system adds the entry (species + description) to the user’s catalog.
+1. The app shows the "save to catalog" option after scanning an image.
+2. The user clicks the "save to catalog" option.
+3. The user selects which catalog to save the scanned image to.
+4. The system adds the entry (species + description) to the user’s catalog.
 
 **Failure scenario(s)**:
 - 1a. User does not have a catalog.
@@ -152,17 +163,15 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 
 **Primary actor(s)**: User 
 
-**Preconditions**: The user is logged into the app.
+**Preconditions**: The user is logged into the app, and has searched for a user.
 
 **Postconditions**: The friend request is sent or accepted, and the new friend is added to the user’s friend list.
     
 **Main success scenario**:
-1. The user selects “Add Friend.”
-2. The system prompts the user to enter a friend’s username.
-3. The system searches and locates the account.
-4. The user sends a friend request.
-5. The recipient accepts the request.
-6. Both users see each other in their friend lists.
+1. The user selects “Add Friend” beside the user they want to add as a friend
+2. The user sends a friend request.
+3. The recipient accepts the request.
+4. Both users see each other in their friend lists.
 
 **Failure scenario(s)**:
 - 1a. No input provided.
