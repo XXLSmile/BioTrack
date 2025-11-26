@@ -30,7 +30,7 @@ import com.cpen321.usermanagement.BuildConfig
 import com.cpen321.usermanagement.data.model.CatalogEntry as RemoteCatalogEntry
 import com.cpen321.usermanagement.data.model.Entry
 import com.cpen321.usermanagement.data.model.RecentObservation
-import com.cpen321.usermanagement.ui.screens.ObservationDetailContent
+import com.cpen321.usermanagement.ui.screens.observation.ObservationDetailContent
 import java.text.ParseException
 import java.text.SimpleDateFormat
 import java.util.Locale

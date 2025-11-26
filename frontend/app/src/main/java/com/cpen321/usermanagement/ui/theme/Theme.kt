@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.cpen321.usermanagement.ui.viewmodels.ThemeViewModel
+import com.cpen321.usermanagement.ui.viewmodels.theme.ThemeViewModel
 
 private val LightColorScheme = lightColorScheme(
     primary = Primary,

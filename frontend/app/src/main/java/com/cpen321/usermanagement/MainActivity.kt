@@ -10,7 +10,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.cpen321.usermanagement.ui.navigation.AppNavigation
-import com.cpen321.usermanagement.ui.screens.SplashScreen
+import com.cpen321.usermanagement.ui.screens.splash.SplashScreen
 import com.cpen321.usermanagement.ui.theme.ProvideFontSizes
 import com.cpen321.usermanagement.ui.theme.ProvideSpacing
 import com.cpen321.usermanagement.ui.theme.UserManagementTheme
@@ -98,7 +98,6 @@ fun UserManagementApp(
         }
     }
 }
-
 
 
 
