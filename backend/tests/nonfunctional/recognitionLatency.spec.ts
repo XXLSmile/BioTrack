@@ -2,9 +2,9 @@ import { describe, expect, it, beforeAll, afterEach } from '@jest/globals';
 import request from 'supertest';
 import { performance } from 'perf_hooks';
 
-import { createApp } from '../../src/app';
-import { recognitionService } from '../../src/recognition/recognition.service';
-import { RecognitionResult } from '../../src/recognition/recognition.types';
+import { createApp } from '../../src/core/app';
+import { recognitionService } from '../../src/services/recognition.service';
+import { RecognitionResult } from '../../src/types/recognition.types';
 
 const mockRecognition: RecognitionResult = {
   species: {

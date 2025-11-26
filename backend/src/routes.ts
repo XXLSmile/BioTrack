@@ -1,11 +1,11 @@
 import { Router } from 'express';
 
-import { authenticateToken } from './auth/auth.middleware';
-import authRoutes from './auth/auth.routes';
-import usersRoutes from './user/user.routes';
-import catalogRoutes from './catalog/catalog.routes';
-import recognitionRoutes from './recognition/recognition.routes';
-import friendRoutes from './friends/friend.routes';
+import { authenticateToken } from './middlewares/auth.middleware';
+import authRoutes from './routes/auth.routes';
+import usersRoutes from './routes/user.routes';
+import catalogRoutes from './routes/catalog.routes';
+import recognitionRoutes from './routes/recognition.routes';
+import friendRoutes from './routes/friend.routes';
 
 const router = Router();
 

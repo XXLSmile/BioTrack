@@ -1,12 +1,12 @@
 import { describe, expect, test, jest } from '@jest/globals';
 import request from 'supertest';
 
-jest.mock('../../../src/firebase', () => ({
+jest.mock('../../../src/config/firebase', () => ({
   messaging: { send: jest.fn() },
   default: { messaging: { send: jest.fn() } },
 }));
 
-import { createApp } from '../../../src/app';
+import { createApp } from '../../../src/core/app';
 
 const app = createApp();
 

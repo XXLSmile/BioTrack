@@ -1,12 +1,12 @@
 import { afterAll, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import mongoose from 'mongoose';
 
-jest.mock('../../../src/firebase', () => ({
+jest.mock('../../../src/config/firebase', () => ({
   messaging: { send: jest.fn() },
   default: { messaging: { send: jest.fn() } },
 }));
 
-jest.mock('../../../src/logger.util', () => ({
+jest.mock('../../../src/utils/logger.util', () => ({
   info: jest.fn(),
   error: jest.fn(),
   warn: jest.fn(),
@@ -15,15 +15,15 @@ jest.mock('../../../src/logger.util', () => ({
 
 const catalogCountMock = jest.fn();
 
-jest.mock('../../../src/recognition/catalog.model', () => ({
+jest.mock('../../../src/models/recognition/catalog.model', () => ({
   CatalogModel: {
     countDocuments: jest.fn(() => catalogCountMock()),
   },
 }));
 
-import { userModel } from '../../../src/user/user.model';
-import type { IUser } from '../../../src/user/user.types';
-import { CatalogModel } from '../../../src/recognition/catalog.model';
+import { userModel } from '../../../src/models/user/user.model';
+import type { IUser } from '../../../src/types/user.types';
+import { CatalogModel } from '../../../src/models/recognition/catalog.model';
 
 void CatalogModel;
 

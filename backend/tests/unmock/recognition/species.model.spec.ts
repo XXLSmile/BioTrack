@@ -2,7 +2,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
 import { afterAll, afterEach, beforeAll, describe, expect, test } from '@jest/globals';
 
-import { SpeciesModel, SpeciesRepository } from '../../../src/recognition/species.model';
+import { SpeciesModel, SpeciesRepository } from '../../../src/models/recognition/species.model';
 
 describe('Unmocked: SpeciesRepository', () => {
   let mongo: MongoMemoryServer | null = null;

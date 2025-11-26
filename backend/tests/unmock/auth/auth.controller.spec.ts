@@ -1,11 +1,11 @@
 import { describe, expect, jest, test } from '@jest/globals';
 
-jest.mock('../../../src/firebase', () => ({
+jest.mock('../../../src/config/firebase', () => ({
   messaging: { send: jest.fn() },
   default: { messaging: { send: jest.fn() } },
 }));
 
-import { AuthController } from '../../../src/auth/auth.controller';
+import { AuthController } from '../../../src/controllers/auth.controller';
 
 const controller = new AuthController();
 

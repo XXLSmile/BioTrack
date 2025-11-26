@@ -3,19 +3,19 @@ import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 
-jest.mock('../../../src/firebase', () => ({
+jest.mock('../../../src/config/firebase', () => ({
   messaging: { send: jest.fn() },
   default: { messaging: { send: jest.fn() } },
 }));
 
-jest.mock('../../../src/user/user.model', () => ({
+jest.mock('../../../src/models/user/user.model', () => ({
   userModel: {
     findById: jest.fn(),
   },
 }));
 
-import { authenticateToken, resolveUserObjectId } from '../../../src/auth/auth.middleware';
-import { userModel } from '../../../src/user/user.model';
+import { authenticateToken, resolveUserObjectId } from '../../../src/middlewares/auth.middleware';
+import { userModel } from '../../../src/models/user/user.model';
 
 const createResponse = (): Response & {
   status: jest.Mock;

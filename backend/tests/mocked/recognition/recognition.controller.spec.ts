@@ -5,25 +5,25 @@ import type { NextFunction, Request, Response } from 'express';
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 
 
-import { recognitionController } from '../../../src/recognition/recognition.controller';
+import { recognitionController } from '../../../src/controllers/recognition.controller';
 import type {
   RecognitionImageResponse,
   RecognitionResult,
-} from '../../../src/recognition/recognition.types';
+} from '../../../src/types/recognition.types';
 
-jest.mock('../../../src/recognition/recognition.service', () => ({
+jest.mock('../../../src/services/recognition.service', () => ({
   recognitionService: {
     recognizeFromUrl: jest.fn(),
   },
 }));
 
-jest.mock('../../../src/recognition/species.model', () => ({
+jest.mock('../../../src/models/recognition/species.model', () => ({
   speciesRepository: {
     findOrCreate: jest.fn(),
   },
 }));
 
-jest.mock('../../../src/recognition/catalog.model', () => ({
+jest.mock('../../../src/models/recognition/catalog.model', () => ({
   catalogRepository: {
     findByHash: jest.fn(),
     create: jest.fn(),
@@ -36,20 +36,20 @@ jest.mock('../../../src/recognition/catalog.model', () => ({
   },
 }));
 
-jest.mock('../../../src/user/user.model', () => ({
+jest.mock('../../../src/models/user/user.model', () => ({
   userModel: {
     incrementObservationCount: jest.fn(),
     addBadge: jest.fn(),
   },
 }));
 
-jest.mock('../../../src/catalog/catalog.model', () => ({
+jest.mock('../../../src/models/catalog/catalog.model', () => ({
   catalogModel: {
     findById: jest.fn(),
   },
 }));
 
-jest.mock('../../../src/catalog/catalogEntryLink.model', () => ({
+jest.mock('../../../src/models/catalog/catalogEntryLink.model', () => ({
   catalogEntryLinkModel: {
     isEntryLinked: jest.fn(),
     linkEntry: jest.fn(),
@@ -58,35 +58,35 @@ jest.mock('../../../src/catalog/catalogEntryLink.model', () => ({
   },
 }));
 
-jest.mock('../../../src/catalog/catalogShare.model', () => ({
+jest.mock('../../../src/models/catalog/catalogShare.model', () => ({
   catalogShareModel: {
     getUserAccess: jest.fn(),
   },
 }));
 
-jest.mock('../../../src/socket/socket.manager', () => ({
+jest.mock('../../../src/infrastructure/socket.manager', () => ({
   emitCatalogEntriesUpdated: jest.fn(),
 }));
 
-jest.mock('../../../src/location/geocoding.service', () => ({
+jest.mock('../../../src/services/location/geocoding.service', () => ({
   geocodingService: {
     reverseGeocode: jest.fn(),
   },
 }));
 
-const { recognitionService } = jest.requireMock('../../../src/recognition/recognition.service') as {
+const { recognitionService } = jest.requireMock('../../../src/services/recognition.service') as {
   recognitionService: {
     recognizeFromUrl: jest.Mock;
   };
 };
 
-const { speciesRepository } = jest.requireMock('../../../src/recognition/species.model') as {
+const { speciesRepository } = jest.requireMock('../../../src/models/recognition/species.model') as {
   speciesRepository: {
     findOrCreate: jest.Mock;
   };
 };
 
-const { catalogRepository } = jest.requireMock('../../../src/recognition/catalog.model') as {
+const { catalogRepository } = jest.requireMock('../../../src/models/recognition/catalog.model') as {
   catalogRepository: {
     findByHash: jest.Mock;
     create: jest.Mock;
@@ -96,7 +96,7 @@ const { catalogRepository } = jest.requireMock('../../../src/recognition/catalog
   };
 };
 
-const { catalogEntryLinkModel } = jest.requireMock('../../../src/catalog/catalogEntryLink.model') as {
+const { catalogEntryLinkModel } = jest.requireMock('../../../src/models/catalog/catalogEntryLink.model') as {
   catalogEntryLinkModel: {
     isEntryLinked: jest.Mock;
     linkEntry: jest.Mock;
@@ -105,29 +105,29 @@ const { catalogEntryLinkModel } = jest.requireMock('../../../src/catalog/catalog
   };
 };
 
-const { catalogModel } = jest.requireMock('../../../src/catalog/catalog.model') as {
+const { catalogModel } = jest.requireMock('../../../src/models/catalog/catalog.model') as {
   catalogModel: {
     findById: jest.Mock;
   };
 };
 
-const { catalogShareModel } = jest.requireMock('../../../src/catalog/catalogShare.model') as {
+const { catalogShareModel } = jest.requireMock('../../../src/models/catalog/catalogShare.model') as {
   catalogShareModel: {
     getUserAccess: jest.Mock;
   };
 };
 
-const { emitCatalogEntriesUpdated } = jest.requireMock('../../../src/socket/socket.manager') as {
+const { emitCatalogEntriesUpdated } = jest.requireMock('../../../src/infrastructure/socket.manager') as {
   emitCatalogEntriesUpdated: jest.Mock;
 };
 
-const { geocodingService } = jest.requireMock('../../../src/location/geocoding.service') as {
+const { geocodingService } = jest.requireMock('../../../src/services/location/geocoding.service') as {
   geocodingService: {
     reverseGeocode: jest.Mock;
   };
 };
 
-const { userModel } = jest.requireMock('../../../src/user/user.model') as {
+const { userModel } = jest.requireMock('../../../src/models/user/user.model') as {
   userModel: {
     incrementObservationCount: jest.Mock;
     addBadge: jest.Mock;
@@ -185,7 +185,9 @@ const addBadgeMock = userModel.addBadge as jest.MockedFunction<
 >;
 
 const backendRoot = path.join(__dirname, '../../..');
-const racoonImagePath = path.join(backendRoot, 'uploads/images/racoon.jpg');
+const uploadsDir = path.join(backendRoot, 'uploads/images');
+const racoonImagePath = path.join(uploadsDir, 'racoon.jpg');
+const originalMediaBaseUrl = process.env.MEDIA_BASE_URL;
 
 const createMockResponse = <T = any>(): Response<T> => {
   const res = {
@@ -197,6 +199,24 @@ const createMockResponse = <T = any>(): Response<T> => {
 };
 
 describe('RecognitionController', () => {
+  beforeAll(() => {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    if (!fs.existsSync(racoonImagePath)) {
+      fs.writeFileSync(racoonImagePath, Buffer.from('racoon fixture image'));
+    }
+  });
+
+  afterAll(() => {
+    if (fs.existsSync(racoonImagePath)) {
+      fs.unlinkSync(racoonImagePath);
+    }
+    if (typeof originalMediaBaseUrl === 'undefined') {
+      delete process.env.MEDIA_BASE_URL;
+    } else {
+      process.env.MEDIA_BASE_URL = originalMediaBaseUrl;
+    }
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     recognitionServiceMock.mockReset();
@@ -216,6 +236,7 @@ describe('RecognitionController', () => {
     reverseGeocodeMock.mockReset();
     incrementObservationCountMock.mockReset();
     addBadgeMock.mockReset();
+    process.env.MEDIA_BASE_URL = '';
   });
 
   // API: POST /api/recognition (recognizeImage)

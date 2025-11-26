@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import mongoose from 'mongoose';
 
-jest.mock('../../../src/firebase', () => ({
+jest.mock('../../../src/config/firebase', () => ({
   messaging: { send: jest.fn() },
   default: { messaging: { send: jest.fn() } },
 }));
@@ -24,7 +24,7 @@ const mockUserModel = {
   updateFcmToken: jest.fn(),
 };
 
-jest.mock('../../../src/user/user.model', () => ({
+jest.mock('../../../src/models/user/user.model', () => ({
   userModel: mockUserModel,
 }));
 
@@ -32,7 +32,7 @@ const mockFriendshipModel = {
   deleteAllForUser: jest.fn(),
 };
 
-jest.mock('../../../src/friends/friend.model', () => ({
+jest.mock('../../../src/models/friends/friend.model', () => ({
   friendshipModel: mockFriendshipModel,
 }));
 
@@ -40,7 +40,7 @@ const mockCatalogRepository = {
   deleteAllForUser: jest.fn(),
 };
 
-jest.mock('../../../src/recognition/catalog.model', () => ({
+jest.mock('../../../src/models/recognition/catalog.model', () => ({
   catalogRepository: mockCatalogRepository,
 }));
 
@@ -48,15 +48,15 @@ const mockCatalogModel = {
   deleteAllOwnedByUser: jest.fn(),
 };
 
-jest.mock('../../../src/catalog/catalog.model', () => ({
+jest.mock('../../../src/models/catalog/catalog.model', () => ({
   catalogModel: mockCatalogModel,
 }));
 
-import { UserController } from '../../../src/user/user.controller';
-import { userModel } from '../../../src/user/user.model';
-import { friendshipModel } from '../../../src/friends/friend.model';
-import { catalogRepository } from '../../../src/recognition/catalog.model';
-import { catalogModel } from '../../../src/catalog/catalog.model';
+import { UserController } from '../../../src/controllers/user.controller';
+import { userModel } from '../../../src/models/user/user.model';
+import { friendshipModel } from '../../../src/models/friends/friend.model';
+import { catalogRepository } from '../../../src/models/recognition/catalog.model';
+import { catalogModel } from '../../../src/models/catalog/catalog.model';
 
 const mockedUserModel = userModel as jest.Mocked<typeof userModel>;
 const mockedFriendshipModel = friendshipModel as jest.Mocked<typeof friendshipModel>;

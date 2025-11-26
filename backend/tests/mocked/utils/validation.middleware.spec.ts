@@ -1,7 +1,7 @@
 import { describe, expect, jest, test } from '@jest/globals';
 import { z } from 'zod';
 
-import { validateBody } from '../../../src/validation.middleware';
+import { validateBody } from '../../../src/middlewares/validation.middleware';
 
 const createResponse = () => {
   const res: any = {};

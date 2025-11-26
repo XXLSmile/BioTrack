@@ -2,7 +2,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
 import { afterAll, afterEach, beforeAll, describe, expect, test } from '@jest/globals';
 
-import { CatalogModel } from '../../../src/catalog/catalog.model';
+import { CatalogModel } from '../../../src/models/catalog/catalog.model';
 
 describe('Unmocked: CatalogModel', () => {
   let mongo: MongoMemoryServer | null = null;

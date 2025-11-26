@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 
-jest.mock('../../../src/logger.util', () => ({
+jest.mock('../../../src/utils/logger.util', () => ({
   __esModule: true,
   default: {
     error: jest.fn(),
@@ -11,8 +11,8 @@ jest.mock('../../../src/logger.util', () => ({
   },
 }));
 
-import { FriendshipModel } from '../../../src/friends/friend.model';
-import logger from '../../../src/logger.util';
+import { FriendshipModel } from '../../../src/models/friends/friend.model';
+import logger from '../../../src/utils/logger.util';
 
 const objectId = () => new mongoose.Types.ObjectId();
 

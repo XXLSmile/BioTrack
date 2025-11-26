@@ -4,7 +4,7 @@ import {
   inviteCollaboratorSchema,
   respondToInvitationSchema,
   updateCollaboratorSchema,
-} from '../../../src/catalog/catalogShare.types';
+} from '../../../src/types/catalogShare.types';
 
 describe('Mocked: catalogShare.types', () => {
   // API: inviteCollaboratorSchema

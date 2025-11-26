@@ -1,11 +1,11 @@
 import { describe, expect, test ,jest} from '@jest/globals';
 
-jest.mock('../../../src/firebase', () => ({
+jest.mock('../../../src/config/firebase', () => ({
   messaging: { send: jest.fn() },
   default: { messaging: { send: jest.fn() } },
 }));
 
-import { authService } from '../../../src/auth/auth.service';
+import { authService } from '../../../src/services/auth.service';
 
 // Interface AuthService.logout
 describe('Unmocked: AuthService.logout', () => {

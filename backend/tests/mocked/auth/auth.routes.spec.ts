@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import request from 'supertest';
 
-jest.mock('../../../src/firebase', () => ({
+jest.mock('../../../src/config/firebase', () => ({
   messaging: { send: jest.fn() },
   default: { messaging: { send: jest.fn() } },
 }));
 
-import { createApp } from '../../../src/app';
-import { authService } from '../../../src/auth/auth.service';
-import type { IUser } from '../../../src/user/user.types';
+import { createApp } from '../../../src/core/app';
+import { authService } from '../../../src/services/auth.service';
+import type { IUser } from '../../../src/types/user.types';
 
-jest.mock('../../../src/auth/auth.service', () => ({
+jest.mock('../../../src/services/auth.service', () => ({
   authService: {
     signUpWithGoogle: jest.fn(),
     signInWithGoogle: jest.fn(),

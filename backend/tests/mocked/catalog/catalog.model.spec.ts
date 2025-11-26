@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { beforeAll, beforeEach, describe, expect, jest, test } from '@jest/globals';
 
-import { CatalogModel } from '../../../src/catalog/catalog.model';
+import { CatalogModel } from '../../../src/models/catalog/catalog.model';
 
 describe('Mocked: CatalogModel', () => {
   let model: CatalogModel;

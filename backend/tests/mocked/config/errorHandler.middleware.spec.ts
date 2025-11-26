@@ -1,15 +1,15 @@
 import { describe, expect, jest, test } from '@jest/globals';
 import type { Request, Response } from 'express';
 
-jest.mock('../../../src/logger.util', () => ({
+jest.mock('../../../src/utils/logger.util', () => ({
   __esModule: true,
   default: {
     error: jest.fn(),
   },
 }));
 
-import { errorHandler, notFoundHandler } from '../../../src/errorHandler.middleware';
-import logger from '../../../src/logger.util';
+import { errorHandler, notFoundHandler } from '../../../src/middlewares/errorHandler.middleware';
+import logger from '../../../src/utils/logger.util';
 
 const mockLogger = logger as unknown as { error: jest.Mock };
 

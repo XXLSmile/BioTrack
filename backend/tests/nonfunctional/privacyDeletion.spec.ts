@@ -4,11 +4,11 @@ import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import jwt from 'jsonwebtoken';
 
-import { createApp } from '../../src/app';
-import { userModel } from '../../src/user/user.model';
-import { friendshipModel } from '../../src/friends/friend.model';
-import { catalogModel } from '../../src/catalog/catalog.model';
-import { CatalogModel as CatalogEntryModel } from '../../src/recognition/catalog.model';
+import { createApp } from '../../src/core/app';
+import { userModel } from '../../src/models/user/user.model';
+import { friendshipModel } from '../../src/models/friends/friend.model';
+import { catalogModel } from '../../src/models/catalog/catalog.model';
+import { CatalogModel as CatalogEntryModel } from '../../src/models/recognition/catalog.model';
 
 const buildTestUserPayload = (index: number) => ({
   googleId: `google-${index}`,

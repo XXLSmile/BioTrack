@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import mongoose from 'mongoose';
 
-jest.mock('../../../src/logger.util', () => ({
+jest.mock('../../../src/utils/logger.util', () => ({
   __esModule: true,
   default: {
     error: jest.fn(),
@@ -12,7 +12,7 @@ jest.mock('../../../src/logger.util', () => ({
   },
 }));
 
-jest.mock('../../../src/catalog/catalog.model', () => ({
+jest.mock('../../../src/models/catalog/catalog.model', () => ({
   catalogModel: {
     createCatalog: jest.fn(),
     listCatalogs: jest.fn(),
@@ -22,13 +22,13 @@ jest.mock('../../../src/catalog/catalog.model', () => ({
   },
 }));
 
-jest.mock('../../../src/catalog/catalogShare.model', () => ({
+jest.mock('../../../src/models/catalog/catalogShare.model', () => ({
   catalogShareModel: {
     getUserAccess: jest.fn(),
   },
 }));
 
-jest.mock('../../../src/catalog/catalogEntryLink.model', () => ({
+jest.mock('../../../src/models/catalog/catalogEntryLink.model', () => ({
   catalogEntryLinkModel: {
     listEntriesWithDetails: jest.fn(),
     isEntryLinked: jest.fn(),
@@ -37,33 +37,33 @@ jest.mock('../../../src/catalog/catalogEntryLink.model', () => ({
   },
 }));
 
-jest.mock('../../../src/recognition/catalog.model', () => ({
+jest.mock('../../../src/models/recognition/catalog.model', () => ({
   catalogRepository: {
     findById: jest.fn(),
   },
 }));
 
-jest.mock('../../../src/catalog/catalog.helpers', () => ({
+jest.mock('../../../src/helpers/catalog.helpers', () => ({
   buildCatalogEntriesResponse: jest.fn(),
 }));
 
-jest.mock('../../../src/socket/socket.manager', () => ({
+jest.mock('../../../src/infrastructure/socket.manager', () => ({
   emitCatalogDeleted: jest.fn(),
   emitCatalogEntriesUpdated: jest.fn(),
   emitCatalogMetadataUpdated: jest.fn(),
 }));
 
-import { CatalogController } from '../../../src/catalog/catalog.controller';
-import { catalogModel } from '../../../src/catalog/catalog.model';
-import { catalogShareModel } from '../../../src/catalog/catalogShare.model';
-import { catalogEntryLinkModel } from '../../../src/catalog/catalogEntryLink.model';
-import { catalogRepository } from '../../../src/recognition/catalog.model';
-import { buildCatalogEntriesResponse } from '../../../src/catalog/catalog.helpers';
+import { CatalogController } from '../../../src/controllers/catalog.controller';
+import { catalogModel } from '../../../src/models/catalog/catalog.model';
+import { catalogShareModel } from '../../../src/models/catalog/catalogShare.model';
+import { catalogEntryLinkModel } from '../../../src/models/catalog/catalogEntryLink.model';
+import { catalogRepository } from '../../../src/models/recognition/catalog.model';
+import { buildCatalogEntriesResponse } from '../../../src/helpers/catalog.helpers';
 import {
   emitCatalogDeleted,
   emitCatalogEntriesUpdated,
   emitCatalogMetadataUpdated,
-} from '../../../src/socket/socket.manager';
+} from '../../../src/infrastructure/socket.manager';
 
 type MockResponse = ReturnType<typeof createMockResponse>;
 

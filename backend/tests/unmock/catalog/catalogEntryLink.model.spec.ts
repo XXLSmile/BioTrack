@@ -2,11 +2,11 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
 import { afterAll, afterEach, beforeAll, describe, expect, test } from '@jest/globals';
 
-import { catalogEntryLinkModel } from '../../../src/catalog/catalogEntryLink.model';
-import { catalogModel } from '../../../src/catalog/catalog.model';
-import { CatalogModel as CatalogEntryModel } from '../../../src/recognition/catalog.model';
-import { SpeciesModel } from '../../../src/recognition/species.model';
-import { userModel } from '../../../src/user/user.model';
+import { catalogEntryLinkModel } from '../../../src/models/catalog/catalogEntryLink.model';
+import { catalogModel } from '../../../src/models/catalog/catalog.model';
+import { CatalogModel as CatalogEntryModel } from '../../../src/models/recognition/catalog.model';
+import { SpeciesModel } from '../../../src/models/recognition/species.model';
+import { userModel } from '../../../src/models/user/user.model';
 
 describe('Unmocked: CatalogEntryLinkModel', () => {
   let mongo: MongoMemoryServer | null = null;

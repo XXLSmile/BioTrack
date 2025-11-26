@@ -55,9 +55,9 @@ describe('Mocked: firebase bootstrap', () => {
   });
 
   const loadModule = () => {
-    let moduleExports: typeof import('../../../src/firebase');
+    let moduleExports: typeof import('../../../src/config/firebase');
     jest.isolateModules(() => {
-      moduleExports = require('../../../src/firebase');
+      moduleExports = require('../../../src/config/firebase');
     });
     return moduleExports!;
   };

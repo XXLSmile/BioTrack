@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 
-import logger from '../../../src/logger.util';
+import logger from '../../../src/utils/logger.util';
 
 describe('Mocked: logger.util', () => {
   let stdoutSpy: jest.SpiedFunction<typeof process.stdout.write>;

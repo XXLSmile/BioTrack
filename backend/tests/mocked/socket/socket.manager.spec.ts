@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import http from 'http';
 import mongoose from 'mongoose';
-import type { ICatalog } from '../../../src/catalog/catalog.types';
+import type { ICatalog } from '../../../src/types/catalog.types';
 
 const mockLogger = {
   warn: jest.fn(),
@@ -9,7 +9,7 @@ const mockLogger = {
   error: jest.fn(),
 };
 
-jest.mock('../../../src/logger.util', () => ({
+jest.mock('../../../src/utils/logger.util', () => ({
   __esModule: true,
   default: mockLogger,
 }));
@@ -18,7 +18,7 @@ const mockUserModel = {
   findById: jest.fn<(...args: any[]) => Promise<any>>(),
 };
 
-jest.mock('../../../src/user/user.model', () => ({
+jest.mock('../../../src/models/user/user.model', () => ({
   userModel: mockUserModel,
 }));
 
@@ -26,7 +26,7 @@ const mockCatalogModel = {
   findById: jest.fn<(...args: any[]) => Promise<any>>(),
 };
 
-jest.mock('../../../src/catalog/catalog.model', () => ({
+jest.mock('../../../src/models/catalog/catalog.model', () => ({
   catalogModel: mockCatalogModel,
 }));
 
@@ -34,7 +34,7 @@ const mockCatalogShareModel = {
   getUserAccess: jest.fn<(...args: any[]) => Promise<any>>(),
 };
 
-jest.mock('../../../src/catalog/catalogShare.model', () => ({
+jest.mock('../../../src/models/catalog/catalogShare.model', () => ({
   catalogShareModel: mockCatalogShareModel,
 }));
 
@@ -68,9 +68,9 @@ jest.mock('socket.io', () => ({
 }));
 
 const loadSocketModule = () => {
-  let moduleExports: typeof import('../../../src/socket/socket.manager');
+  let moduleExports: typeof import('../../../src/infrastructure/socket.manager');
   jest.isolateModules(() => {
-    moduleExports = require('../../../src/socket/socket.manager');
+    moduleExports = require('../../../src/infrastructure/socket.manager');
   });
   return moduleExports!;
 };

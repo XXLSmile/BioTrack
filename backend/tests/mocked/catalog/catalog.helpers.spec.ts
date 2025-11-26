@@ -1,17 +1,17 @@
 import mongoose from 'mongoose';
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 
-jest.mock('../../../src/logger.util', () => ({
+jest.mock('../../../src/utils/logger.util', () => ({
   __esModule: true,
   default: {
     warn: jest.fn(),
   },
 }));
 
-import logger from '../../../src/logger.util';
-import { buildCatalogEntriesResponse, resolveImageUrl } from '../../../src/catalog/catalog.helpers';
-import { ICatalogEntry } from '../../../src/recognition/catalog.model';
-import { ICatalogEntryLink } from '../../../src/catalog/catalogEntryLink.model';
+import logger from '../../../src/utils/logger.util';
+import { buildCatalogEntriesResponse, resolveImageUrl } from '../../../src/helpers/catalog.helpers';
+import { ICatalogEntry } from '../../../src/models/recognition/catalog.model';
+import { ICatalogEntryLink } from '../../../src/models/catalog/catalogEntryLink.model';
 
 const getLoggerWarn = () => (logger.warn as jest.Mock);
 

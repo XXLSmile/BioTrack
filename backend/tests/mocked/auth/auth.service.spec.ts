@@ -25,19 +25,19 @@ const createUserMock: jest.MockedFunction<
   (payload: unknown) => Promise<any>
 > = jest.fn();
 
-jest.mock('../../../src/user/user.model', () => ({
+jest.mock('../../../src/models/user/user.model', () => ({
   userModel: {
     findByGoogleId: findByGoogleIdMock,
     create: createUserMock,
   },
 }));
 
-jest.mock('../../../src/firebase', () => ({
+jest.mock('../../../src/config/firebase', () => ({
   messaging: { send: jest.fn() },
   default: { messaging: { send: jest.fn() } },
 }));
 
-import { authService } from '../../../src/auth/auth.service';
+import { authService } from '../../../src/services/auth.service';
 
 const buildPayload = (overrides: Partial<ReturnType<typeof buildBasePayload>> = {}) =>
   ({

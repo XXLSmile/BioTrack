@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import type { Request, Response, NextFunction } from 'express';
 
-jest.mock('../../../src/firebase', () => ({
+jest.mock('../../../src/config/firebase', () => ({
   messaging: { send: jest.fn() },
   default: { messaging: { send: jest.fn() } },
 }));
 
-import { AuthController } from '../../../src/auth/auth.controller';
-import { authService } from '../../../src/auth/auth.service';
+import { AuthController } from '../../../src/controllers/auth.controller';
+import { authService } from '../../../src/services/auth.service';
 
 const controller = new AuthController();
 

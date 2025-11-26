@@ -2,16 +2,16 @@ import axios from 'axios';
 import crypto from 'crypto';
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 
-import { recognitionService } from '../../../src/recognition/recognition.service';
-import { speciesRepository } from '../../../src/recognition/species.model';
+import { recognitionService } from '../../../src/services/recognition.service';
+import { speciesRepository } from '../../../src/models/recognition/species.model';
 
-jest.mock('../../../src/recognition/species.model', () => ({
+jest.mock('../../../src/models/recognition/species.model', () => ({
   speciesRepository: {
     findOrCreate: jest.fn(),
   },
 }));
 
-jest.mock('../../../src/logger.util', () => ({
+jest.mock('../../../src/utils/logger.util', () => ({
   info: jest.fn(),
   error: jest.fn(),
   warn: jest.fn(),

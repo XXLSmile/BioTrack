@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, test, jest } from '@jest/globa
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 
-jest.mock('../../../src/firebase', () => ({
+jest.mock('../../../src/config/firebase', () => ({
   messaging: { send: jest.fn() },
   default: { messaging: { send: jest.fn() } },
 }));
 
-import { authenticateToken } from '../../../src/auth/auth.middleware';
+import { authenticateToken } from '../../../src/middlewares/auth.middleware';
 
 const createResponse = () => {
   const res = {

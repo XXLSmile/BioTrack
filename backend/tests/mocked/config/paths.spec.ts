@@ -1,6 +1,6 @@
 import { describe, expect, jest, test } from '@jest/globals';
 
-jest.mock('../../../src/logger.util', () => ({
+jest.mock('../../../src/utils/logger.util', () => ({
   __esModule: true,
   default: {
     info: jest.fn(),

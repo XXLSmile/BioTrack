@@ -2,15 +2,15 @@
 import mongoose from 'mongoose';
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 
-jest.mock('../../../src/logger.util', () => ({
+jest.mock('../../../src/utils/logger.util', () => ({
   __esModule: true,
   default: {
     error: jest.fn(),
   },
 }));
 
-import logger from '../../../src/logger.util';
-import { CatalogShareModel } from '../../../src/catalog/catalogShare.model';
+import logger from '../../../src/utils/logger.util';
+import { CatalogShareModel } from '../../../src/models/catalog/catalogShare.model';
 
 const getLoggerError = () => (logger.error as jest.Mock);
 

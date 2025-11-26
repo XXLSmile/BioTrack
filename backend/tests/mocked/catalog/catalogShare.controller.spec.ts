@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import mongoose from 'mongoose';
 
-jest.mock('../../../src/logger.util', () => ({
+jest.mock('../../../src/utils/logger.util', () => ({
   __esModule: true,
   default: {
     error: jest.fn(),
@@ -12,13 +12,13 @@ jest.mock('../../../src/logger.util', () => ({
   },
 }));
 
-jest.mock('../../../src/catalog/catalog.model', () => ({
+jest.mock('../../../src/models/catalog/catalog.model', () => ({
   catalogModel: {
     findById: jest.fn(),
   },
 }));
 
-jest.mock('../../../src/catalog/catalogShare.model', () => ({
+jest.mock('../../../src/models/catalog/catalogShare.model', () => ({
   catalogShareModel: {
     listCollaborators: jest.fn(),
     findByCatalogAndInvitee: jest.fn(),
@@ -32,22 +32,22 @@ jest.mock('../../../src/catalog/catalogShare.model', () => ({
   },
 }));
 
-jest.mock('../../../src/user/user.model', () => ({
+jest.mock('../../../src/models/user/user.model', () => ({
   userModel: {
     findById: jest.fn(),
   },
 }));
 
-jest.mock('../../../src/firebase', () => ({
+jest.mock('../../../src/config/firebase', () => ({
   messaging: { send: jest.fn() },
   default: { messaging: { send: jest.fn() } },
 }));
 
-import { CatalogShareController } from '../../../src/catalog/catalogShare.controller';
-import { catalogModel } from '../../../src/catalog/catalog.model';
-import { catalogShareModel } from '../../../src/catalog/catalogShare.model';
-import { userModel } from '../../../src/user/user.model';
-import { messaging } from '../../../src/firebase';
+import { CatalogShareController } from '../../../src/controllers/catalogShare.controller';
+import { catalogModel } from '../../../src/models/catalog/catalog.model';
+import { catalogShareModel } from '../../../src/models/catalog/catalogShare.model';
+import { userModel } from '../../../src/models/user/user.model';
+import { messaging } from '../../../src/config/firebase';
 
 const catalogModelMock = catalogModel as any;
 const catalogShareModelMock = catalogShareModel as any;

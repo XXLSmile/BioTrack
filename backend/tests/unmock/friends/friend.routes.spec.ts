@@ -5,18 +5,18 @@ import dotenv from 'dotenv';
 
 dotenv.config({ path: path.join(__dirname, '../../..', '.env') });
 
-jest.mock('../../../src/firebase', () => ({
+jest.mock('../../../src/config/firebase', () => ({
   messaging: { send: jest.fn() },
   default: { messaging: { send: jest.fn() } },
 }));
 
-jest.mock('../../../src/location/geocoding.service', () => ({
+jest.mock('../../../src/services/location/geocoding.service', () => ({
   geocodingService: {
     forwardGeocode: jest.fn(),
   },
 }));
 
-jest.mock('../../../src/user/user.model', () => {
+jest.mock('../../../src/models/user/user.model', () => {
   const mongoose = require('mongoose');
 
   type StoredUser = {
@@ -107,7 +107,7 @@ jest.mock('../../../src/user/user.model', () => {
   return { userModel: api };
 });
 
-jest.mock('../../../src/friends/friend.model', () => {
+jest.mock('../../../src/models/friends/friend.model', () => {
   const mongoose = require('mongoose');
 
   type StoredFriendship = {
@@ -188,7 +188,7 @@ jest.mock('../../../src/friends/friend.model', () => {
   };
 
   const listByPredicate = (predicate: (friendship: StoredFriendship) => boolean) => {
-    const { userModel } = require('../../../src/user/user.model');
+    const { userModel } = require('../../../src/models/user/user.model');
     return Array.from(friendships.values())
       .filter(predicate)
       .map(friendship => ({
@@ -282,11 +282,11 @@ jest.mock('google-auth-library', () => {
   };
 });
 
-import { friendController } from '../../../src/friends/friend.controller';
-import { authService } from '../../../src/auth/auth.service';
-import { userModel } from '../../../src/user/user.model';
-import { friendshipModel } from '../../../src/friends/friend.model';
-import { geocodingService } from '../../../src/location/geocoding.service';
+import { friendController } from '../../../src/controllers/friend.controller';
+import { authService } from '../../../src/services/auth.service';
+import { userModel } from '../../../src/models/user/user.model';
+import { friendshipModel } from '../../../src/models/friends/friend.model';
+import { geocodingService } from '../../../src/services/location/geocoding.service';
 
 const FRIEND_TOKEN_1 = process.env.FRIEND_TEST_USER1_ID_TOKEN;
 const FRIEND_TOKEN_2 = process.env.FRIEND_TEST_USER2_ID_TOKEN;
@@ -335,8 +335,8 @@ const getPayload = (res: any) => ((res.json as jest.Mock).mock.calls[0]?.[0] ?? 
 describe('Unmocked: Friends controller (in-memory store)', () => {
   afterEach(() => {
     jest.clearAllMocks();
-    const userModelMock = (jest.requireMock('../../../src/user/user.model') as any).userModel;
-    const friendshipModelMock = (jest.requireMock('../../../src/friends/friend.model') as any).friendshipModel;
+    const userModelMock = (jest.requireMock('../../../src/models/user/user.model') as any).userModel;
+    const friendshipModelMock = (jest.requireMock('../../../src/models/friends/friend.model') as any).friendshipModel;
     if (typeof userModelMock.__reset === 'function') {
       userModelMock.__reset();
     }

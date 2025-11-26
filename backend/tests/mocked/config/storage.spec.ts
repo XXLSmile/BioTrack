@@ -28,7 +28,7 @@ import { UPLOADS_ROOT } from '../../../src/config/paths';
 
 const loadModule = () => {
   jest.isolateModules(() => {
-    require('../../../src/storage');
+    require('../../../src/config/storage');
   });
 };
 

@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 
-import { SpeciesModel, SpeciesRepository } from '../../../src/recognition/species.model';
+import { SpeciesModel, SpeciesRepository } from '../../../src/models/recognition/species.model';
 
 describe('Mocked: SpeciesRepository', () => {
   let repository: SpeciesRepository;

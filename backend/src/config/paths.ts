@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import logger from '../logger.util';
+import logger from '../utils/logger.util';
 
 // Always resolve from the project root, not dist/src
 export const UPLOADS_ROOT = path.resolve(process.cwd(), 'uploads/images');

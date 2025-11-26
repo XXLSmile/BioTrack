@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 
-jest.mock('../../../src/logger.util', () => ({
+jest.mock('../../../src/utils/logger.util', () => ({
   __esModule: true,
   default: {
     warn: jest.fn(),
@@ -8,14 +8,14 @@ jest.mock('../../../src/logger.util', () => ({
   },
 }));
 
-const mockedLogger = require('../../../src/logger.util').default as {
+const mockedLogger = require('../../../src/utils/logger.util').default as {
   warn: jest.Mock;
   error: jest.Mock;
 };
 
 jest.mock('axios');
 import axios from 'axios';
-import { geocodingService } from '../../../src/location/geocoding.service';
+import { geocodingService } from '../../../src/services/location/geocoding.service';
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 const originalEnv = { ...process.env };

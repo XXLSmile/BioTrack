@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import mongoose from 'mongoose';
 
-jest.mock('../../../src/firebase', () => ({
+jest.mock('../../../src/config/firebase', () => ({
   messaging: { send: jest.fn() },
   default: { messaging: { send: jest.fn() } },
 }));
 
-jest.mock('../../../src/logger.util', () => ({
+jest.mock('../../../src/utils/logger.util', () => ({
   __esModule: true,
   default: {
     info: jest.fn(),
@@ -16,7 +16,7 @@ jest.mock('../../../src/logger.util', () => ({
   },
 }));
 
-jest.mock('../../../src/friends/friend.model', () => ({
+jest.mock('../../../src/models/friends/friend.model', () => ({
   friendshipModel: {
     getFriendsForUser: jest.fn(),
     getPendingForUser: jest.fn(),
@@ -31,7 +31,7 @@ jest.mock('../../../src/friends/friend.model', () => ({
   },
 }));
 
-jest.mock('../../../src/user/user.model', () => ({
+jest.mock('../../../src/models/user/user.model', () => ({
   userModel: {
     findById: jest.fn(),
     findByGoogleId: jest.fn(),
@@ -42,18 +42,18 @@ jest.mock('../../../src/user/user.model', () => ({
   },
 }));
 
-jest.mock('../../../src/location/geocoding.service', () => ({
+jest.mock('../../../src/services/location/geocoding.service', () => ({
   geocodingService: {
     forwardGeocode: jest.fn(),
   },
 }));
 
-const { friendController } = require('../../../src/friends/friend.controller');
-const { friendshipModel } = require('../../../src/friends/friend.model');
-const { userModel } = require('../../../src/user/user.model');
-const { messaging } = require('../../../src/firebase');
-const logger = require('../../../src/logger.util').default;
-const { geocodingService } = require('../../../src/location/geocoding.service');
+const { friendController } = require('../../../src/controllers/friend.controller');
+const { friendshipModel } = require('../../../src/models/friends/friend.model');
+const { userModel } = require('../../../src/models/user/user.model');
+const { messaging } = require('../../../src/config/firebase');
+const logger = require('../../../src/utils/logger.util').default;
+const { geocodingService } = require('../../../src/services/location/geocoding.service');
 
 const createMockResponse = () => {
   const res: any = {};

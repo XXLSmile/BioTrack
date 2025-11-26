@@ -13,29 +13,29 @@ jest.mock('../../../src/utils/safeFs', () => ({
   unlinkSync: jest.fn(),
 }));
 
-jest.mock('../../../src/catalog/catalogEntryLink.model', () => ({
+jest.mock('../../../src/models/catalog/catalogEntryLink.model', () => ({
   catalogEntryLinkModel: {
     removeEntryFromAllCatalogs: jest.fn(),
   },
 }));
 
-jest.mock('../../../src/user/user.model', () => ({
+jest.mock('../../../src/models/user/user.model', () => ({
   userModel: {
     recomputeObservationCount: jest.fn(),
   },
 }));
 
-jest.mock('../../../src/logger.util', () => ({
+jest.mock('../../../src/utils/logger.util', () => ({
   __esModule: true,
   default: {
     error: jest.fn(),
   },
 }));
 
-import { CatalogModel, catalogRepository } from '../../../src/recognition/catalog.model';
-import { catalogEntryLinkModel } from '../../../src/catalog/catalogEntryLink.model';
-import { userModel } from '../../../src/user/user.model';
-import logger from '../../../src/logger.util';
+import { CatalogModel, catalogRepository } from '../../../src/models/recognition/catalog.model';
+import { catalogEntryLinkModel } from '../../../src/models/catalog/catalogEntryLink.model';
+import { userModel } from '../../../src/models/user/user.model';
+import logger from '../../../src/utils/logger.util';
 import * as pathSafe from '../../../src/utils/pathSafe';
 import * as safeFs from '../../../src/utils/safeFs';
 

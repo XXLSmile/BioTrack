@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 import { afterEach, describe, expect, jest, test } from '@jest/globals';
 
-import { recognitionService } from '../../../src/recognition/recognition.service';
-import { speciesRepository } from '../../../src/recognition/species.model';
+import { recognitionService } from '../../../src/services/recognition.service';
+import { speciesRepository } from '../../../src/models/recognition/species.model';
 
 const runLiveSuite = process.env.RUN_ZYLA_LIVE_TESTS === 'true';
 

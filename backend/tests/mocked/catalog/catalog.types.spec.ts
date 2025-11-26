@@ -1,6 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 
-import { updateCatalogSchema } from '../../../src/catalog/catalog.types';
+import { updateCatalogSchema } from '../../../src/types/catalog.types';
 
 describe('Mocked: catalog.types', () => {
   // API: updateCatalogSchema
