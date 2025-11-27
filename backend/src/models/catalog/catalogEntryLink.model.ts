@@ -44,7 +44,9 @@ export class CatalogEntryLinkModel {
   private link: mongoose.Model<ICatalogEntryLink>;
 
   constructor() {
-    this.link = mongoose.model<ICatalogEntryLink>('CatalogEntryLink', catalogEntryLinkSchema);
+    this.link =
+      (mongoose.models.CatalogEntryLink as mongoose.Model<ICatalogEntryLink> | undefined) ??
+      mongoose.model<ICatalogEntryLink>('CatalogEntryLink', catalogEntryLinkSchema);
   }
 
   async linkEntry(
