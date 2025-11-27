@@ -57,7 +57,9 @@ describe('Mocked: error handlers', () => {
     const res = createResponse();
     const err = new Error('boom');
 
-    errorHandler(err, req, res);
+    const next = jest.fn();
+
+    errorHandler(err, req, res, next);
 
     expect(mockLogger.error).toHaveBeenCalledWith('Error:', err);
     expect(res.status).toHaveBeenCalledWith(500);

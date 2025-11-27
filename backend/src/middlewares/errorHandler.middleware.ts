@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 
 import logger from '../utils/logger.util';
 
@@ -12,7 +12,7 @@ export const notFoundHandler = (req: Request, res: Response) => {
   });
 };
 
-export const errorHandler = (error: Error, req: Request, res: Response) => {
+export const errorHandler = (error: Error, req: Request, res: Response, _next: NextFunction) => {
   logger.error('Error:', error);
 
   return res.status(500).json({
