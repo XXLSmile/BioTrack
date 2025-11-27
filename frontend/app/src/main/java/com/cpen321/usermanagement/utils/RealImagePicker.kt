@@ -5,18 +5,20 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material3.*
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import java.io.File
-import java.io.FileOutputStream
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
+import androidx.compose.material3.ElevatedButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import com.cpen321.usermanagement.ui.screens.camera.ImageCompression
 
 
 class RealImagePicker : ImagePicker {
@@ -50,9 +52,6 @@ class RealImagePicker : ImagePicker {
         }
     }
 
-    private fun saveBitmapToCache(context: Context, bitmap: Bitmap): Uri {
-        val file = File(context.cacheDir, "captured_image.jpg")
-        FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 100, it) }
-        return Uri.fromFile(file)
-    }
+    private fun saveBitmapToCache(context: Context, bitmap: Bitmap): Uri =
+        ImageCompression.saveBitmapToCache(context, bitmap)
 }

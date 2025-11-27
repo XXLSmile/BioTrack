@@ -10,6 +10,7 @@ import com.cpen321.usermanagement.data.remote.dto.ScanData
 import com.cpen321.usermanagement.data.remote.dto.ScanResponse
 import com.cpen321.usermanagement.ui.viewmodels.catalog.CatalogViewModel
 import com.cpen321.usermanagement.ui.viewmodels.profile.ProfileViewModel
+import com.cpen321.usermanagement.ui.screens.camera.ImageCompression
 import com.google.android.gms.location.FusedLocationProviderClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +23,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.HttpException
 import retrofit2.Response
 import java.io.File
-import java.io.FileOutputStream
 import java.io.IOException
 
 internal data class RecognitionContext(
@@ -61,11 +61,15 @@ internal fun performRecognition(environment: RecognitionContext) {
     }
 
     environment.scope.launch {
+        environment.uiState.updateResult("Preparing photo…")
         val locationToUse = environment.currentLocation ?: fetchCurrentLocation(environment.fusedLocationClient).also {
             environment.onLocationUpdated(it)
         }
-        environment.uiState.updateResult("Recognizing...")
-        val (message, response) = recognizeImage(environment.appContext, uri, locationToUse)
+        val (message, response) = recognizeImage(
+            environment.appContext,
+            uri,
+            locationToUse
+        ) { status -> environment.uiState.updateResult(status) }
         environment.uiState.showRecognitionResult(message, response)
     }
 }
@@ -108,17 +112,22 @@ internal fun handleCatalogSave(
 private suspend fun recognizeImage(
     context: Context,
     uri: Uri,
-    location: Location?
+    location: Location?,
+    progress: (String) -> Unit
 ): Pair<String, ScanResponse?> {
     var tempFile: File? = null
     return try {
+        emitProgress(progress, "Compressing photo before upload…")
         val (imagePart, file) = createImagePart(context, uri)
         tempFile = file
         val latitudeBody = location?.latitude?.toTextRequestBody()
         val longitudeBody = location?.longitude?.toTextRequestBody()
+        emitProgress(progress, "Uploading photo to BioTrack…")
         val response = withContext(Dispatchers.IO) {
+            emitProgress(progress, "Contacting species recognition service…")
             RetrofitClient.wildlifeApi.recognizeAnimal(imagePart, latitudeBody, longitudeBody)
         }
+        emitProgress(progress, "Processing recognition results…")
         buildRecognitionResult(response)
     } catch (e: IOException) {
         "⚠️ Upload failed: ${e.localizedMessage ?: "Check your connection and try again."}" to null
@@ -165,17 +174,21 @@ private suspend fun createImagePart(
     context: Context,
     uri: Uri
 ): Pair<MultipartBody.Part, File> = withContext(Dispatchers.IO) {
-    val inputStream = context.contentResolver.openInputStream(uri)
-        ?: throw IllegalArgumentException("Unable to open selected image.")
+    val bitmap = ImageCompression.decodeScaledBitmap(context, uri)
     val tempFile = File.createTempFile("upload_", ".jpg", context.cacheDir)
-    inputStream.use { input ->
-        FileOutputStream(tempFile).use { output ->
-            input.copyTo(output)
-        }
+    ImageCompression.compressBitmapToFile(bitmap, tempFile)
+    if (!bitmap.isRecycled) {
+        bitmap.recycle()
     }
 
     val requestFile = tempFile.asRequestBody("image/jpeg".toMediaTypeOrNull())
     MultipartBody.Part.createFormData("image", tempFile.name, requestFile) to tempFile
+}
+
+private suspend fun emitProgress(progress: (String) -> Unit, message: String) {
+    withContext(Dispatchers.Main) {
+        progress(message)
+    }
 }
 
 private fun formatRecognitionMessage(data: ScanData): String {
