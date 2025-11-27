@@ -94,7 +94,9 @@ catalogSchema.index({ userId: 1, createdAt: -1 });
 catalogSchema.index({ speciesId: 1, createdAt: -1 });
 catalogSchema.index({ userId: 1, imageHash: 1 }, { unique: true });
 
-export const CatalogModel = mongoose.model<ICatalogEntry>('CatalogEntry', catalogSchema);
+export const CatalogModel =
+  (mongoose.models.CatalogEntry as mongoose.Model<ICatalogEntry> | undefined) ??
+  mongoose.model<ICatalogEntry>('CatalogEntry', catalogSchema);
 
 // Catalog Repository
 const UPLOADS_ROOT = path.resolve(path.join(__dirname, '../../uploads'));

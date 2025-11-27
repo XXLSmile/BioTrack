@@ -33,7 +33,9 @@ export class CatalogModel {
   private catalog: mongoose.Model<ICatalog>;
 
   constructor() {
-    this.catalog = mongoose.model<ICatalog>('Catalog', catalogSchema);
+    this.catalog =
+      (mongoose.models.Catalog as mongoose.Model<ICatalog> | undefined) ??
+      mongoose.model<ICatalog>('Catalog', catalogSchema);
   }
 
   async findById(catalogId: string): Promise<ICatalog | null> {

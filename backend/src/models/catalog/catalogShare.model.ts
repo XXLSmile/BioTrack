@@ -59,7 +59,9 @@ export class CatalogShareModel {
   private share: mongoose.Model<ICatalogShare>;
 
   constructor() {
-    this.share = mongoose.model<ICatalogShare>('CatalogShare', catalogShareSchema);
+    this.share =
+      (mongoose.models.CatalogShare as mongoose.Model<ICatalogShare> | undefined) ??
+      mongoose.model<ICatalogShare>('CatalogShare', catalogShareSchema);
   }
 
   async createInvitation(

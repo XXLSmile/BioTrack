@@ -96,7 +96,9 @@ export class UserModel {
   private user: mongoose.Model<IUser>;
 
   constructor() {
-    this.user = mongoose.model<IUser>('User', userSchema);
+    this.user =
+      (mongoose.models.User as mongoose.Model<IUser> | undefined) ??
+      mongoose.model<IUser>('User', userSchema);
   }
 
   async create(userInfo: GoogleUserInfo): Promise<IUser> {

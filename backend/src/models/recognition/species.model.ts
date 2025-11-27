@@ -49,7 +49,9 @@ const speciesSchema = new Schema<ISpecies>(
   }
 );
 
-export const SpeciesModel = mongoose.model<ISpecies>('Species', speciesSchema);
+export const SpeciesModel =
+  (mongoose.models.Species as mongoose.Model<ISpecies> | undefined) ??
+  mongoose.model<ISpecies>('Species', speciesSchema);
 
 // Species Repository
 export class SpeciesRepository {
@@ -77,4 +79,3 @@ export class SpeciesRepository {
 }
 
 export const speciesRepository = new SpeciesRepository();
-

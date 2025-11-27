@@ -38,7 +38,9 @@ export class FriendshipModel {
   private friendship: mongoose.Model<IFriendship>;
 
   constructor() {
-    this.friendship = mongoose.model<IFriendship>('Friendship', friendshipSchema);
+    this.friendship =
+      (mongoose.models.Friendship as mongoose.Model<IFriendship> | undefined) ??
+      mongoose.model<IFriendship>('Friendship', friendshipSchema);
   }
 
   async createRequest(
