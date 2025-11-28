@@ -20,6 +20,8 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONException
+import org.json.JSONObject
 import retrofit2.HttpException
 import retrofit2.Response
 import java.io.File
@@ -207,8 +209,11 @@ private fun formatRecognitionMessage(data: ScanData): String {
 
 private fun buildRecognitionResult(response: Response<ScanResponse>): Pair<String, ScanResponse?> {
     if (!response.isSuccessful) {
-        val errorMessage = response.errorBody()?.string()?.takeIf { it.isNotBlank() }
-        return "❌ Error: ${errorMessage ?: response.message()}" to null
+        val rawMessage = response.errorBody()?.string()
+        val parsedMessage = rawMessage?.let(::parseServerErrorMessage)
+        val httpMessage = response.message().takeIf { it.isNotBlank() }
+        val friendlyMessage = parsedMessage ?: httpMessage ?: "Recognition service is unavailable. Please try again."
+        return "❌ Error: $friendlyMessage" to null
     }
     val body = response.body() ?: return "⚠️ No species identified. Try again!" to null
     val recognitionData = body.data.recognition
@@ -218,6 +223,20 @@ private fun buildRecognitionResult(response: Response<ScanResponse>): Pair<Strin
     }
     val finalMessage = saveHint?.let { "$message$it" } ?: message
     return finalMessage to body
+}
+
+private fun parseServerErrorMessage(rawMessage: String): String? {
+    val trimmed = rawMessage.trim()
+    if (trimmed.isBlank()) return null
+    if (trimmed.startsWith("<")) {
+        // HTML error (e.g., reverse proxy) — return null so we fall back to a friendly default.
+        return null
+    }
+    return try {
+        JSONObject(trimmed).optString("message").takeIf { it.isNotBlank() } ?: trimmed
+    } catch (e: JSONException) {
+        trimmed
+    }
 }
 
 private fun interpretSaveResponse(

@@ -89,8 +89,8 @@ describe('RecognitionService (unit)', () => {
 
   // API: RecognitionService.recognizeFromUrl
   // Input: Zyla response with success false and empty output array
-  // Expected behavior: service throws generic failure error
-  // Expected output: Promise rejection with message "Failed to recognize species from image"
+  // Expected behavior: service throws standardized "no species recognized" error
+  // Expected output: Promise rejection with message "No species recognized from image"
   // Mock behavior: axios.post mocked to return empty output; speciesRepository.not invoked
   test('throws when API returns no results', async () => {
     jest.spyOn(axios, 'post').mockResolvedValue({
@@ -102,7 +102,7 @@ describe('RecognitionService (unit)', () => {
 
     await expect(
       recognitionService.recognizeFromUrl('https://example.com/empty.jpg')
-    ).rejects.toThrow('Failed to recognize species from image');
+    ).rejects.toThrow('No species recognized from image');
   });
 
   test('throws when API succeeds but returns empty outputs', async () => {
@@ -115,7 +115,7 @@ describe('RecognitionService (unit)', () => {
 
     await expect(
       recognitionService.recognizeFromUrl('https://example.com/empty-success.jpg')
-    ).rejects.toThrow('Failed to recognize species from image');
+    ).rejects.toThrow('No species recognized from image');
   });
 
   test('throws when API payload omits output field', async () => {
@@ -127,7 +127,7 @@ describe('RecognitionService (unit)', () => {
 
     await expect(
       recognitionService.recognizeFromUrl('https://example.com/missing-output.jpg')
-    ).rejects.toThrow('Failed to recognize species from image');
+    ).rejects.toThrow('No species recognized from image');
   });
 
   // API: RecognitionService.recognizeFromUrl

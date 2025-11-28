@@ -76,7 +76,21 @@ export class RecognitionService {
         });
       }
 
-      logger.error('Error recognizing species:', error instanceof Error ? error.message : String(error));
+      const normalizedMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Error recognizing species:', normalizedMessage);
+
+      if (typeof normalizedMessage === 'string') {
+        const recognizedMessages = [
+          'No species recognized from image',
+          'Rate limit exceeded',
+          'Request timed out while contacting upstream',
+        ];
+
+        if (recognizedMessages.some(message => normalizedMessage.includes(message))) {
+          throw error;
+        }
+      }
+
       throw new Error('Failed to recognize species from image');
     }
   }
