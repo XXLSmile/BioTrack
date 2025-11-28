@@ -194,6 +194,15 @@ export class UserModel {
     }
   }
 
+  async deleteAllUsers(): Promise<void> {
+    try {
+      await this.user.deleteMany({});
+    } catch (error) {
+      logger.error('Error clearing users collection:', error);
+      throw new Error('Failed to clear users');
+    }
+  }
+
   async findByUsername(username: string): Promise<IUser | null> {
     try {
       // Username is stored lowercase, so direct match
