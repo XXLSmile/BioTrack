@@ -50,29 +50,41 @@ internal data class CatalogSaveContext(
 )
 
 internal fun performRecognition(environment: RecognitionContext) {
+    val uiState = environment.uiState
     if (!environment.hasLocationPermission()) {
         environment.requestLocationPermission()
-        environment.uiState.updateResult("Grant location permission to attach coordinates.")
+        uiState.updateResult("Grant location permission to attach coordinates.")
         return
     }
 
-    val uri = environment.uiState.imageUri
+    if (uiState.isRecognizing) {
+        uiState.updateResult("Recognition already in progress. Please wait…")
+        return
+    }
+
+    val uri = uiState.imageUri
     if (uri == null) {
-        environment.uiState.updateResult("Select a photo before scanning.")
+        uiState.updateResult("Select a photo before scanning.")
         return
     }
 
+    uiState.setRecognizingState(true)
     environment.scope.launch {
-        environment.uiState.updateResult("Preparing photo…")
-        val locationToUse = environment.currentLocation ?: fetchCurrentLocation(environment.fusedLocationClient).also {
-            environment.onLocationUpdated(it)
+        try {
+            uiState.updateResult("Preparing photo…")
+            val locationToUse =
+                environment.currentLocation ?: fetchCurrentLocation(environment.fusedLocationClient).also {
+                    environment.onLocationUpdated(it)
+                }
+            val (message, response) = recognizeImage(
+                environment.appContext,
+                uri,
+                locationToUse
+            ) { status -> uiState.updateResult(status) }
+            uiState.showRecognitionResult(message, response)
+        } finally {
+            uiState.setRecognizingState(false)
         }
-        val (message, response) = recognizeImage(
-            environment.appContext,
-            uri,
-            locationToUse
-        ) { status -> environment.uiState.updateResult(status) }
-        environment.uiState.showRecognitionResult(message, response)
     }
 }
 

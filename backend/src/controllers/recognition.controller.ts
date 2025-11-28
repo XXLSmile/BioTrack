@@ -24,6 +24,7 @@ import {
   readFileBufferSync,
   writeFileSync as safeWriteFileSync,
   renameSync as safeRenameSync,
+  unlinkSync as safeUnlinkSync,
 } from '../utils/safeFs';
 
 const parseCoordinate = (value: unknown): number | undefined => {
@@ -179,6 +180,10 @@ export class RecognitionController {
     res: Response<RecognitionImageResponse>,
     next: NextFunction
   ) {
+    let savedImage:
+      | { fullPath: string; relativePath: string; filename: string }
+      | undefined;
+
     try {
       const body = req.body as Record<string, unknown>;
       const latitude = parseCoordinate(body.latitude);
@@ -195,9 +200,6 @@ export class RecognitionController {
       logger.info('Processing image recognition request');
 
       let recognitionResult;
-      let savedImage:
-        | { fullPath: string; relativePath: string; filename: string }
-        | undefined;
       let absoluteImageUrl: string | undefined = imageUrl;
 
       if (imageUrl) {
@@ -227,6 +229,19 @@ export class RecognitionController {
         },
       });
     } catch (error) {
+      if (savedImage?.fullPath) {
+        try {
+          if (safeExistsSync(savedImage.fullPath)) {
+            safeUnlinkSync(savedImage.fullPath);
+          }
+        } catch (cleanupError) {
+          logger.warn('Failed to clean up temporary upload after recognition error', {
+            file: savedImage.fullPath,
+            error: cleanupError instanceof Error ? cleanupError.message : cleanupError,
+          });
+        }
+      }
+
       logger.error('Error in recognizeImage controller:', error);
 
       if (error instanceof Error) {
@@ -379,12 +394,21 @@ export class RecognitionController {
       };
 
       const uploadsInfo = normalizeUploadsPath(imagePath);
-      const currentFullPath = resolveWithinRoot(UPLOADS_ROOT, uploadsInfo.relativePath);
+      let activeRelativePath = uploadsInfo.relativePath;
+      let currentFullPath = resolveWithinRoot(UPLOADS_ROOT, activeRelativePath);
 
       if (!safeExistsSync(currentFullPath)) {
-        return res.status(404).json({
-          message: 'Uploaded image could not be found. Please run recognition again.',
-        });
+        const relocatedRelativePath = path.posix.join('images', uploadsInfo.filename);
+        const relocatedFullPath = resolveWithinRoot(UPLOADS_ROOT, relocatedRelativePath);
+
+        if (safeExistsSync(relocatedFullPath)) {
+          activeRelativePath = relocatedRelativePath;
+          currentFullPath = relocatedFullPath;
+        } else {
+          return res.status(404).json({
+            message: 'Uploaded image could not be found. Please run recognition again.',
+          });
+        }
       }
 
       const imageBuffer = readFileBufferSync(currentFullPath);
@@ -411,21 +435,25 @@ export class RecognitionController {
           : undefined;
 
       let isNewEntry = false;
-      let finalRelativePath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+      const toUploadsPath = (relativePath: string): string =>
+        `/uploads/${relativePath.replace(/^\/+/, '')}`;
+      let finalRelativePath = toUploadsPath(activeRelativePath);
       let persistedCatalogEntry: ICatalogEntry;
 
       if (!catalogEntry) {
         const imagesDir = ensureDirectoryExists(resolveWithinRoot(UPLOADS_ROOT, 'images'));
 
         let targetFilename = uploadsInfo.filename;
-        if (!uploadsInfo.relativePath.startsWith('images/')) {
+        if (!activeRelativePath.startsWith('images/')) {
           targetFilename = generateUniqueFilename(imagesDir, uploadsInfo.filename);
           const destinationPath = ensurePathWithinRoot(
             UPLOADS_ROOT,
             path.join(imagesDir, targetFilename)
           );
           safeRenameSync(currentFullPath, destinationPath);
-          finalRelativePath = path.posix.join('/uploads/images', targetFilename);
+          currentFullPath = destinationPath;
+          activeRelativePath = path.posix.join('images', targetFilename);
+          finalRelativePath = toUploadsPath(activeRelativePath);
         }
 
         const imageMimeType = guessMimeType(targetFilename);
@@ -449,7 +477,7 @@ export class RecognitionController {
       } else {
         persistedCatalogEntry = catalogEntry;
 
-        if (!uploadsInfo.relativePath.startsWith('images/')) {
+        if (!activeRelativePath.startsWith('images/')) {
           const imagesDir = ensureDirectoryExists(resolveWithinRoot(UPLOADS_ROOT, 'images'));
           const targetFilename = generateUniqueFilename(imagesDir, uploadsInfo.filename);
           const destinationPath = ensurePathWithinRoot(
@@ -457,6 +485,9 @@ export class RecognitionController {
             path.join(imagesDir, targetFilename)
           );
           safeRenameSync(currentFullPath, destinationPath);
+          currentFullPath = destinationPath;
+          activeRelativePath = path.posix.join('images', targetFilename);
+          finalRelativePath = toUploadsPath(activeRelativePath);
         }
       }
 

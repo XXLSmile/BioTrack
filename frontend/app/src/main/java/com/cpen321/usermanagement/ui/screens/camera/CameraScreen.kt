@@ -57,6 +57,7 @@ private fun CameraScreenHost(
         imageUri = controller.uiState.imageUri,
         resultText = controller.uiState.resultText,
         isSaving = controller.uiState.isSaving,
+        isRecognizing = controller.uiState.isRecognizing,
         imagePicker = imagePicker,
         onImageSelected = controller.uiState::updateImage,
         onRecognizeClick = { triggerRecognition(controller, requestLocationPermission) }

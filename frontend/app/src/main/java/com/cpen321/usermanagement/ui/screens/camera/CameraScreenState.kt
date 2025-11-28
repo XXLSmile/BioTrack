@@ -38,6 +38,8 @@ class CameraUiState {
         private set
     var isSaving by mutableStateOf(false)
         private set
+    var isRecognizing by mutableStateOf(false)
+        private set
 
     fun updateImage(uri: android.net.Uri?) {
         imageUri = uri
@@ -66,6 +68,10 @@ class CameraUiState {
 
     fun setSavingState(value: Boolean) {
         isSaving = value
+    }
+
+    fun setRecognizingState(value: Boolean) {
+        isRecognizing = value
     }
 }
 

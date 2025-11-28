@@ -42,6 +42,7 @@ fun CameraScreenLayout(
     imageUri: Uri?,
     resultText: String?,
     isSaving: Boolean,
+    isRecognizing: Boolean,
     imagePicker: ImagePicker,
     onImageSelected: (Uri?) -> Unit,
     onRecognizeClick: () -> Unit
@@ -67,6 +68,7 @@ fun CameraScreenLayout(
             imageUri = imageUri,
             resultText = resultText,
             isSaving = isSaving,
+            isRecognizing = isRecognizing,
             imagePicker = imagePicker,
             onImageSelected = onImageSelected,
             onRecognizeClick = onRecognizeClick
@@ -80,6 +82,7 @@ private fun CameraScreenBody(
     imageUri: Uri?,
     resultText: String?,
     isSaving: Boolean,
+    isRecognizing: Boolean,
     imagePicker: ImagePicker,
     onImageSelected: (Uri?) -> Unit,
     onRecognizeClick: () -> Unit
@@ -97,7 +100,7 @@ private fun CameraScreenBody(
         CameraActionButtons(imagePicker = imagePicker, onImageSelected = onImageSelected)
         Spacer(modifier = Modifier.height(24.dp))
         RecognizeButton(
-            enabled = !isSaving,
+            enabled = !isSaving && !isRecognizing,
             onClick = onRecognizeClick
         )
         Spacer(modifier = Modifier.height(24.dp))
