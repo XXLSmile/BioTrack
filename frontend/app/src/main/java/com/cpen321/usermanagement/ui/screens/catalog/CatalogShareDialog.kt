@@ -3,34 +3,38 @@ package com.cpen321.usermanagement.ui.screens.catalog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.Row
-import androidx.compose.ui.Alignment
 import com.cpen321.usermanagement.data.model.CatalogShareEntry
 import com.cpen321.usermanagement.data.remote.dto.FriendSummary
 import com.cpen321.usermanagement.ui.viewmodels.catalog.CatalogShareUiState
@@ -195,30 +199,39 @@ private fun ShareDialogFriendSelector(
     inviteState: ShareInviteState,
     enabled: Boolean
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .wrapContentSize(Alignment.TopStart)
-    ) {
-        OutlinedButton(
-            onClick = { inviteState.friendMenuExpanded = true },
-            enabled = enabled,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(inviteState.friendDisplay())
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Select friend",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        if (state.friends.isEmpty()) {
+            Text(
+                text = "No friends available to invite.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            return@Column
         }
-        androidx.compose.material3.DropdownMenu(
-            expanded = inviteState.friendMenuExpanded,
-            onDismissRequest = { inviteState.friendMenuExpanded = false }
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 200.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            state.friends.forEach { friend ->
-                DropdownMenuItem(
-                    text = { Text(inviteState.friendDisplay(friend)) },
-                    onClick = {
-                        inviteState.selectedFriend = friend
-                        inviteState.friendMenuExpanded = false
-                    }
-                )
+            items(state.friends) { friend ->
+                val isSelected = inviteState.selectedFriend?.user?._id == friend.user?._id
+                OutlinedButton(
+                    onClick = { if (enabled) inviteState.selectedFriend = friend },
+                    enabled = enabled,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    )
+                ) {
+                    Text(inviteState.friendDisplay(friend))
+                }
             }
         }
     }
@@ -229,29 +242,27 @@ private fun ShareDialogRoleSelector(
     inviteState: ShareInviteState,
     enabled: Boolean
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .wrapContentSize(Alignment.TopStart)
-    ) {
-        OutlinedButton(
-            onClick = { inviteState.roleMenuExpanded = true },
-            enabled = enabled,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Role: ${inviteState.roleLabel}")
-        }
-        androidx.compose.material3.DropdownMenu(
-            expanded = inviteState.roleMenuExpanded,
-            onDismissRequest = { inviteState.roleMenuExpanded = false }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Choose role",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             inviteState.roleOptions.forEach { role ->
-                DropdownMenuItem(
-                    text = { Text(role.replaceFirstChar { it.uppercase() }) },
+                FilterChip(
+                    selected = inviteState.selectedRole == role,
                     onClick = {
-                        inviteState.selectedRole = role
-                        inviteState.roleMenuExpanded = false
-                    }
+                        if (enabled) {
+                            inviteState.selectedRole = role
+                        }
+                    },
+                    enabled = enabled,
+                    label = { Text(role.replaceFirstChar { it.uppercase() }) }
                 )
             }
         }
@@ -347,8 +358,6 @@ private fun rememberShareInviteState(state: CatalogShareUiState): ShareInviteSta
 private class ShareInviteState(initialFriend: FriendSummary?) {
     var selectedFriend: FriendSummary? = initialFriend
     var selectedRole: String = "viewer"
-    var friendMenuExpanded: Boolean = false
-    var roleMenuExpanded: Boolean = false
 
     val roleOptions = listOf("viewer", "editor")
     val roleLabel: String get() = selectedRole.replaceFirstChar { it.uppercase() }
