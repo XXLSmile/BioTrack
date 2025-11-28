@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.IOException
 import retrofit2.HttpException
@@ -38,7 +39,11 @@ class CatalogViewModel @Inject constructor(
     private val _catalogDetail = MutableStateFlow<CatalogData?>(null)
     val catalogDetail: StateFlow<CatalogData?> = _catalogDetail.asStateFlow()
 
+    private val _catalogPreviews = MutableStateFlow<Map<String, String?>>(emptyMap())
+    val catalogPreviews: StateFlow<Map<String, String?>> = _catalogPreviews.asStateFlow()
+
     private var activeCatalogId: String? = null
+    private val previewRequests = LinkedHashSet<String>()
 
     init {
         observeSocketEvents()
@@ -78,7 +83,9 @@ class CatalogViewModel @Inject constructor(
                 val created = repository.createCatalog(name, description)
                 if (created != null) {
                     _catalogs.value = _catalogs.value + created
+                    loadCatalogPreview(created._id)
                 }
+                loadCatalogs()
             } catch (e: RepositoryException) {
                 logCatalogError("Failed to create catalog", e)
             } catch (e: IOException) {
@@ -138,6 +145,39 @@ class CatalogViewModel @Inject constructor(
         }
     }
 
+    fun loadCatalogPreview(catalogId: String) {
+        if (_catalogPreviews.value.containsKey(catalogId) || previewRequests.contains(catalogId)) {
+            return
+        }
+        previewRequests.add(catalogId)
+        viewModelScope.launch {
+            try {
+                val previewUrl = repository.getCatalogPreviewImage(catalogId)
+                _catalogPreviews.update { current -> current + (catalogId to previewUrl) }
+            } catch (e: RepositoryException) {
+                logCatalogError("Failed to load catalog preview", e)
+            } catch (e: IOException) {
+                logCatalogError("Failed to load catalog preview due to network error", e)
+            } catch (e: HttpException) {
+                logCatalogError("Failed to load catalog preview: HTTP ${e.code()}", e)
+            } finally {
+                previewRequests.remove(catalogId)
+            }
+        }
+    }
+
+    private fun invalidateCatalogPreview(catalogId: String) {
+        previewRequests.remove(catalogId)
+        _catalogPreviews.update { previews ->
+            if (previews.containsKey(catalogId)) {
+                previews - catalogId
+            } else {
+                previews
+            }
+        }
+        loadCatalogPreview(catalogId)
+    }
+
     fun addEntryToCatalog(
         targetCatalogId: String,
         entryId: String,
@@ -147,6 +187,7 @@ class CatalogViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val updatedCatalog = repository.linkEntryToCatalog(targetCatalogId, entryId)
+                invalidateCatalogPreview(targetCatalogId)
                 loadCatalogs()
                 when {
                     currentCatalogId == null -> Unit
@@ -175,6 +216,7 @@ class CatalogViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val updatedCatalog = repository.unlinkEntryFromCatalog(catalogId, entryId)
+                invalidateCatalogPreview(catalogId)
                 loadCatalogs()
                 if (updatedCatalog != null) {
                     applyCatalogData(updatedCatalog)
@@ -204,7 +246,10 @@ class CatalogViewModel @Inject constructor(
             recognitionRepository.deleteEntry(entryId)
                 .onSuccess {
                     loadCatalogs()
-                    currentCatalogId?.let { loadCatalogDetail(it) }
+                    currentCatalogId?.let {
+                        invalidateCatalogPreview(it)
+                        loadCatalogDetail(it)
+                    }
                     onComplete(true, null)
                 }
                 .onFailure { error ->
@@ -234,12 +279,12 @@ class CatalogViewModel @Inject constructor(
     }
 
     private fun handleEntriesUpdated(event: CatalogSocketEvent.EntriesUpdated) {
-        val current = _catalogDetail.value ?: return
-        if (current.catalog._id != event.catalogId) {
-            return
+        invalidateCatalogPreview(event.catalogId)
+        val current = _catalogDetail.value
+        if (current?.catalog?._id == event.catalogId) {
+            val updated = current.copy(entries = event.entries)
+            applyCatalogData(updated)
         }
-        val updated = current.copy(entries = event.entries)
-        applyCatalogData(updated)
     }
 
     private fun handleMetadataUpdated(event: CatalogSocketEvent.MetadataUpdated) {
@@ -262,6 +307,7 @@ class CatalogViewModel @Inject constructor(
     private fun handleCatalogDeleted(event: CatalogSocketEvent.CatalogDeleted) {
         val removedId = event.catalogId
         _catalogs.value = _catalogs.value.filterNot { it._id == removedId }
+        invalidateCatalogPreview(removedId)
         if (activeCatalogId == removedId) {
             activeCatalogId = null
             _catalogDetail.value = null

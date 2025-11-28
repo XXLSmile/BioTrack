@@ -7,6 +7,7 @@ import com.cpen321.usermanagement.data.model.InviteCollaboratorBody
 import com.cpen321.usermanagement.data.model.RespondInvitationBody
 import com.cpen321.usermanagement.data.model.UpdateCollaboratorBody
 import com.cpen321.usermanagement.data.remote.api.CatalogApi
+import com.cpen321.usermanagement.data.remote.api.RetrofitClient
 import java.io.IOException
 import javax.inject.Inject
 import retrofit2.HttpException
@@ -42,6 +43,17 @@ class CatalogRepository @Inject constructor(
     suspend fun getCatalogById(catalogId: String): com.cpen321.usermanagement.data.model.CatalogData? {
         val response = api.getCatalog(catalogId)
         return response.body()?.data
+    }
+
+    suspend fun getCatalogPreviewImage(catalogId: String): String? {
+        val data = getCatalogById(catalogId)
+        val latestEntry = data?.entries
+            ?.sortedByDescending {
+                it.entry.createdAt ?: it.entry.updatedAt ?: it.linkedAt ?: ""
+            }
+            ?.firstOrNull()
+        val rawUrl = latestEntry?.entry?.imageUrl
+        return RetrofitClient.resolveImageUrl(rawUrl)
     }
 
 

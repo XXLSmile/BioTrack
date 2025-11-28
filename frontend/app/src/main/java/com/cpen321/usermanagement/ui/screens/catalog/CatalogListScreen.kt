@@ -16,24 +16,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -42,8 +37,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -51,10 +44,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -66,6 +62,8 @@ import com.cpen321.usermanagement.ui.navigation.NavRoutes
 import com.cpen321.usermanagement.ui.viewmodels.catalog.CatalogShareUiState
 import com.cpen321.usermanagement.ui.viewmodels.catalog.CatalogShareViewModel
 import com.cpen321.usermanagement.ui.viewmodels.catalog.CatalogViewModel
+import coil.compose.AsyncImage
+import androidx.compose.ui.draw.blur
 
 @Composable
 fun CatalogListScreen(
@@ -81,19 +79,35 @@ fun CatalogListScreen(
 private fun CatalogListScreenHost(state: CatalogListScreenState) {
     CatalogListSideEffects(state)
 
+    var selectedTab by rememberSaveable { mutableStateOf(CatalogListTab.ALL_CATALOGS) }
+    var catalogPendingDeleteId by rememberSaveable { mutableStateOf<String?>(null) }
+    var catalogPendingDeleteName by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val callbacks = CatalogListCallbacks(
+        onBack = state::navigateBack,
+        onOpenCatalogEntries = state::openCatalogEntries,
+        onOpenCatalog = state::openCatalog,
+        onCreateCatalogClick = { state.creationDialogState.open() },
+        onSelectMyTab = { selectedTab = CatalogListTab.MY_CATALOGS },
+        onSelectSharedTab = { selectedTab = CatalogListTab.SHARED_CATALOGS },
+        onSelectAllTab = { selectedTab = CatalogListTab.ALL_CATALOGS },
+        onRespondToInvitation = { id, action -> state.shareViewModel.respondToInvitation(id, action) },
+        onDeleteCatalog = { state.viewModel.deleteCatalog(it) }
+    )
+
     CatalogListScreenLayout(
         catalogs = state.catalogs,
         shareUiState = state.shareUiState,
+        selectedTab = selectedTab,
+        catalogPreviews = state.catalogPreviews,
         showNavigationIcon = state.showNavigationIcon,
         snackbarHostState = state.snackbarHostState,
-        callbacks = CatalogListCallbacks(
-            onBack = state::navigateBack,
-            onOpenCatalogEntries = state::openCatalogEntries,
-            onOpenCatalog = state::openCatalog,
-            onCreateCatalogClick = { state.creationDialogState.open() },
-            onRespondToInvitation = { id, action -> state.shareViewModel.respondToInvitation(id, action) },
-            onDeleteCatalog = { state.viewModel.deleteCatalog(it) }
-        )
+        callbacks = callbacks,
+        onRequestDeleteCatalog = { catalogId, catalogName ->
+            catalogPendingDeleteId = catalogId
+            catalogPendingDeleteName = catalogName
+        },
+        onRequestPreview = state::requestCatalogPreview
     )
 
     CatalogCreationDialog(
@@ -104,26 +118,50 @@ private fun CatalogListScreenHost(state: CatalogListScreenState) {
         },
         onDismiss = { state.creationDialogState.close(resetName = false) }
     )
+
+    if (catalogPendingDeleteId != null) {
+        DeleteCatalogConfirmationDialog(
+            catalogName = catalogPendingDeleteName,
+            onConfirm = {
+                catalogPendingDeleteId?.let { callbacks.onDeleteCatalog(it) }
+                catalogPendingDeleteId = null
+                catalogPendingDeleteName = null
+            },
+            onDismiss = {
+                catalogPendingDeleteId = null
+                catalogPendingDeleteName = null
+            }
+        )
+    }
 }
 
 @Composable
 private fun CatalogListScreenLayout(
     catalogs: List<Catalog>,
     shareUiState: CatalogShareUiState,
+    selectedTab: CatalogListTab,
+    catalogPreviews: Map<String, String?>,
     showNavigationIcon: Boolean,
     snackbarHostState: SnackbarHostState,
-    callbacks: CatalogListCallbacks
+    callbacks: CatalogListCallbacks,
+    onRequestDeleteCatalog: (String, String) -> Unit,
+    onRequestPreview: (String) -> Unit
 ) {
     CatalogListScaffold(
         snackbarHostState = snackbarHostState,
         showNavigationIcon = showNavigationIcon,
+        selectedTab = selectedTab,
         callbacks = callbacks
     ) { paddingValues ->
         CatalogListBody(
             paddingValues = paddingValues,
             catalogs = catalogs,
             shareUiState = shareUiState,
-            callbacks = callbacks
+            selectedTab = selectedTab,
+            callbacks = callbacks,
+            onRequestDeleteCatalog = onRequestDeleteCatalog,
+            catalogPreviews = catalogPreviews,
+            onRequestPreview = onRequestPreview
         )
     }
 }
@@ -132,40 +170,25 @@ private fun CatalogListScreenLayout(
 private fun CatalogListScaffold(
     snackbarHostState: SnackbarHostState,
     showNavigationIcon: Boolean,
+    selectedTab: CatalogListTab,
     callbacks: CatalogListCallbacks,
     content: @Composable (PaddingValues) -> Unit
 ) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text("My Catalogs") },
-                navigationIcon = {
-                    if (showNavigationIcon) {
-                        IconButton(onClick = callbacks.onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back"
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
-        },
+        topBar = {},
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = callbacks.onCreateCatalogClick,
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(
-                    Icons.Outlined.Add,
-                    contentDescription = "Add Catalog",
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
+            if (selectedTab == CatalogListTab.MY_CATALOGS || selectedTab == CatalogListTab.ALL_CATALOGS) {
+                FloatingActionButton(
+                    onClick = callbacks.onCreateCatalogClick,
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(
+                        Icons.Outlined.Add,
+                        contentDescription = "Add Catalog",
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
             }
         }
     ) { paddingValues -> content(paddingValues) }
@@ -176,7 +199,11 @@ private fun CatalogListBody(
     paddingValues: PaddingValues,
     catalogs: List<Catalog>,
     shareUiState: CatalogShareUiState,
-    callbacks: CatalogListCallbacks
+    selectedTab: CatalogListTab,
+    callbacks: CatalogListCallbacks,
+    onRequestDeleteCatalog: (String, String) -> Unit,
+    catalogPreviews: Map<String, String?>,
+    onRequestPreview: (String) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -188,25 +215,85 @@ private fun CatalogListBody(
         ManageAllEntriesCard(onManageAll = callbacks.onOpenCatalogEntries)
         Spacer(modifier = Modifier.height(16.dp))
 
-        CatalogInvitationsSection(
-            invitations = shareUiState.pendingInvitations,
-            isProcessing = shareUiState.isProcessing,
-            onRespond = callbacks.onRespondToInvitation
-        )
-
-        SharedCatalogsSection(
-            shares = shareUiState.sharedCatalogs,
-            onOpenCatalog = callbacks.onOpenCatalog
-        )
+    CatalogTabSelector(
+        selectedTab = selectedTab,
+        onMyCatalogs = callbacks.onSelectMyTab,
+        onSharedCatalogs = callbacks.onSelectSharedTab,
+        onAllCatalogs = callbacks.onSelectAllTab
+    )
+    Spacer(modifier = Modifier.height(16.dp))
 
         Box(modifier = Modifier.weight(1f, fill = true)) {
-            CatalogGrid(
-                catalogs = catalogs,
-                onOpenCatalog = callbacks.onOpenCatalog,
-                onDeleteCatalog = callbacks.onDeleteCatalog,
-                modifier = Modifier.fillMaxSize()
-            )
+            when (selectedTab) {
+                CatalogListTab.MY_CATALOGS -> {
+                    MyCatalogsSection(
+                        catalogs = catalogs,
+                        onOpenCatalog = callbacks.onOpenCatalog,
+                        onDeleteCatalog = onRequestDeleteCatalog,
+                        catalogPreviews = catalogPreviews,
+                        onRequestPreview = onRequestPreview,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                CatalogListTab.SHARED_CATALOGS -> {
+                    SharedCatalogsList(
+                        invitations = shareUiState.pendingInvitations,
+                        isProcessing = shareUiState.isProcessing,
+                        onRespond = callbacks.onRespondToInvitation,
+                        shares = shareUiState.sharedCatalogs,
+                        onOpenCatalog = callbacks.onOpenCatalog,
+                        catalogPreviews = catalogPreviews,
+                        onRequestPreview = onRequestPreview
+                    )
+                }
+                CatalogListTab.ALL_CATALOGS -> {
+                    AllCatalogsList(
+                        myCatalogs = catalogs,
+                        sharedCatalogs = shareUiState.sharedCatalogs,
+                        onOpenCatalog = callbacks.onOpenCatalog,
+                        onDeleteCatalog = onRequestDeleteCatalog,
+                        onRespondToInvitation = callbacks.onRespondToInvitation,
+                        catalogPreviews = catalogPreviews,
+                        onRequestPreview = onRequestPreview,
+                        isProcessingInvites = shareUiState.isProcessing,
+                        pendingInvitations = shareUiState.pendingInvitations
+                    )
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun CatalogTabSelector(
+    selectedTab: CatalogListTab,
+    onMyCatalogs: () -> Unit,
+    onSharedCatalogs: () -> Unit,
+    onAllCatalogs: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        val allSelected = selectedTab == CatalogListTab.ALL_CATALOGS
+        val mySelected = selectedTab == CatalogListTab.MY_CATALOGS
+        val sharedSelected = selectedTab == CatalogListTab.SHARED_CATALOGS
+
+        FilterChip(
+            selected = allSelected,
+            onClick = onAllCatalogs,
+            label = { Text("All Catalogs") }
+        )
+        FilterChip(
+            selected = mySelected,
+            onClick = onMyCatalogs,
+            label = { Text("My Catalogs") }
+        )
+        FilterChip(
+            selected = sharedSelected,
+            onClick = onSharedCatalogs,
+            label = { Text("Shared Catalogs") }
+        )
     }
 }
 
@@ -278,9 +365,153 @@ private fun CatalogInvitationRow(
 }
 
 @Composable
+private fun SharedCatalogsList(
+    invitations: List<CatalogShareEntry>,
+    isProcessing: Boolean,
+    onRespond: (String, String) -> Unit,
+    shares: List<CatalogShareEntry>,
+    onOpenCatalog: (String) -> Unit,
+    catalogPreviews: Map<String, String?>,
+    onRequestPreview: (String) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 80.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        if (invitations.isNotEmpty()) {
+            item {
+                CatalogInvitationsSection(
+                    invitations = invitations,
+                    isProcessing = isProcessing,
+                    onRespond = onRespond
+                )
+            }
+        }
+
+        if (shares.isNotEmpty()) {
+            item {
+                SharedCatalogsSection(
+                    shares = shares,
+                    onOpenCatalog = onOpenCatalog,
+                    catalogPreviews = catalogPreviews,
+                    onRequestPreview = onRequestPreview
+                )
+            }
+        } else {
+            item {
+                Text(
+                    text = "No shared catalogs yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AllCatalogsList(
+    myCatalogs: List<Catalog>,
+    sharedCatalogs: List<CatalogShareEntry>,
+    onOpenCatalog: (String) -> Unit,
+    onDeleteCatalog: (String, String) -> Unit,
+    onRespondToInvitation: (String, String) -> Unit,
+    catalogPreviews: Map<String, String?>,
+    onRequestPreview: (String) -> Unit,
+    isProcessingInvites: Boolean,
+    pendingInvitations: List<CatalogShareEntry>
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 80.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Text(
+                text = "All Catalogs",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        if (pendingInvitations.isNotEmpty()) {
+            item {
+                CatalogInvitationsSection(
+                    invitations = pendingInvitations,
+                    isProcessing = isProcessingInvites,
+                    onRespond = onRespondToInvitation
+                )
+            }
+        }
+
+        if (myCatalogs.isEmpty() && sharedCatalogs.isEmpty()) {
+            item {
+                Text(
+                    text = "No catalogs available yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        if (myCatalogs.isNotEmpty()) {
+            items(
+                items = myCatalogs,
+                key = { it._id }
+            ) { catalog ->
+                val previewUrl = catalogPreviews[catalog._id]
+                val hasPreview = catalogPreviews.containsKey(catalog._id)
+                CatalogCard(
+                    catalogName = catalog.name,
+                    description = catalog.description,
+                    onOpen = { onOpenCatalog(catalog._id) },
+                    onDelete = { onDeleteCatalog(catalog._id, catalog.name ?: "Catalog") },
+                    previewUrl = previewUrl,
+                    hasPreview = hasPreview,
+                    requestPreview = { onRequestPreview(catalog._id) }
+                )
+            }
+        }
+
+        if (sharedCatalogs.isNotEmpty()) {
+            item {
+                Text(
+                    text = "Shared Catalogs",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            items(
+                items = sharedCatalogs,
+                key = { it._id }
+            ) { share ->
+                val catalogId = share.catalog?._id ?: return@items
+                val previewUrl = catalogPreviews[catalogId]
+                val hasPreview = catalogPreviews.containsKey(catalogId)
+                val ownerLabel = share.invitedBy?.let { resolveUserName(it) }
+                    ?.takeIf { it.isNotBlank() }
+                    ?: share.owner?.takeIf { it.isNotBlank() }
+                    ?: "Unknown owner"
+                SharedCatalogCard(
+                    catalogName = share.catalog.name ?: "Catalog",
+                    roleLabel = share.role.replaceFirstChar { it.uppercase() },
+                    ownerLabel = ownerLabel,
+                    onClick = { onOpenCatalog(catalogId) },
+                    previewUrl = previewUrl,
+                    hasPreview = hasPreview,
+                    requestPreview = { onRequestPreview(catalogId) }
+                )
+            }
+        }
+    }
+}
+@Composable
 private fun SharedCatalogsSection(
     shares: List<CatalogShareEntry>,
-    onOpenCatalog: (String) -> Unit
+    onOpenCatalog: (String) -> Unit,
+    catalogPreviews: Map<String, String?>,
+    onRequestPreview: (String) -> Unit
 ) {
     if (shares.isEmpty()) return
 
@@ -290,15 +521,22 @@ private fun SharedCatalogsSection(
     ) {
         Text(text = "Catalogs shared with you", style = MaterialTheme.typography.titleMedium)
         shares.forEach { share ->
-            val catalogId = share.catalog?._id
-            if (catalogId != null) {
-                SharedCatalogCard(
-                    catalogName = share.catalog.name ?: "Catalog",
-                    roleLabel = share.role.replaceFirstChar { it.uppercase() },
-                    inviter = share.invitedBy,
-                    onClick = { onOpenCatalog(catalogId) }
-                )
-            }
+            val catalogId = share.catalog?._id ?: return@forEach
+            val previewUrl = catalogPreviews[catalogId]
+            val hasPreview = catalogPreviews.containsKey(catalogId)
+            val ownerLabel = share.invitedBy?.let { resolveUserName(it) }
+                ?.takeIf { it.isNotBlank() }
+                ?: share.owner?.takeIf { it.isNotBlank() }
+                ?: "Unknown owner"
+            SharedCatalogCard(
+                catalogName = share.catalog.name ?: "Catalog",
+                roleLabel = share.role.replaceFirstChar { it.uppercase() },
+                ownerLabel = ownerLabel,
+                onClick = { onOpenCatalog(catalogId) },
+                previewUrl = previewUrl,
+                hasPreview = hasPreview,
+                requestPreview = { onRequestPreview(catalogId) }
+            )
         }
     }
     Spacer(modifier = Modifier.height(16.dp))
@@ -315,72 +553,143 @@ private fun resolveUserName(user: PublicUserSummary?): String {
 private fun SharedCatalogCard(
     catalogName: String,
     roleLabel: String,
-    inviter: PublicUserSummary?,
-    onClick: () -> Unit
+    ownerLabel: String,
+    onClick: () -> Unit,
+    previewUrl: String?,
+    hasPreview: Boolean,
+    requestPreview: () -> Unit
 ) {
+    LaunchedEffect(hasPreview) {
+        if (!hasPreview) {
+            requestPreview()
+        }
+    }
+
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(220.dp),
         onClick = onClick
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(catalogName, style = MaterialTheme.typography.titleMedium)
-            Text(
-                text = "Role: $roleLabel",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            inviter?.let { invitedBy ->
-                val inviterName = resolveUserName(invitedBy)
-                if (inviterName.isNotBlank()) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (previewUrl != null) {
+                AsyncImage(
+                    model = previewUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .matchParentSize()
+                        .blur(25.dp),
+                    contentScale = ContentScale.Crop
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.65f),
+                                    Color.Black.copy(alpha = 0.3f),
+                                    Color.Black.copy(alpha = 0.75f)
+                                )
+                            )
+                        )
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.primary,
+                                    MaterialTheme.colorScheme.primaryContainer
+                                )
+                            )
+                        )
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        text = "Shared by $inviterName",
+                        catalogName,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "Role: $roleLabel",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = Color.White.copy(alpha = 0.9f)
+                    )
+                    Text(
+                        text = "Owner: $ownerLabel",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.9f)
                     )
                 }
+
+                Text(
+                    text = "Tap to open",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.85f)
+                )
             }
         }
     }
 }
 
 @Composable
-private fun CatalogGrid(
+private fun MyCatalogsSection(
     catalogs: List<Catalog>,
     onOpenCatalog: (String) -> Unit,
-    onDeleteCatalog: (String) -> Unit,
+    onDeleteCatalog: (String, String) -> Unit,
+    catalogPreviews: Map<String, String?>,
+    onRequestPreview: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (catalogs.isEmpty()) {
-        Box(
-            modifier = modifier
-                .fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
+    LazyColumn(
+        contentPadding = PaddingValues(bottom = 80.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        item {
             Text(
-                "No catalogs yet. Tap + to create one.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                text = "My Catalogs",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-    } else {
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 180.dp),
-            contentPadding = PaddingValues(bottom = 80.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = modifier.fillMaxWidth()
-        ) {
-            items(catalogs) { catalog ->
+
+        if (catalogs.isEmpty()) {
+            item {
+                Text(
+                    "No catalogs yet. Tap + to create one.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                )
+            }
+        } else {
+            items(
+                items = catalogs,
+                key = { it._id }
+            ) { catalog ->
+                val previewUrl = catalogPreviews[catalog._id]
+                val hasPreview = catalogPreviews.containsKey(catalog._id)
                 CatalogCard(
                     catalogName = catalog.name,
                     description = catalog.description,
                     onOpen = { onOpenCatalog(catalog._id) },
-                    onDelete = { onDeleteCatalog(catalog._id) }
+                    onDelete = { onDeleteCatalog(catalog._id, catalog.name ?: "Catalog") },
+                    previewUrl = previewUrl,
+                    hasPreview = hasPreview,
+                    requestPreview = { onRequestPreview(catalog._id) }
                 )
             }
         }
@@ -392,55 +701,111 @@ private fun CatalogCard(
     catalogName: String,
     description: String?,
     onOpen: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    previewUrl: String?,
+    hasPreview: Boolean,
+    requestPreview: () -> Unit
 ) {
+    LaunchedEffect(hasPreview) {
+        if (!hasPreview) {
+            requestPreview()
+        }
+    }
+
     ElevatedCard(
         onClick = onOpen,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(220.dp)
     ) {
-        Column(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .fillMaxSize()
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            if (previewUrl != null) {
+                AsyncImage(
+                    model = previewUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .matchParentSize()
+                        .blur(25.dp),
+                    contentScale = ContentScale.Crop
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.65f),
+                                    Color.Black.copy(alpha = 0.3f),
+                                    Color.Black.copy(alpha = 0.75f)
+                                )
+                            )
+                        )
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.primary,
+                                    MaterialTheme.colorScheme.primaryContainer
+                                )
+                            )
+                        )
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = catalogName,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (!description.isNullOrBlank()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
+                            text = catalogName,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = Color.White
+                        )
+                        if (!description.isNullOrBlank()) {
+                            Text(
+                                text = description,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.85f),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = onDelete,
+                        colors = IconButtonDefaults.iconButtonColors(
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Delete,
+                            contentDescription = "Delete catalog"
                         )
                     }
                 }
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        imageVector = Icons.Outlined.Delete,
-                        contentDescription = "Delete catalog"
-                    )
-                }
-            }
 
-            OutlinedButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.List,
-                    contentDescription = null
+                Text(
+                    text = "Tap to open",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.85f)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Open catalog")
             }
         }
     }
@@ -472,7 +837,7 @@ private fun ManageAllEntriesCard(onManageAll: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = "Manage all entries",
+                    text = "Manage all Observations",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onPrimary
                 )
@@ -490,6 +855,32 @@ private fun ManageAllEntriesCard(onManageAll: () -> Unit) {
             )
         }
     }
+}
+
+@Composable
+private fun DeleteCatalogConfirmationDialog(
+    catalogName: String?,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Delete")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        title = { Text("Delete catalog?") },
+        text = {
+            val name = catalogName?.takeIf { it.isNotBlank() } ?: "this catalog"
+            Text("Are you sure you want to delete $name? This cannot be undone.")
+        }
+    )
 }
 
 @Composable
@@ -585,6 +976,7 @@ private class CatalogListScreenState(
     val navController: NavController,
     val catalogs: List<Catalog>,
     val shareUiState: CatalogShareUiState,
+    val catalogPreviews: Map<String, String?>,
     val snackbarHostState: SnackbarHostState,
     val creationDialogState: CatalogCreationDialogState,
     val showNavigationIcon: Boolean
@@ -603,6 +995,10 @@ private class CatalogListScreenState(
         val route = NavRoutes.CATALOG_DETAIL.replace("{catalogId}", catalogId)
         navController.navigate(route)
     }
+
+    fun requestCatalogPreview(catalogId: String) {
+        viewModel.loadCatalogPreview(catalogId)
+    }
 }
 
 @Composable
@@ -614,6 +1010,7 @@ private fun rememberCatalogListState(
     val shareViewModel: CatalogShareViewModel = hiltViewModel()
     val catalogs by viewModel.catalogs.collectAsState()
     val shareUiState by shareViewModel.uiState.collectAsState()
+    val catalogPreviews by viewModel.catalogPreviews.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val creationDialogState = rememberCatalogCreationDialogState()
 
@@ -623,6 +1020,7 @@ private fun rememberCatalogListState(
         navController = navController,
         catalogs = catalogs,
         shareUiState = shareUiState,
+        catalogPreviews = catalogPreviews,
         snackbarHostState = snackbarHostState,
         creationDialogState = creationDialogState,
         showNavigationIcon = showNavigationIcon
@@ -634,6 +1032,11 @@ private data class CatalogListCallbacks(
     val onOpenCatalogEntries: () -> Unit,
     val onOpenCatalog: (String) -> Unit,
     val onCreateCatalogClick: () -> Unit,
+    val onSelectMyTab: () -> Unit,
+    val onSelectSharedTab: () -> Unit,
+    val onSelectAllTab: () -> Unit,
     val onRespondToInvitation: (String, String) -> Unit,
     val onDeleteCatalog: (String) -> Unit
 )
+
+private enum class CatalogListTab { MY_CATALOGS, SHARED_CATALOGS, ALL_CATALOGS }

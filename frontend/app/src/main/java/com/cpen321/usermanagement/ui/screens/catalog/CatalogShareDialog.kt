@@ -1,17 +1,18 @@
 package com.cpen321.usermanagement.ui.screens.catalog
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -65,7 +66,6 @@ private fun ShareCatalogDialog(
     onRevoke: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val scrollState = rememberScrollState()
     val inviteState = rememberShareInviteState(state)
     val messageState = remember { ShareDialogMessageState(state) }
 
@@ -75,7 +75,6 @@ private fun ShareCatalogDialog(
         text = {
             ShareDialogBody(
                 state = state,
-                scrollState = scrollState,
                 inviteState = inviteState,
                 onInvite = onInvite,
                 onChangeRole = onChangeRole,
@@ -116,21 +115,39 @@ private fun ShareDialogTitle(catalogName: String?) {
 @Composable
 private fun ShareDialogBody(
     state: CatalogShareUiState,
-    scrollState: androidx.compose.foundation.ScrollState,
     inviteState: ShareInviteState,
     onInvite: (String, String) -> Unit,
     onChangeRole: (String, String) -> Unit,
     onRevoke: (String) -> Unit
 ) {
-    Column(
+    LazyColumn(
         modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(scrollState),
+            .fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        ShareDialogInviteSection(state, inviteState, onInvite)
-        HorizontalDivider()
-        ShareDialogCollaboratorsSection(state, onChangeRole, onRevoke)
+        item {
+            ShareDialogInviteSection(state, inviteState, onInvite)
+        }
+        item {
+            HorizontalDivider()
+        }
+        if (state.collaborators.isEmpty()) {
+            item {
+                Text(
+                    text = "No collaborators yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            items(state.collaborators) { collaborator ->
+                CollaboratorRow(
+                    collaborator = collaborator,
+                    onChangeRole = onChangeRole,
+                    onRevoke = onRevoke
+                )
+            }
+        }
     }
 }
 
@@ -178,25 +195,31 @@ private fun ShareDialogFriendSelector(
     inviteState: ShareInviteState,
     enabled: Boolean
 ) {
-    OutlinedButton(
-        onClick = { inviteState.friendMenuExpanded = true },
-        enabled = enabled,
-        modifier = Modifier.fillMaxWidth()
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .wrapContentSize(Alignment.TopStart)
     ) {
-        Text(inviteState.friendDisplay())
-    }
-    DropdownMenu(
-        expanded = inviteState.friendMenuExpanded,
-        onDismissRequest = { inviteState.friendMenuExpanded = false }
-    ) {
-        state.friends.forEach { friend ->
-            DropdownMenuItem(
-                text = { Text(inviteState.friendDisplay(friend)) },
-                onClick = {
-                    inviteState.selectedFriend = friend
-                    inviteState.friendMenuExpanded = false
-                }
-            )
+        OutlinedButton(
+            onClick = { inviteState.friendMenuExpanded = true },
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(inviteState.friendDisplay())
+        }
+        androidx.compose.material3.DropdownMenu(
+            expanded = inviteState.friendMenuExpanded,
+            onDismissRequest = { inviteState.friendMenuExpanded = false }
+        ) {
+            state.friends.forEach { friend ->
+                DropdownMenuItem(
+                    text = { Text(inviteState.friendDisplay(friend)) },
+                    onClick = {
+                        inviteState.selectedFriend = friend
+                        inviteState.friendMenuExpanded = false
+                    }
+                )
+            }
         }
     }
 }
@@ -206,52 +229,30 @@ private fun ShareDialogRoleSelector(
     inviteState: ShareInviteState,
     enabled: Boolean
 ) {
-    OutlinedButton(
-        onClick = { inviteState.roleMenuExpanded = true },
-        enabled = enabled,
-        modifier = Modifier.fillMaxWidth()
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .wrapContentSize(Alignment.TopStart)
     ) {
-        Text("Role: ${inviteState.roleLabel}")
-    }
-    DropdownMenu(
-        expanded = inviteState.roleMenuExpanded,
-        onDismissRequest = { inviteState.roleMenuExpanded = false }
-    ) {
-        inviteState.roleOptions.forEach { role ->
-            DropdownMenuItem(
-                text = { Text(role.replaceFirstChar { it.uppercase() }) },
-                onClick = {
-                    inviteState.selectedRole = role
-                    inviteState.roleMenuExpanded = false
-                }
-            )
+        OutlinedButton(
+            onClick = { inviteState.roleMenuExpanded = true },
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Role: ${inviteState.roleLabel}")
         }
-    }
-}
-
-@Composable
-private fun ShareDialogCollaboratorsSection(
-    state: CatalogShareUiState,
-    onChangeRole: (String, String) -> Unit,
-    onRevoke: (String) -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(text = "Collaborators", style = MaterialTheme.typography.titleMedium)
-        if (state.collaborators.isEmpty()) {
-            Text(
-                text = "No collaborators yet.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(state.collaborators) { collaborator ->
-                    CollaboratorRow(
-                        collaborator = collaborator,
-                        onChangeRole = onChangeRole,
-                        onRevoke = onRevoke
-                    )
-                }
+        androidx.compose.material3.DropdownMenu(
+            expanded = inviteState.roleMenuExpanded,
+            onDismissRequest = { inviteState.roleMenuExpanded = false }
+        ) {
+            inviteState.roleOptions.forEach { role ->
+                DropdownMenuItem(
+                    text = { Text(role.replaceFirstChar { it.uppercase() }) },
+                    onClick = {
+                        inviteState.selectedRole = role
+                        inviteState.roleMenuExpanded = false
+                    }
+                )
             }
         }
     }
@@ -298,34 +299,36 @@ private fun RowActions(
             text = collaborator.status.replaceFirstChar { it.uppercase() },
             style = MaterialTheme.typography.bodySmall
         )
-        IconButton(onClick = { menuExpanded.value = true }) {
-            Icon(imageVector = Icons.Default.MoreVert, contentDescription = "Collaborator actions")
-        }
-        DropdownMenu(
-            expanded = menuExpanded.value,
-            onDismissRequest = { menuExpanded.value = false }
-        ) {
-            DropdownMenuItem(
-                text = { Text("Promote to editor") },
-                onClick = {
-                    menuExpanded.value = false
-                    onChangeRole(collaborator._id, "editor")
-                }
-            )
-            DropdownMenuItem(
-                text = { Text("Set as viewer") },
-                onClick = {
-                    menuExpanded.value = false
-                    onChangeRole(collaborator._id, "viewer")
-                }
-            )
-            DropdownMenuItem(
-                text = { Text("Remove") },
-                onClick = {
-                    menuExpanded.value = false
-                    onRevoke(collaborator._id)
-                }
-            )
+        Box(modifier = Modifier.wrapContentSize(Alignment.TopEnd)) {
+            IconButton(onClick = { menuExpanded.value = true }) {
+                Icon(imageVector = Icons.Default.MoreVert, contentDescription = "Collaborator actions")
+            }
+            DropdownMenu(
+                expanded = menuExpanded.value,
+                onDismissRequest = { menuExpanded.value = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Promote to editor") },
+                    onClick = {
+                        menuExpanded.value = false
+                        onChangeRole(collaborator._id, "editor")
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Set as viewer") },
+                    onClick = {
+                        menuExpanded.value = false
+                        onChangeRole(collaborator._id, "viewer")
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Remove") },
+                    onClick = {
+                        menuExpanded.value = false
+                        onRevoke(collaborator._id)
+                    }
+                )
+            }
         }
     }
 }
