@@ -11,7 +11,25 @@ import {
   createCatalogSchema,
   UpdateCatalogRequest,
 } from '../types/catalog.types';
-import { catalogModel } from '../models/catalog/catalog.model';
+import { catalogModel, CatalogNameConflictError } from '../models/catalog/catalog.model';
+
+const isCatalogNameConflict = (error: unknown): boolean => {
+  if (error instanceof CatalogNameConflictError) {
+    return true;
+  }
+
+  if (error && typeof error === 'object') {
+    const err = error as { name?: string; code?: number };
+    if (err.name === 'CatalogNameConflictError') {
+      return true;
+    }
+    if (err.code === 11000) {
+      return true;
+    }
+  }
+
+  return false;
+};
 import { catalogShareModel } from '../models/catalog/catalogShare.model';
 import { catalogEntryLinkModel } from '../models/catalog/catalogEntryLink.model';
 import { catalogRepository } from '../models/recognition/catalog.model';
@@ -60,7 +78,7 @@ export class CatalogController {
         });
       }
 
-      if ((error as { code?: number }).code === 11000) {
+      if (isCatalogNameConflict(error)) {
         return res.status(409).json({
           message: 'Catalog with the same name already exists',
         });
@@ -189,7 +207,7 @@ export class CatalogController {
     } catch (error) {
       logger.error('Failed to update catalog:', error);
 
-      if ((error as { code?: number }).code === 11000) {
+      if (isCatalogNameConflict(error)) {
         return res.status(409).json({
           message: 'Catalog with the same name already exists',
         });

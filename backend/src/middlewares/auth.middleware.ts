@@ -33,7 +33,7 @@ const authenticateTokenImpl = async (
     if (!token) {
       res.status(401).json({
         error: 'Access denied',
-        message: 'No token provided',
+        message: 'Authentication required',
       });
       return;
     }

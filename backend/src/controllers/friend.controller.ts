@@ -714,8 +714,13 @@ export class FriendController {
         await friendshipModel.deleteFriendship(requestObjectIdForUpdate);
       }
 
+      const responseMessage =
+        newStatus === 'accepted'
+          ? 'Friend request accepted successfully'
+          : 'Friend request declined successfully';
+
       res.status(200).json({
-        message: `Friend request ${action}ed successfully`,
+        message: responseMessage,
         data: {
           request: newStatus === 'declined' ? null : updated,
         },

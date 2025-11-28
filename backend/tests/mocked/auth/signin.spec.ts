@@ -3,7 +3,7 @@ import request from 'supertest';
 
 import { createApp } from '../../../src/core/app';
 import { userModel } from '../../../src/models/user/user.model';
-import { mockGoogleVerifySuccess, VALID_ID_TOKEN } from '../../unmock/auth/helpers';
+import { mockGoogleVerifySuccess, VALID_ID_TOKEN } from '../../unmocked/auth/helpers';
 
 const app = createApp();
 const api = request(app);

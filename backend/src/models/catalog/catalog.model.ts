@@ -29,6 +29,13 @@ const catalogSchema = new Schema<ICatalog>(
 
 catalogSchema.index({ owner: 1, name: 1 }, { unique: true });
 
+export class CatalogNameConflictError extends Error {
+  constructor(message = 'Catalog with the same name already exists') {
+    super(message);
+    this.name = 'CatalogNameConflictError';
+  }
+}
+
 export class CatalogModel {
   private catalog: mongoose.Model<ICatalog>;
 
@@ -50,6 +57,15 @@ export class CatalogModel {
     owner: mongoose.Types.ObjectId,
     payload: { name: string; description?: string }
   ): Promise<ICatalog> {
+    const existing = await this.catalog.findOne({
+      owner,
+      name: payload.name,
+    });
+
+    if (existing) {
+      throw new CatalogNameConflictError();
+    }
+
     return this.catalog.create({
       owner,
       name: payload.name,
@@ -85,6 +101,18 @@ export class CatalogModel {
   ): Promise<ICatalog | null> {
     if (!mongoose.Types.ObjectId.isValid(catalogId)) {
       return null;
+    }
+
+    if (payload.name) {
+      const conflict = await this.catalog.findOne({
+        owner,
+        name: payload.name,
+        _id: { $ne: catalogId },
+      });
+
+      if (conflict) {
+        throw new CatalogNameConflictError();
+      }
     }
 
     return this.catalog.findOneAndUpdate(
