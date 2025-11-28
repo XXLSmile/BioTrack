@@ -28,9 +28,10 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -356,8 +357,8 @@ private fun rememberShareInviteState(state: CatalogShareUiState): ShareInviteSta
 }
 
 private class ShareInviteState(initialFriend: FriendSummary?) {
-    var selectedFriend: FriendSummary? = initialFriend
-    var selectedRole: String = "viewer"
+    var selectedFriend by mutableStateOf(initialFriend)
+    var selectedRole by mutableStateOf("viewer")
 
     val roleOptions = listOf("viewer", "editor")
     val roleLabel: String get() = selectedRole.replaceFirstChar { it.uppercase() }
