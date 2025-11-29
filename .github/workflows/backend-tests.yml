@@ -103,5 +103,5 @@ jobs:
         if: success()
         run: |
           echo "All backend tests passed successfully!"
-          echo "Coverage report available in artifacts" 
+          echo "Coverage report available in artifacts"
 
