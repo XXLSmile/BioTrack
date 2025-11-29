@@ -65,6 +65,21 @@ import com.cpen321.usermanagement.data.model.CatalogEntry as RemoteCatalogEntry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
+private data class CatalogEntriesDialogDependencies(
+    val dialogState: CatalogEntriesDialogState,
+    val catalogViewModel: CatalogViewModel,
+    val profileViewModel: ProfileViewModel,
+    val snackbarHostState: SnackbarHostState,
+    val coroutineScope: CoroutineScope,
+    val additionalCatalogOptions: List<CatalogOption>
+)
+
+private data class CatalogEntriesDialogCallbacks(
+    val onEntryAdded: () -> Unit,
+    val onEntryDeleted: () -> Unit,
+    val onEntryUpdated: (String) -> Unit
+)
+
 @Composable
 fun CatalogEntriesScreen(
     navController: NavController,
@@ -93,13 +108,15 @@ private fun CatalogEntriesScreenHost(
         onOpenImage = state.openImage
     )
 
-    CatalogEntriesDialogs(
+    val dialogDependencies = CatalogEntriesDialogDependencies(
         dialogState = state.dialogState,
         catalogViewModel = state.catalogViewModel,
         profileViewModel = state.profileViewModel,
         snackbarHostState = state.snackbarHostState,
         coroutineScope = state.coroutineScope,
-        additionalCatalogOptions = state.additionalCatalogOptions,
+        additionalCatalogOptions = state.additionalCatalogOptions
+    )
+    val dialogCallbacks = CatalogEntriesDialogCallbacks(
         onEntryAdded = {
             onRefresh()
             state.coroutineScope.launch {
@@ -125,6 +142,10 @@ private fun CatalogEntriesScreenHost(
                 state.snackbarHostState.showSnackbar(message)
             }
         }
+    )
+    CatalogEntriesDialogs(
+        dependencies = dialogDependencies,
+        callbacks = dialogCallbacks
     )
 }
 
@@ -306,16 +327,14 @@ private fun CatalogEntriesList(
 
 @Composable
 private fun CatalogEntriesDialogs(
-    dialogState: CatalogEntriesDialogState,
-    catalogViewModel: CatalogViewModel,
-    profileViewModel: ProfileViewModel,
-    snackbarHostState: SnackbarHostState,
-    coroutineScope: CoroutineScope,
-    additionalCatalogOptions: List<CatalogOption>,
-    onEntryAdded: () -> Unit,
-    onEntryDeleted: () -> Unit,
-    onEntryUpdated: (String) -> Unit
+    dependencies: CatalogEntriesDialogDependencies,
+    callbacks: CatalogEntriesDialogCallbacks
 ) {
+    val dialogState = dependencies.dialogState
+    val catalogViewModel = dependencies.catalogViewModel
+    val profileViewModel = dependencies.profileViewModel
+    val snackbarHostState = dependencies.snackbarHostState
+    val coroutineScope = dependencies.coroutineScope
     val entry = dialogState.entry
 
     if (dialogState.showAddDialog && entry != null) {
@@ -323,14 +342,14 @@ private fun CatalogEntriesDialogs(
             viewModel = catalogViewModel,
             isSaving = dialogState.isProcessing,
             onSave = { catalogId ->
-                handleAddToCatalog(catalogId, dialogState, catalogViewModel, onEntryAdded)
+                handleAddToCatalog(catalogId, dialogState, catalogViewModel, callbacks.onEntryAdded)
             },
             onDismiss = {
                 if (!dialogState.isProcessing) {
                     dialogState.closeAddDialog()
                 }
             },
-            additionalCatalogs = additionalCatalogOptions
+            additionalCatalogs = dependencies.additionalCatalogOptions
         )
     }
 
@@ -356,7 +375,7 @@ private fun CatalogEntriesDialogs(
                             profileViewModel = profileViewModel,
                             snackbarHostState = snackbarHostState,
                             coroutineScope = coroutineScope,
-                            onEntryUpdated = onEntryUpdated
+                            onEntryUpdated = callbacks.onEntryUpdated
                         )
                     }
                 }
@@ -373,7 +392,7 @@ private fun CatalogEntriesDialogs(
                     dialogState = dialogState,
                     catalogViewModel = catalogViewModel,
                     profileViewModel = profileViewModel,
-                    onEntryDeleted = onEntryDeleted
+                    onEntryDeleted = callbacks.onEntryDeleted
                 )
             },
             onDismiss = { dialogState.clearPendingAction() }

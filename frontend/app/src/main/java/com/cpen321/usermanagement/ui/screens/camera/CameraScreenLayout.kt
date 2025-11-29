@@ -36,24 +36,32 @@ import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
 import com.cpen321.usermanagement.util.ImagePicker
 
+data class CameraLayoutState(
+    val imageUri: Uri?,
+    val resultText: String?,
+    val isSaving: Boolean,
+    val isRecognizing: Boolean
+)
+
+data class CameraLayoutCallbacks(
+    val onBack: () -> Unit,
+    val onImageSelected: (Uri?) -> Unit,
+    val onRecognizeClick: () -> Unit,
+    val onSaveImageOnly: () -> Unit
+)
+
 @Composable
 fun CameraScreenLayout(
-    onBack: () -> Unit,
-    imageUri: Uri?,
-    resultText: String?,
-    isSaving: Boolean,
-    isRecognizing: Boolean,
-    imagePicker: ImagePicker,
-    onImageSelected: (Uri?) -> Unit,
-    onRecognizeClick: () -> Unit,
-    onSaveImageOnly: () -> Unit
+    state: CameraLayoutState,
+    callbacks: CameraLayoutCallbacks,
+    imagePicker: ImagePicker
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Scan Wildlife") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = callbacks.onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
@@ -66,14 +74,9 @@ fun CameraScreenLayout(
     ) { paddingValues ->
         CameraScreenBody(
             paddingValues = paddingValues,
-            imageUri = imageUri,
-            resultText = resultText,
-            isSaving = isSaving,
-            isRecognizing = isRecognizing,
+            state = state,
             imagePicker = imagePicker,
-            onImageSelected = onImageSelected,
-            onRecognizeClick = onRecognizeClick,
-            onSaveImageOnly = onSaveImageOnly
+            callbacks = callbacks
         )
     }
 }
@@ -81,14 +84,9 @@ fun CameraScreenLayout(
 @Composable
 private fun CameraScreenBody(
     paddingValues: PaddingValues,
-    imageUri: Uri?,
-    resultText: String?,
-    isSaving: Boolean,
-    isRecognizing: Boolean,
+    state: CameraLayoutState,
     imagePicker: ImagePicker,
-    onImageSelected: (Uri?) -> Unit,
-    onRecognizeClick: () -> Unit,
-    onSaveImageOnly: () -> Unit
+    callbacks: CameraLayoutCallbacks
 ) {
     Column(
         modifier = Modifier
@@ -98,21 +96,21 @@ private fun CameraScreenBody(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        CameraPreview(imageUri)
+        CameraPreview(state.imageUri)
         Spacer(modifier = Modifier.height(16.dp))
-        CameraActionButtons(imagePicker = imagePicker, onImageSelected = onImageSelected)
+        CameraActionButtons(imagePicker = imagePicker, onImageSelected = callbacks.onImageSelected)
         Spacer(modifier = Modifier.height(24.dp))
         RecognizeButton(
-            enabled = !isSaving && !isRecognizing,
-            onClick = onRecognizeClick
+            enabled = !state.isSaving && !state.isRecognizing,
+            onClick = callbacks.onRecognizeClick
         )
         Spacer(modifier = Modifier.height(12.dp))
         SaveImageOnlyButton(
-            enabled = !isSaving && !isRecognizing,
-            onClick = onSaveImageOnly
+            enabled = !state.isSaving && !state.isRecognizing,
+            onClick = callbacks.onSaveImageOnly
         )
         Spacer(modifier = Modifier.height(24.dp))
-        resultText?.let {
+        state.resultText?.let {
             Text(
                 text = it,
                 style = MaterialTheme.typography.titleMedium,
