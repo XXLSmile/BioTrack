@@ -10,6 +10,9 @@ import com.cpen321.usermanagement.data.remote.dto.ScanData
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import retrofit2.Response
+import org.json.JSONException
+import org.json.JSONObject
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -47,7 +50,7 @@ class RecognitionRepository @Inject constructor(
             Unit
         } else {
             throw RecognitionRepositoryException(
-                response.errorBody()?.string().orEmpty().ifBlank { "Failed to delete observation" }
+                response.parseApiMessage("Failed to delete observation")
             )
         }
     }
@@ -61,7 +64,7 @@ class RecognitionRepository @Inject constructor(
             payload.toDomain()
         } else {
             throw RecognitionRepositoryException(
-                response.errorBody()?.string().orEmpty().ifBlank { "Failed to re-run recognition" }
+                response.parseApiMessage("Failed to re-run recognition")
             )
         }
     }
@@ -84,7 +87,7 @@ class RecognitionRepository @Inject constructor(
             entry ?: throw RecognitionRepositoryException("Missing entry from save response")
         } else {
             throw RecognitionRepositoryException(
-                response.errorBody()?.string().orEmpty().ifBlank { "Failed to save observation image" }
+                response.parseApiMessage("Failed to save observation image")
             )
         }
     }
@@ -131,4 +134,17 @@ private fun EntryRecognitionUpdateDto.toDomain(): EntryRecognitionUpdate {
         observation = observation,
         recognition = recognition
     )
+}
+
+private fun <T> Response<T>.parseApiMessage(fallback: String): String {
+    val rawBody = errorBody()?.string()?.trim().orEmpty()
+    if (rawBody.isBlank()) return fallback
+    return try {
+        val json = JSONObject(rawBody)
+        json.optString("message")
+            .ifBlank { json.optString("error") }
+            .ifBlank { fallback }
+    } catch (_: JSONException) {
+        rawBody
+    }
 }
