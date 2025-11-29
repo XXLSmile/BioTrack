@@ -35,6 +35,12 @@ interface ServerSocketData {
   user?: SocketUserData;
 }
 
+const hasUserIdClaim = (
+  payload: string | jwt.JwtPayload
+): payload is jwt.JwtPayload & { id: unknown } => {
+  return typeof payload === 'object' && payload !== null && 'id' in payload;
+};
+
 export interface CatalogEntriesEventPayload {
   catalogId: string;
   entries: unknown[];
@@ -168,10 +174,7 @@ export const initializeSocketServer = (
       }
 
       const decoded = jwt.verify(token, secret);
-      const rawId =
-        typeof decoded === 'object' && decoded !== null && 'id' in decoded
-          ? (decoded as { id: unknown }).id
-          : undefined;
+      const rawId = hasUserIdClaim(decoded) ? decoded.id : undefined;
 
       let userObjectId: mongoose.Types.ObjectId | undefined;
 

@@ -791,7 +791,7 @@ export class RecognitionController {
       });
     } catch (error) {
       logger.error('Error rerunning recognition for entry:', error);
-      if (axios.isAxiosError?.(error)) {
+      if (axios.isAxiosError(error)) {
         return res.status(error.response?.status ?? 502).json({
           message: 'Failed to recognize species. Please try again later.',
         });

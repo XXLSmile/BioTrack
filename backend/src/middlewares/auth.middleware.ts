@@ -21,6 +21,12 @@ export const resolveUserObjectId = (
   return undefined;
 };
 
+const hasUserIdClaim = (
+  payload: string | jwt.JwtPayload
+): payload is jwt.JwtPayload & { id: unknown } => {
+  return typeof payload === 'object' && payload !== null && 'id' in payload;
+};
+
 const authenticateTokenImpl = async (
   req: Request,
   res: Response,
@@ -49,10 +55,7 @@ const authenticateTokenImpl = async (
 
     const decoded = jwt.verify(token, secret);
 
-    const rawId =
-      typeof decoded === 'object' && decoded !== null && 'id' in decoded
-        ? (decoded as { id: unknown }).id
-        : undefined;
+    const rawId = hasUserIdClaim(decoded) ? decoded.id : undefined;
 
     const userObjectId = resolveUserObjectId(rawId);
 
