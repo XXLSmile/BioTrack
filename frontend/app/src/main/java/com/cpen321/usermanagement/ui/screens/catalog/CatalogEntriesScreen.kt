@@ -97,6 +97,8 @@ private fun CatalogEntriesScreenHost(
         dialogState = state.dialogState,
         catalogViewModel = state.catalogViewModel,
         profileViewModel = state.profileViewModel,
+        snackbarHostState = state.snackbarHostState,
+        coroutineScope = state.coroutineScope,
         additionalCatalogOptions = state.additionalCatalogOptions,
         onEntryAdded = {
             onRefresh()
@@ -109,6 +111,18 @@ private fun CatalogEntriesScreenHost(
             state.profileViewModel.refreshStats()
             state.coroutineScope.launch {
                 state.snackbarHostState.showSnackbar("Observation deleted")
+            }
+        },
+        onEntryUpdated = { label ->
+            onRefresh()
+            state.profileViewModel.refreshStats()
+            state.coroutineScope.launch {
+                val message = if (label.isNotBlank()) {
+                    "Recognition updated for $label"
+                } else {
+                    "Recognition updated"
+                }
+                state.snackbarHostState.showSnackbar(message)
             }
         }
     )
@@ -295,9 +309,12 @@ private fun CatalogEntriesDialogs(
     dialogState: CatalogEntriesDialogState,
     catalogViewModel: CatalogViewModel,
     profileViewModel: ProfileViewModel,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope,
     additionalCatalogOptions: List<CatalogOption>,
     onEntryAdded: () -> Unit,
-    onEntryDeleted: () -> Unit
+    onEntryDeleted: () -> Unit,
+    onEntryUpdated: (String) -> Unit
 ) {
     val entry = dialogState.entry
 
@@ -330,7 +347,19 @@ private fun CatalogEntriesDialogs(
                     }
                 },
                 onAddToCatalog = { dialogState.openAddDialog() },
-                onDeleteEntry = { dialogState.scheduleDelete() }
+                onDeleteEntry = { dialogState.scheduleDelete() },
+                onRerunRecognition = {
+                    if (!dialogState.isProcessing) {
+                        handleRerunRecognition(
+                            dialogState = dialogState,
+                            catalogViewModel = catalogViewModel,
+                            profileViewModel = profileViewModel,
+                            snackbarHostState = snackbarHostState,
+                            coroutineScope = coroutineScope,
+                            onEntryUpdated = onEntryUpdated
+                        )
+                    }
+                }
             )
         )
     }
@@ -422,6 +451,35 @@ private fun handleDeleteEntry(
     }
 }
 
+private fun handleRerunRecognition(
+    dialogState: CatalogEntriesDialogState,
+    catalogViewModel: CatalogViewModel,
+    profileViewModel: ProfileViewModel,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope,
+    onEntryUpdated: (String) -> Unit
+) {
+    val entryId = dialogState.entry?.entry?._id ?: return
+    dialogState.startProcessing()
+    dialogState.clearError()
+    catalogViewModel.rerunEntryRecognition(entryId, null) { success, result, error ->
+        dialogState.stopProcessing()
+        if (success && result != null) {
+            val updatedEntry = result.observation.toCatalogEntry()
+            dialogState.updateEntry(updatedEntry)
+            profileViewModel.refreshStats()
+            val label = updatedEntry.entry.species ?: "observation"
+            onEntryUpdated(label)
+        } else {
+            val message = error ?: "Failed to re-run recognition"
+            dialogState.setError(message)
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(message)
+            }
+        }
+    }
+}
+
 @Composable
 private fun rememberOpenImageAction(context: android.content.Context): (String?) -> Unit {
     return remember(context) {
@@ -500,6 +558,10 @@ private class CatalogEntriesDialogState {
 
     fun clearPendingAction() {
         pendingAction = null
+    }
+
+    fun updateEntry(updated: RemoteCatalogEntry) {
+        entry = updated
     }
 }
 

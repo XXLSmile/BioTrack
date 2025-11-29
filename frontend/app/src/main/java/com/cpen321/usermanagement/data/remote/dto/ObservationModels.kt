@@ -60,3 +60,8 @@ class SpeciesSummaryAdapter : JsonDeserializer<SpeciesSummaryDto?> {
         }
     }
 }
+
+data class EntryRecognitionUpdateDto(
+    val entry: RecentEntryDto,
+    val recognition: ScanData?
+)

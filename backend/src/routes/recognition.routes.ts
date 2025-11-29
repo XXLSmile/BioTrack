@@ -49,4 +49,10 @@ router.delete(
   asyncHandler(recognitionController.deleteEntry.bind(recognitionController))
 );
 
+router.post(
+  '/entry/:entryId/rerun',
+  authenticateToken,
+  asyncHandler(recognitionController.rerunEntryRecognition.bind(recognitionController))
+);
+
 export default router;

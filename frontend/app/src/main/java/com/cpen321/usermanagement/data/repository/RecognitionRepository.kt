@@ -3,7 +3,9 @@ package com.cpen321.usermanagement.data.repository
 import com.cpen321.usermanagement.data.model.RecentObservation
 import com.cpen321.usermanagement.data.remote.api.RecognitionApi
 import com.cpen321.usermanagement.data.remote.api.RetrofitClient
+import com.cpen321.usermanagement.data.remote.dto.EntryRecognitionUpdateDto
 import com.cpen321.usermanagement.data.remote.dto.RecentEntryDto
+import com.cpen321.usermanagement.data.remote.dto.ScanData
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -45,7 +47,26 @@ class RecognitionRepository @Inject constructor(
             )
         }
     }
+
+    suspend fun rerunEntryRecognition(entryId: String): Result<EntryRecognitionUpdate> = runCatching {
+        val response = recognitionApi.rerunEntryRecognition(entryId)
+        if (response.isSuccessful) {
+            val payload = response.body()?.data ?: throw RecognitionRepositoryException(
+                "Missing recognition data"
+            )
+            payload.toDomain()
+        } else {
+            throw RecognitionRepositoryException(
+                response.errorBody()?.string().orEmpty().ifBlank { "Failed to re-run recognition" }
+            )
+        }
+    }
 }
+
+data class EntryRecognitionUpdate(
+    val observation: RecentObservation,
+    val recognition: ScanData?
+)
 
 private fun RecentEntryDto.toDomain(): RecentObservation {
     val species = this.speciesId
@@ -74,5 +95,13 @@ private fun RecentEntryDto.toDomain(): RecentObservation {
         speciesCommonName = commonName,
         speciesScientificName = scientificName,
         createdAtIso = createdAt
+    )
+}
+
+private fun EntryRecognitionUpdateDto.toDomain(): EntryRecognitionUpdate {
+    val observation = entry.toDomain()
+    return EntryRecognitionUpdate(
+        observation = observation,
+        recognition = recognition
     )
 }

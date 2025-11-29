@@ -120,6 +120,8 @@ All responses follow:
 | POST | `/save` | Yes | Same form-data | Recognize, persist catalog entry (stores image, metadata). |
 | GET | `/catalog` | Yes | — | Shortcut to fetch the authenticated user’s catalog entries. |
 | GET | `/recent` | Yes | `?limit=10` | Latest observations for the current user (sorted by `createdAt` desc). |
+| POST | `/entry/:entryId/rerun` | Yes | — | Re-run recognition on a saved observation’s stored image; updates species + confidence and returns the refreshed entry. |
+| DELETE | `/entry/:entryId` | Yes | — | Permanently delete an observation entry (and unlink it from catalogs). |
 
 **Recognition success response**
 ```json

@@ -176,6 +176,9 @@ private fun rememberActionsList(
     val errorColor = MaterialTheme.colorScheme.error
     return remember(canRemoveFromCatalog, callbacks, errorColor) {
         buildList {
+            callbacks.onRerunRecognition?.let {
+                add(EntryDialogAction("Re-run recognition", it))
+            }
             callbacks.onAddToCatalog?.let {
                 add(EntryDialogAction("Add to another catalog", it))
             }
@@ -195,7 +198,8 @@ data class EntryDetailDialogCallbacks(
     val onDismiss: () -> Unit,
     val onAddToCatalog: (() -> Unit)? = null,
     val onRemoveFromCatalog: (() -> Unit)? = null,
-    val onDeleteEntry: (() -> Unit)? = null
+    val onDeleteEntry: (() -> Unit)? = null,
+    val onRerunRecognition: (() -> Unit)? = null
 )
 
 @Composable

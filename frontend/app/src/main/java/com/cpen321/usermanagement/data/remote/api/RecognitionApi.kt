@@ -1,10 +1,12 @@
 package com.cpen321.usermanagement.data.remote.api
 
 import com.cpen321.usermanagement.data.remote.dto.ApiResponse
+import com.cpen321.usermanagement.data.remote.dto.EntryRecognitionUpdateDto
 import com.cpen321.usermanagement.data.remote.dto.RecentEntriesResponse
 import retrofit2.Response
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -21,4 +23,9 @@ interface RecognitionApi {
     suspend fun deleteEntry(
         @Path("entryId") entryId: String
     ): Response<ApiResponse<Unit>>
+
+    @POST("recognition/entry/{entryId}/rerun")
+    suspend fun rerunEntryRecognition(
+        @Path("entryId") entryId: String
+    ): Response<ApiResponse<EntryRecognitionUpdateDto>>
 }

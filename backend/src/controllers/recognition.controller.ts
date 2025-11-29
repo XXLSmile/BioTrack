@@ -27,6 +27,14 @@ import {
   unlinkSync as safeUnlinkSync,
 } from '../utils/safeFs';
 
+interface RerunRecognitionResponse {
+  message: string;
+  data?: {
+    entry: ICatalogEntry;
+    recognition: RecognitionResult;
+  };
+}
+
 const parseCoordinate = (value: unknown): number | undefined => {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -657,6 +665,106 @@ export class RecognitionController {
       });
     } catch (error) {
       logger.error('Error fetching recent catalog entries:', error);
+      next(error);
+    }
+  }
+
+  async rerunEntryRecognition(
+    req: Request<{ entryId: string }>,
+    res: Response<RerunRecognitionResponse>,
+    next: NextFunction
+  ) {
+    try {
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+
+      const { entryId } = req.params;
+      if (!entryId) {
+        return res.status(400).json({
+          message: 'Entry ID is required',
+        });
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(entryId)) {
+        return res.status(400).json({
+          message: 'Invalid entry ID',
+        });
+      }
+
+      const entry = await catalogRepository.findById(entryId);
+      if (!entry) {
+        return res.status(404).json({
+          message: 'Catalog entry not found',
+        });
+      }
+
+      const owningUserId =
+        entry.userId instanceof mongoose.Types.ObjectId
+          ? entry.userId
+          : new mongoose.Types.ObjectId(entry.userId);
+
+      if (!owningUserId.equals(user._id)) {
+        return res.status(403).json({
+          message: 'You do not have permission to re-run recognition for this entry',
+        });
+      }
+
+      if (!entry.imageUrl) {
+        return res.status(400).json({
+          message: 'This entry is missing an image. Capture a new photo to run recognition.',
+        });
+      }
+
+      let uploadsInfo: { relativePath: string; filename: string };
+      try {
+        uploadsInfo = normalizeUploadsPath(entry.imageUrl);
+      } catch (pathError) {
+        const message =
+          pathError instanceof Error
+            ? pathError.message
+            : 'Unable to locate the stored image for this entry.';
+        return res.status(400).json({ message });
+      }
+
+      const absoluteImagePath = resolveWithinRoot(UPLOADS_ROOT, uploadsInfo.relativePath);
+      if (!safeExistsSync(absoluteImagePath)) {
+        return res.status(404).json({
+          message: 'Observation image could not be found. Please capture a new photo.',
+        });
+      }
+
+      const normalizedRelativePath = `/uploads/${uploadsInfo.relativePath.replace(/^\/+/, '')}`;
+      const accessibleImageUrl = buildAccessibleImageUrl(normalizedRelativePath, req);
+
+      const recognitionResult = await recognitionService.recognizeFromUrl(accessibleImageUrl);
+      const species = await speciesRepository.findOrCreate({
+        inaturalistId: recognitionResult.species.id,
+        scientificName: recognitionResult.species.scientificName,
+        commonName: recognitionResult.species.commonName,
+        rank: recognitionResult.species.rank,
+        taxonomy: recognitionResult.species.taxonomy,
+        wikipediaUrl: recognitionResult.species.wikipediaUrl,
+        imageUrl: recognitionResult.species.imageUrl,
+      });
+
+      entry.speciesId = species._id;
+      entry.confidence = recognitionResult.confidence;
+      await entry.save();
+
+      const refreshedEntry = await catalogRepository.findById(entryId);
+      const responseEntry = refreshedEntry ?? entry;
+
+      return res.status(200).json({
+        message: 'Recognition rerun successfully',
+        data: {
+          entry: responseEntry,
+          recognition: recognitionResult,
+        },
+      });
+    } catch (error) {
+      logger.error('Error rerunning recognition for entry:', error);
       next(error);
     }
   }

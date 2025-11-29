@@ -70,7 +70,7 @@ private fun MainScreenHost(state: MainScreenState) {
         }
     }
 
-    ObservationEntryDetailDialog(state = state.entryDialogState)
+    ObservationEntryDetailDialog(state = state)
 
     ConfirmEntryDeletionDialog(
         catalogViewModel = state.catalogViewModel,
