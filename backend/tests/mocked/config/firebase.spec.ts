@@ -74,11 +74,23 @@ describe('Mocked: firebase bootstrap', () => {
     const moduleExports = loadModule();
 
     expect(readFileSyncMock).toHaveBeenCalled();
-    expect(credentialCertMock).toHaveBeenCalledWith(expect.objectContaining({ project_id: 'demo' }));
+    expect(credentialCertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ project_id: 'demo' })
+    );
     expect(initializeAppMock).toHaveBeenCalledWith({
       credential: expect.any(Object),
     });
-    expect(moduleExports.messaging).toBe(messagingInstance);
+
+    // messaging is a thin adapter around admin.messaging().send(...)
+    expect(typeof moduleExports.messaging.send).toBe('function');
+
+    // Verify that messaging.send delegates to admin.messaging().send
+    const message = { data: { foo: 'bar' } } as any;
+    const resultPromise = moduleExports.messaging.send(message, true);
+
+    expect(messagingFactoryMock).toHaveBeenCalledTimes(1);
+    expect(messagingInstance.send).toHaveBeenCalledWith(message, true);
+    expect(resultPromise).resolves.toBe('message-id');
   });
 
   // API: firebase messaging bootstrap
@@ -99,7 +111,7 @@ describe('Mocked: firebase bootstrap', () => {
     });
     expect(response).toBe('');
     expect(warnSpy).toHaveBeenCalledWith(
-      'Firebase service account not found. Messaging send() invoked in noop mode.'
+      'Firebase service account not found. Messaging send() invoked in noop mode for target: unknown target.'
     );
 
     warnSpy.mockRestore();

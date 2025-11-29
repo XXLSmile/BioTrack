@@ -13,6 +13,11 @@ import {
 const app = createApp();
 const api = request(app);
 
+// Interface /api/friends/requests operations
+// Input: authenticated user requesting incoming/outgoing lists, acting on request IDs for accept/decline/cancel
+// Expected status code: 200 for listings and state changes, 401 when unauthenticated
+// Expected behavior: allows users to view their requests, accept/decline incoming, cancel outgoing, rejects unauthenticated calls
+// Expected output: request counts/messages or error detail
 describe('API: /api/friends/requests operations', () => {
   beforeEach(async () => {
     await dropTestDb();

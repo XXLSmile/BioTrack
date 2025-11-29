@@ -17,12 +17,7 @@ export class AuthController {
     try {
       const { idToken } = req.body;
 
-      if (typeof idToken !== 'string' || idToken.length === 0) {
-        return res.status(400).json({
-          message: 'Google token is required',
-        });
-      }
-
+      // Request body is already validated by route-level schema middleware.
       const data = await authService.signUpWithGoogle(idToken);
 
       return res.status(201).json({
@@ -64,12 +59,7 @@ export class AuthController {
     try {
       const { idToken } = req.body;
 
-      if (typeof idToken !== 'string' || idToken.length === 0) {
-        return res.status(400).json({
-          message: 'Google token is required',
-        });
-      }
-
+      // Request body is already validated by route-level schema middleware.
       const data = await authService.signInWithGoogle(idToken);
 
       return res.status(200).json({

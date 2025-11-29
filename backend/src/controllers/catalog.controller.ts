@@ -29,9 +29,6 @@ const isCatalogNameConflict = (error: unknown): boolean => {
 
   if (error && typeof error === 'object') {
     const err = error as { name?: string; code?: number };
-    if (err.name === 'CatalogNameConflictError') {
-      return true;
-    }
     if (err.code === 11000) {
       return true;
     }
@@ -47,10 +44,7 @@ export class CatalogController {
     next: NextFunction
   ) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
+      const user = req.user!;
 
       const createPayload = createCatalogSchema.parse(req.body);
       const catalog = await catalogModel.createCatalog(user._id, {
@@ -64,19 +58,6 @@ export class CatalogController {
       });
     } catch (error) {
       logger.error('Failed to create catalog:', error);
-
-      // Handle Zod validation errors
-      if (error && typeof error === 'object' && 'issues' in error) {
-        return res.status(400).json({
-          message: 'Invalid catalog data',
-        });
-      }
-
-      if (error instanceof mongoose.Error.ValidationError) {
-        return res.status(400).json({
-          message: 'Invalid catalog data',
-        });
-      }
 
       if (isCatalogNameConflict(error)) {
         return res.status(409).json({
@@ -94,10 +75,7 @@ export class CatalogController {
     next: NextFunction
   ) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
+      const user = req.user!;
 
       const catalogs = await catalogModel.listCatalogs(user._id);
 
@@ -117,10 +95,7 @@ export class CatalogController {
     next: NextFunction
   ) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
+      const user = req.user!;
       const { catalogId } = req.params;
 
       const catalog = await catalogModel.findById(catalogId);
@@ -223,10 +198,7 @@ export class CatalogController {
     next: NextFunction
   ) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
+      const user = req.user!;
       const { catalogId } = req.params;
 
       const catalog = await catalogModel.findById(catalogId);
@@ -267,10 +239,7 @@ export class CatalogController {
     next: NextFunction
   ) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
+      const user = req.user!;
       const { catalogId, entryId } = req.params;
 
       const catalog = await catalogModel.findById(catalogId);
@@ -343,10 +312,7 @@ export class CatalogController {
     next: NextFunction
   ) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
+      const user = req.user!;
       const { catalogId, entryId } = req.params;
 
       const catalog = await catalogModel.findById(catalogId);

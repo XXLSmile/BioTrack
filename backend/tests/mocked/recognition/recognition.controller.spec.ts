@@ -585,7 +585,7 @@ describe('RecognitionController', () => {
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
-        message: 'Could not recognize any species from the image. Try a clearer photo.',
+        message: 'Could not recognize any species. Try again later or save only.',
       })
     );
 

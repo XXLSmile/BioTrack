@@ -2,6 +2,11 @@ import { afterEach, beforeEach, describe, expect, test, jest } from '@jest/globa
 import { api, createCatalogRequest, dropTestDb } from './test.utils';
 import { createUserAndToken } from '../auth/helpers';
 
+// Interface PATCH /api/catalogs/:catalogId
+// Input: authenticated owner with catalog ID and update fields
+// Expected status code: 200 for successful updates, 409 for duplicate names, 401/404 for auth/catalog issues
+// Expected behavior: allows owners to rename descriptions while preventing duplicate names for same owner
+// Expected output: updated catalog data or conflict/error message
 describe('API: catalog update flow', () => {
   beforeEach(async () => {
     await dropTestDb();

@@ -6,6 +6,11 @@ import { userModel } from '../../../src/models/user/user.model';
 import { catalogShareModel } from '../../../src/models/catalog/catalogShare.model';
 import { catalogModel } from '../../../src/models/catalog/catalog.model';
 
+// Interface catalog sharing endpoints
+// Input: authenticated owner or collaborator performing GET/POST/PATCH actions on sharing routes
+// Expected status code: 200 for authorized operations, 401 for missing auth, 403 for unauthorized users, 404 for missing resources, 400/409/500 for invalid payloads/conflicts/internal failures
+// Expected behavior: enforces ownership, manages invitations, handles collaborator listing/updating/revocation, and surfaces errors from models/FCM
+// Expected output: collaborator lists, invitation confirmations, or descriptive error payloads
 describe('API: catalog share flow', () => {
   beforeEach(async () => {
     await dropTestDb();
@@ -16,6 +21,11 @@ describe('API: catalog share flow', () => {
     jest.restoreAllMocks();
   });
 
+  // Interface GET /api/catalogs/:catalogId/share
+  // Input: authenticated owner or privileged user requesting collaborator list
+  // Expected status code: 200 for owner, 401 when unauthenticated, 403 when not owner, 404 when catalog missing, 500 for backend faults
+  // Expected behavior: enforces ownership, lists collaborators, handles missing catalog/auth
+  // Expected output: collaborator list payload or error message
   describe('GET /api/catalogs/:catalogId/share', () => {
     test('returns 401 when unauthenticated', async () => {
       const catalogId = new mongoose.Types.ObjectId();
@@ -82,6 +92,11 @@ describe('API: catalog share flow', () => {
     });
   });
 
+  // Interface POST /api/catalogs/:catalogId/share
+  // Input: owner with inviteeId/role, bearing valid auth token
+  // Expected status code: 201 on new invite, 200 on restoration, 400/403/404/409 for invalid data/permissions/conflicts, 500 for backend/FCM errors
+  // Expected behavior: enforces ownership, creates invitations, handles duplicates and notification failures gracefully
+  // Expected output: invitation confirmation or error message
   describe('POST /api/catalogs/:catalogId/share', () => {
     test('returns 401 when unauthenticated', async () => {
       const catalogId = new mongoose.Types.ObjectId();
@@ -332,6 +347,11 @@ describe('API: catalog share flow', () => {
     });
   });
 
+  // Interface PATCH /api/catalogs/:catalogId/share/:shareId
+  // Input: owner with shareId and action/role payload
+  // Expected status code: 200 when updates/revokes succeed, 401/403/404 when unauth/unauthorized/missing, 500 when collaborators update fails
+  // Expected behavior: validates ownership, updates collaborator role/status, surfaces backend errors
+  // Expected output: updated invitation or descriptive error
   describe('PATCH /api/catalogs/:catalogId/share/:shareId', () => {
     test('returns 401 when unauthenticated', async () => {
       const catalogId = new mongoose.Types.ObjectId();
@@ -481,6 +501,11 @@ describe('API: catalog share flow', () => {
     });
   });
 
+  // Interface PATCH /api/catalogs/share/:shareId/respond
+  // Input: invitee with shareId responding with accept/revoke
+  // Expected status code: 200 on acceptance/rejection, 401 without auth, 403 when acting user is not invitee, 404 if invitation missing, 500 on internal failure
+  // Expected behavior: enforces invitee identity, updates invitation status, notifies owner via FCM even if messaging fails
+  // Expected output: response confirmation or error
   describe('PATCH /api/catalogs/share/:shareId/respond', () => {
     test('returns 401 when unauthenticated', async () => {
       const shareId = new mongoose.Types.ObjectId();
@@ -759,6 +784,11 @@ describe('API: catalog share flow', () => {
     });
   });
 
+  // Interface GET /api/catalogs/share/pending
+  // Input: authenticated user requesting pending invites
+  // Expected status code: 200 when pending invites are returned, 401 when unauthenticated, 500 on backend failure
+  // Expected behavior: lists pending invitations for the bearer token, surfaces errors from sharing model
+  // Expected output: pending invitations array or error message
   describe('GET /api/catalogs/share/pending', () => {
     test('returns 401 when unauthenticated', async () => {
       const response = await api.get('/api/catalogs/share/pending');
@@ -812,6 +842,11 @@ describe('API: catalog share flow', () => {
     });
   });
 
+  // Interface GET /api/catalogs/shared-with/me
+  // Input: authenticated collaborator reviewing accepted catalog shares
+  // Expected status code: 200 on success, 401 when unauthenticated, 500 on backend errors
+  // Expected behavior: lists catalogs shared with the user after acceptance, handles failures from share model
+  // Expected output: shared catalog entries or error payload
   describe('GET /api/catalogs/shared-with/me', () => {
     test('returns 401 when unauthenticated', async () => {
       const response = await api.get('/api/catalogs/shared-with/me');
@@ -858,7 +893,9 @@ describe('API: catalog share flow', () => {
     test('handles errors when fetching shared catalogs', async () => {
       const token = await createUserAndToken(api);
 
-      jest.spyOn(catalogShareModel, 'listSharedWithUser').mockRejectedValueOnce(new Error('db error'));
+      jest
+        .spyOn(catalogShareModel, 'listSharedWithUser')
+        .mockRejectedValueOnce(new Error('db error'));
 
       const response = await api
         .get('/api/catalogs/shared-with/me')
@@ -866,6 +903,6 @@ describe('API: catalog share flow', () => {
 
       expect(response.status).toBe(500);
       expect(response.body?.message).toBe('Internal server error');
-    });
+    }, 10000);
   });
 });

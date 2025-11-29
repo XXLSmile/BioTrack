@@ -26,6 +26,11 @@ const MEDIA_BASE_URL = process.env.MEDIA_BASE_URL ?? 'http://4.206.208.211:80/up
 const DEFAULT_RECOGNITION_IMAGE_URL = `${MEDIA_BASE_URL}/dc606ab876ac356ace4cc107d20646ca.jpg`;
 const MISSING_RECOGNITION_IMAGE_URL = `${MEDIA_BASE_URL}/014ca3681f74d0c087486c0b10dd453c.jpg`;
 
+// Interface POST /api/recognition
+// Input: publicly hosted image URL (recognized or unknown)
+// Expected status code: 200 when third-party detection succeeds, 404 when recognition fails
+// Expected behavior: forwards request to the real upstream recognition API and surfaces success or not-found errors
+// Expected output: recognition details (species/confidence) or descriptive error message
 describe('API (unmocked): /api/recognition with real upstream service', () => {
   beforeAll(() => {
     // Allow extra time for real network + upstream API latency.
