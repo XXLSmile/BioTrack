@@ -17,21 +17,6 @@ const resolveMessageTarget = (message: admin.messaging.Message): string => {
     return targetToken;
   }
 
-  const targetTopic = 'topic' in message ? (message.topic as unknown) : undefined;
-  if (isNonEmptyString(targetTopic)) {
-    return targetTopic;
-  }
-
-  const targetCondition = 'condition' in message ? (message.condition as unknown) : undefined;
-  if (isNonEmptyString(targetCondition)) {
-    return targetCondition;
-  }
-
-  const analyticsLabel = message.fcmOptions?.analyticsLabel as unknown;
-  if (isNonEmptyString(analyticsLabel)) {
-    return analyticsLabel;
-  }
-
   return 'unknown target';
 };
 

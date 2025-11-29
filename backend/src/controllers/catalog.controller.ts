@@ -29,9 +29,6 @@ const isCatalogNameConflict = (error: unknown): boolean => {
 
   if (error && typeof error === 'object') {
     const err = error as { name?: string; code?: number };
-    if (err.name === 'CatalogNameConflictError') {
-      return true;
-    }
     if (err.code === 11000) {
       return true;
     }
@@ -47,10 +44,7 @@ export class CatalogController {
     next: NextFunction
   ) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
+      const user = req.user!;
 
       const createPayload = createCatalogSchema.parse(req.body);
       const catalog = await catalogModel.createCatalog(user._id, {
@@ -81,10 +75,7 @@ export class CatalogController {
     next: NextFunction
   ) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
+      const user = req.user!;
 
       const catalogs = await catalogModel.listCatalogs(user._id);
 
@@ -104,10 +95,7 @@ export class CatalogController {
     next: NextFunction
   ) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
+      const user = req.user!;
       const { catalogId } = req.params;
 
       const catalog = await catalogModel.findById(catalogId);
@@ -210,10 +198,7 @@ export class CatalogController {
     next: NextFunction
   ) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
+      const user = req.user!;
       const { catalogId } = req.params;
 
       const catalog = await catalogModel.findById(catalogId);
@@ -254,10 +239,7 @@ export class CatalogController {
     next: NextFunction
   ) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
+      const user = req.user!;
       const { catalogId, entryId } = req.params;
 
       const catalog = await catalogModel.findById(catalogId);
@@ -330,10 +312,7 @@ export class CatalogController {
     next: NextFunction
   ) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
+      const user = req.user!;
       const { catalogId, entryId } = req.params;
 
       const catalog = await catalogModel.findById(catalogId);

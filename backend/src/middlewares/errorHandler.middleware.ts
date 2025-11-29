@@ -13,11 +13,6 @@ export const notFoundHandler = (req: Request, res: Response) => {
 };
 
 export const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
-  if (res.headersSent) {
-    next(error);
-    return;
-  }
-
   logger.error(`Error handling ${req.method} ${req.originalUrl}:`, error);
 
   return res.status(500).json({

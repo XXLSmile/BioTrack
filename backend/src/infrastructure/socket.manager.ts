@@ -184,8 +184,6 @@ export const initializeSocketServer = (
           return;
         }
         userObjectId = new mongoose.Types.ObjectId(rawId);
-      } else if (rawId instanceof mongoose.Types.ObjectId) {
-        userObjectId = rawId;
       } else {
         next(new Error('Unauthorized'));
         return;

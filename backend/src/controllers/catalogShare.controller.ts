@@ -111,7 +111,7 @@ export class CatalogShareController {
           token: invitee.fcmToken,
           notification: {
             title: "Catalog Invitation 📘",
-            body: `${user.name || user.username} invited you to collaborate on "${catalog.name}"`,
+            body: `${user.username} invited you to collaborate on "${catalog.name}"`,
           },
           data: {
             type: "CATALOG_INVITE_RECEIVED",
@@ -220,24 +220,16 @@ export class CatalogShareController {
         if (catalog) {
           const owner = await userModel.findById(catalog.owner);
           if (owner?.fcmToken) {
-            const title =
-              newStatus === 'accepted'
-                ? 'Invitation Accepted ✅'
-                : 'Invitation Declined 🚫';
-
-            const body =
-              newStatus === 'accepted'
-                ? `${user.name || user.username} accepted your invitation to "${catalog.name}"`
-                : `${user.name || user.username} declined your invitation to "${catalog.name}"`;
+            const title = newStatus === 'accepted' ? 'Invitation Accepted ✅' : 'Invitation Declined 🚫';
+            const body = newStatus === 'accepted'
+              ? `${user.username} accepted your invitation to "${catalog.name}"`
+              : `${user.username} declined your invitation to "${catalog.name}"`;
 
             await messaging.send({
               token: owner.fcmToken,
               notification: { title, body },
               data: {
-                type:
-                  newStatus === 'accepted'
-                    ? 'CATALOG_INVITE_ACCEPTED'
-                    : 'CATALOG_INVITE_DECLINED',
+                type: newStatus === 'accepted' ? 'CATALOG_INVITE_ACCEPTED' : 'CATALOG_INVITE_DECLINED',
                 catalogId: catalog._id.toString(),
                 inviteeId: user._id.toString(),
               },

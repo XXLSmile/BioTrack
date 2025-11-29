@@ -11,11 +11,8 @@ import { catalogRepository } from '../models/recognition/catalog.model';
 import { catalogModel } from '../models/catalog/catalog.model';
 
 export class UserController {
-  getProfile(req: Request, res: Response<GetProfileResponse>) {
-    const user = req.user;
-    if (!user) {
-      return res.status(401).json({ message: 'Authentication required' });
-    }
+  async getProfile(req: Request, res: Response<GetProfileResponse>) {
+    const user = req.user!;
 
     res.status(200).json({
       message: 'Profile fetched successfully',
@@ -29,10 +26,7 @@ export class UserController {
     next: NextFunction
   ) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
+      const user = req.user!;
       const updatePayload = updateProfileSchema.parse(req.body);
       const username = updatePayload.username;
 
@@ -103,11 +97,7 @@ export class UserController {
 
   async deleteProfile(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
-
+      const user = req.user!;
       const userId = user._id;
 
       const connectedFriendIds = await friendshipModel.deleteAllForUser(userId);
@@ -329,10 +319,7 @@ export class UserController {
 
   async getUserStats(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
+      const user = req.user!;
 
       const stats = await userModel.getUserStats(user._id);
 
@@ -361,10 +348,7 @@ export class UserController {
 
   async addFavoriteSpecies(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
+      const user = req.user!;
       const { speciesName } = req.body as { speciesName?: unknown };
 
       if (typeof speciesName !== 'string' || speciesName.trim().length === 0) {
@@ -386,10 +370,7 @@ export class UserController {
 
   async removeFavoriteSpecies(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
+      const user = req.user!;
       const { speciesName } = req.body as { speciesName?: unknown };
 
       if (typeof speciesName !== 'string' || speciesName.trim().length === 0) {
@@ -449,10 +430,7 @@ export class UserController {
 
   async updateFcmToken(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
+      const user = req.user!;
       const { token } = req.body as { token?: unknown };
 
       if (typeof token !== 'string' || token.trim().length === 0) {
@@ -472,10 +450,7 @@ export class UserController {
 
   async clearFcmToken(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
+      const user = req.user!;
 
       await userModel.update(user._id, { fcmToken: null });
 

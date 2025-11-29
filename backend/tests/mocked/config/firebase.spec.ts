@@ -111,7 +111,7 @@ describe('Mocked: firebase bootstrap', () => {
     });
     expect(response).toBe('');
     expect(warnSpy).toHaveBeenCalledWith(
-      'Firebase service account not found. Messaging send() invoked in noop mode.'
+      'Firebase service account not found. Messaging send() invoked in noop mode for target: unknown target.'
     );
 
     warnSpy.mockRestore();

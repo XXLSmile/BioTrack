@@ -10,7 +10,7 @@ const writeLog = (level: LogLevel, message: string, args: unknown[]): void => {
         return value;
       }
       if (value instanceof Error) {
-        return sanitizeInput(value.stack ?? value.message);
+        return sanitizeInput(value.message);
       }
       try {
         return sanitizeInput(JSON.stringify(value));

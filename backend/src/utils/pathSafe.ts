@@ -2,7 +2,7 @@ import path from 'path';
 
 const normalizeRoot = (root: string): string => {
   const resolvedRoot = path.resolve(root);
-  return resolvedRoot.endsWith(path.sep) ? resolvedRoot : `${resolvedRoot}${path.sep}`;
+  return `${resolvedRoot}${path.sep}`;
 };
 
 export const ensurePathWithinRoot = (root: string, targetPath: string): string => {
