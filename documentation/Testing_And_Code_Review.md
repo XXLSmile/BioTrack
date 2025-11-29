@@ -121,12 +121,12 @@ The combined run (`npm run test:coverage`) produces the full report (`coverage/l
 
 | **Non-Functional Requirement**                  | **Location in Git**                                                                                   |
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| **Recognition Latency (≤ 10 s end-to-end)**     | [`backend/tests/nonfunctional/recognitionLatency.spec.ts`](../backend/tests/nonfunctional/recognitionLatency.spec.ts#L1) |
+| **Recognition Latency (<= 10 s end-to-end)**     | [`backend/tests/nonfunctional/recognitionLatency.spec.ts`](../backend/tests/nonfunctional/recognitionLatency.spec.ts#L1) |
 | **Privacy & Data Protection (Account Deletion)** | [`backend/tests/nonfunctional/privacyDeletion.spec.ts`](../backend/tests/nonfunctional/privacyDeletion.spec.ts#L1)         |
 
 ### 3.2. Test Verification and Logs
 
-- **Recognition Latency (≤ 10 s end-to-end)**
+- **Recognition Latency (<= 10 s end-to-end)**
 
   - **Verification:** A Jest + Supertest suite hits `POST /api/recognition`, injects canned Zyla responses via `jest.spyOn(recognitionService, 'recognizeFromUrl')`, and measures the elapsed wall-clock time between request dispatch and JSON payload delivery. The test iterates through three representative payload descriptors (1 MB, 3 MB, 5 MB) and fails if any response exceeds the 10 000 ms SLA, giving us a fast regression signal that controller/middleware changes didn’t bloat latency. Execute with `npm run test:nfr-recognition`.
   - **Log Output**
@@ -134,9 +134,9 @@ The combined run (`npm run test:coverage`) produces the full report (`coverage/l
     $ cd backend && npm run test:nfr-recognition
     PASS tests/nonfunctional/recognitionLatency.spec.ts
       NFR: Recognition latency
-        ✓ { label: '1MB payload', body: [Object] } completes within 10 seconds (17 ms)
-        ✓ { label: '3MB payload', body: [Object] } completes within 10 seconds (2 ms)
-        ✓ { label: '5MB payload', body: [Object] } completes within 10 seconds (1 ms)
+        PASS { label: '1MB payload', body: [Object] } completes within 10 seconds (17 ms)
+        PASS { label: '3MB payload', body: [Object] } completes within 10 seconds (2 ms)
+        PASS { label: '5MB payload', body: [Object] } completes within 10 seconds (1 ms)
     ```
 
 - **Privacy & Data Protection (Account Deletion)**
@@ -146,8 +146,8 @@ The combined run (`npm run test:coverage`) produces the full report (`coverage/l
     $ cd backend && npm run test:nfr-privacy
     PASS tests/nonfunctional/privacyDeletion.spec.ts
       NFR: Privacy & Data Protection
-        ✓ catalog endpoints reject unauthenticated access (153 ms)
-        ✓ deleting a profile removes personal data and invalidates the token (449 ms)
+        PASS catalog endpoints reject unauthenticated access (153 ms)
+        PASS deleting a profile removes personal data and invalidates the token (449 ms)
     ```
 
 ---

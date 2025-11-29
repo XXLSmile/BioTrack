@@ -219,7 +219,7 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 <a name="nfr1"></a>
 
 1. **Recognition Latency**
-    - **Description**: The app must return wildlife recognition results within ≤ 10 seconds for almost all scans.
+    - **Description**: The app must return wildlife recognition results within <= 10 seconds for almost all scans.
     - **Justification**: Real-time wildlife identification is a core value proposition; if results take too long, the app feels unusable in outdoor/field settings. The 10-second threshold balances API response times, network variability, and user patience. (https://www.nngroup.com/articles/response-times-3-important-limits/)
 <a name="nfr2"></a>
 
