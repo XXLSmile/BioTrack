@@ -12,7 +12,7 @@ export const createApp = () => {
 
   app.use(express.json());
   app.use('/api', router);
-  app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+  app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
   app.use('*', notFoundHandler);
   app.use(errorHandler);
 
