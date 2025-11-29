@@ -497,22 +497,24 @@ private fun AllCatalogsList(
                 )
             }
             items(items = content.sharedCatalogs, key = { it._id }) { share ->
-                val catalogId = share.catalog?._id ?: return@items
-                val previewUrl = content.catalogPreviews[catalogId]
-                val hasPreview = content.catalogPreviews.containsKey(catalogId)
-                val ownerLabel = share.invitedBy?.let { resolveUserName(it) }
-                    ?.takeIf { it.isNotBlank() }
-                    ?: share.owner?.takeIf { it.isNotBlank() }
-                    ?: "Unknown owner"
-                SharedCatalogCard(
-                    catalogName = share.catalog.name ?: "Catalog",
-                    roleLabel = share.role.replaceFirstChar { it.uppercase() },
-                    ownerLabel = ownerLabel,
-                    onClick = { actions.onOpenCatalog(catalogId) },
-                    previewUrl = previewUrl,
-                    hasPreview = hasPreview,
-                    requestPreview = { actions.onRequestPreview(catalogId) }
-                )
+                val catalogId = share.catalog?._id
+                if (catalogId != null) {
+                    val previewUrl = content.catalogPreviews[catalogId]
+                    val hasPreview = content.catalogPreviews.containsKey(catalogId)
+                    val ownerLabel = share.invitedBy?.let { resolveUserName(it) }
+                        ?.takeIf { it.isNotBlank() }
+                        ?: share.owner?.takeIf { it.isNotBlank() }
+                        ?: "Unknown owner"
+                    SharedCatalogCard(
+                        catalogName = share.catalog.name ?: "Catalog",
+                        roleLabel = share.role.replaceFirstChar { it.uppercase() },
+                        ownerLabel = ownerLabel,
+                        onClick = { actions.onOpenCatalog(catalogId) },
+                        previewUrl = previewUrl,
+                        hasPreview = hasPreview,
+                        requestPreview = { actions.onRequestPreview(catalogId) }
+                    )
+                }
             }
         }
     }
@@ -532,22 +534,24 @@ private fun SharedCatalogsSection(
     ) {
         Text(text = "Catalogs shared with you", style = MaterialTheme.typography.titleMedium)
         shares.forEach { share ->
-            val catalogId = share.catalog?._id ?: return@forEach
-            val previewUrl = catalogPreviews[catalogId]
-            val hasPreview = catalogPreviews.containsKey(catalogId)
-            val ownerLabel = share.invitedBy?.let { resolveUserName(it) }
-                ?.takeIf { it.isNotBlank() }
-                ?: share.owner?.takeIf { it.isNotBlank() }
-                ?: "Unknown owner"
-            SharedCatalogCard(
-                catalogName = share.catalog.name ?: "Catalog",
-                roleLabel = share.role.replaceFirstChar { it.uppercase() },
-                ownerLabel = ownerLabel,
-                onClick = { onOpenCatalog(catalogId) },
-                previewUrl = previewUrl,
-                hasPreview = hasPreview,
-                requestPreview = { onRequestPreview(catalogId) }
-            )
+            val catalogId = share.catalog?._id
+            if (catalogId != null) {
+                val previewUrl = catalogPreviews[catalogId]
+                val hasPreview = catalogPreviews.containsKey(catalogId)
+                val ownerLabel = share.invitedBy?.let { resolveUserName(it) }
+                    ?.takeIf { it.isNotBlank() }
+                    ?: share.owner?.takeIf { it.isNotBlank() }
+                    ?: "Unknown owner"
+                SharedCatalogCard(
+                    catalogName = share.catalog.name ?: "Catalog",
+                    roleLabel = share.role.replaceFirstChar { it.uppercase() },
+                    ownerLabel = ownerLabel,
+                    onClick = { onOpenCatalog(catalogId) },
+                    previewUrl = previewUrl,
+                    hasPreview = hasPreview,
+                    requestPreview = { onRequestPreview(catalogId) }
+                )
+            }
         }
     }
     Spacer(modifier = Modifier.height(16.dp))
