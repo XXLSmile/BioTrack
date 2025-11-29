@@ -4,7 +4,7 @@ import fs from 'fs';
 
 const serviceAccountPath = path.resolve(__dirname, '../firebase-adminsdk.json');
 
-const initializeWithCredentials = () => {
+const initializeWithCredentials = (): admin.messaging.Messaging => {
   const serviceAccountRaw = fs.readFileSync(serviceAccountPath, 'utf8');
   const serviceAccount = JSON.parse(serviceAccountRaw);
   admin.initializeApp({
@@ -13,7 +13,7 @@ const initializeWithCredentials = () => {
   return admin.messaging();
 };
 
-const initializeWithoutCredentials = () => {
+const initializeWithoutCredentials = (): Pick<admin.messaging.Messaging, 'send'> => {
   if (!admin.apps.length) {
     admin.initializeApp({
       projectId: process.env.FIREBASE_PROJECT_ID ?? 'local-dev',
@@ -31,12 +31,12 @@ const initializeWithoutCredentials = () => {
     },
   };
 
-  return noopMessaging as unknown as admin.messaging.Messaging;
+  return noopMessaging;
 };
 
 const messagingInstance = fs.existsSync(serviceAccountPath)
   ? initializeWithCredentials()
   : initializeWithoutCredentials();
 
-export const messaging = messagingInstance;
+export const messaging: admin.messaging.Messaging | Pick<admin.messaging.Messaging, 'send'> = messagingInstance;
 export default admin;

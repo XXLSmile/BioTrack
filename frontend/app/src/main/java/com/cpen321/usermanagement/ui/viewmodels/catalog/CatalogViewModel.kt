@@ -8,6 +8,7 @@ import com.cpen321.usermanagement.data.model.CatalogData
 import com.cpen321.usermanagement.data.remote.socket.CatalogSocketEvent
 import com.cpen321.usermanagement.data.remote.socket.CatalogSocketService
 import com.cpen321.usermanagement.data.repository.CatalogRepository
+import com.cpen321.usermanagement.data.repository.EntryRecognitionUpdate
 import com.cpen321.usermanagement.data.repository.RecognitionRepository
 import com.cpen321.usermanagement.data.repository.RepositoryException
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -255,6 +256,24 @@ class CatalogViewModel @Inject constructor(
                 .onFailure { error ->
                     Log.e(TAG, "Failed to delete entry", error)
                     onComplete(false, error.message)
+                }
+        }
+    }
+
+    fun rerunEntryRecognition(
+        entryId: String,
+        currentCatalogId: String?,
+        onComplete: (Boolean, EntryRecognitionUpdate?, String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            recognitionRepository.rerunEntryRecognition(entryId)
+                .onSuccess { update ->
+                    loadCatalogs()
+                    currentCatalogId?.let { loadCatalogDetail(it) }
+                    onComplete(true, update, null)
+                }
+                .onFailure { error ->
+                    onComplete(false, null, error.message ?: "Failed to re-run recognition")
                 }
         }
     }

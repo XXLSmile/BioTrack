@@ -64,11 +64,13 @@ import com.cpen321.usermanagement.data.repository.FriendRecommendation
 import com.cpen321.usermanagement.ui.viewmodels.friends.FriendUiState
 import com.cpen321.usermanagement.ui.viewmodels.friends.FriendUiTab
 import com.cpen321.usermanagement.ui.viewmodels.friends.FriendViewModel
+import com.cpen321.usermanagement.ui.viewmodels.profile.ProfileViewModel
 import java.util.Locale
 
 @Composable
 fun FriendsScreen(
     viewModel: FriendViewModel = hiltViewModel(),
+    profileViewModel: ProfileViewModel = hiltViewModel(),
     onUserSelected: (PublicUserSummary) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -95,14 +97,19 @@ fun FriendsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    FriendsScreenHost(uiState = uiState, handlers = handlers)
+    FriendsScreenHost(
+        uiState = uiState,
+        handlers = handlers,
+        onSuccessEvent = { profileViewModel.refreshStats() }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FriendsScreenHost(
     uiState: FriendUiState,
-    handlers: FriendsScreenHandlers
+    handlers: FriendsScreenHandlers,
+    onSuccessEvent: () -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -110,6 +117,7 @@ private fun FriendsScreenHost(
         uiState.successMessage?.let {
             snackbarHostState.showSnackbar(it)
             handlers.onClearMessage()
+            onSuccessEvent()
         }
     }
 

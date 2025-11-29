@@ -6,6 +6,7 @@ import com.cpen321.usermanagement.ui.components.ConfirmEntryActionDialog
 import com.cpen321.usermanagement.ui.components.EntryAction
 import com.cpen321.usermanagement.ui.components.EntryDetailDialog
 import com.cpen321.usermanagement.ui.components.EntryDetailDialogCallbacks
+import com.cpen321.usermanagement.ui.components.toCatalogEntry
 import com.cpen321.usermanagement.ui.viewmodels.catalog.CatalogViewModel
 import com.cpen321.usermanagement.ui.viewmodels.profile.ProfileViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -21,7 +22,14 @@ fun CatalogEntryDialogs(
     permissions: CatalogEntryPermissions
 ) {
     AddEntryDialogHost(dialogState, viewModel, snackbarHostState, coroutineScope, permissions)
-    EntryDetailDialogHost(dialogState, permissions)
+    EntryDetailDialogHost(
+        dialogState = dialogState,
+        viewModel = viewModel,
+        profileViewModel = profileViewModel,
+        snackbarHostState = snackbarHostState,
+        coroutineScope = coroutineScope,
+        permissions = permissions
+    )
     EntryActionConfirmationHost(
         dialogState = dialogState,
         viewModel = viewModel,
@@ -69,6 +77,10 @@ private fun AddEntryDialogHost(
 @Composable
 private fun EntryDetailDialogHost(
     dialogState: CatalogEntryDialogState,
+    viewModel: CatalogViewModel,
+    profileViewModel: ProfileViewModel,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope,
     permissions: CatalogEntryPermissions
 ) {
     val entry = dialogState.entry ?: return
@@ -91,6 +103,18 @@ private fun EntryDetailDialogHost(
             },
             onDeleteEntry = permissions.takeIf { it.canDeleteEntry }?.let {
                 { dialogState.scheduleAction(EntryAction.Delete(entry)) }
+            },
+            onRerunRecognition = {
+                if (!dialogState.isProcessing) {
+                    handleRerunRecognition(
+                        viewModel = viewModel,
+                        profileViewModel = profileViewModel,
+                        dialogState = dialogState,
+                        permissions = permissions,
+                        snackbarHostState = snackbarHostState,
+                        coroutineScope = coroutineScope
+                    )
+                }
             }
         )
     )
@@ -208,6 +232,41 @@ private fun handleDeleteEntry(
             }
         } else {
             dialogState.setError(error ?: "Failed to delete observation")
+        }
+    }
+}
+
+private fun handleRerunRecognition(
+    viewModel: CatalogViewModel,
+    profileViewModel: ProfileViewModel,
+    dialogState: CatalogEntryDialogState,
+    permissions: CatalogEntryPermissions,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope
+) {
+    val entryId = dialogState.entry?.entry?._id ?: return
+    dialogState.startProcessing()
+    dialogState.clearError()
+    viewModel.rerunEntryRecognition(entryId, permissions.currentCatalogId) { success, result, error ->
+        dialogState.stopProcessing()
+        if (success && result != null) {
+            val existing = dialogState.entry
+            val updatedEntry = result.observation.toCatalogEntry().copy(
+                linkedAt = existing?.linkedAt,
+                addedBy = existing?.addedBy
+            )
+            dialogState.updateEntry(updatedEntry)
+            profileViewModel.refreshStats()
+            coroutineScope.launch {
+                val label = updatedEntry.entry.species ?: "observation"
+                snackbarHostState.showSnackbar("Recognition updated for $label")
+            }
+        } else {
+            val message = error ?: "Failed to re-run recognition"
+            dialogState.setError(message)
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(message)
+            }
         }
     }
 }

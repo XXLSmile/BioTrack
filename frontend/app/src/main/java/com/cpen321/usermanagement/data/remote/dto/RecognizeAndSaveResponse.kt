@@ -11,6 +11,11 @@ data class RecognizeAndSaveData(
     val linkedCatalogId: String?
 )
 
+data class SavedEntryResponse(
+    val entry: SavedCatalogEntry?,
+    val imageUrl: String?
+)
+
 data class SavedCatalogEntry(
     val _id: String,
     val userId: String,

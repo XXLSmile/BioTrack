@@ -51,6 +51,8 @@ export const connectDB = async (): Promise<void> => {
     await mongoose.connect(uri);
 
     logger.info('✅ MongoDB connected successfully');
+
+    logger.info('✅ backend v1.0.0 is running');
   } catch (error) {
     logger.error('❌ Failed to connect to MongoDB:', error);
     process.exitCode = 1;

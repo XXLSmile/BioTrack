@@ -6,13 +6,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.cpen321.usermanagement.data.model.CatalogEntry as RemoteCatalogEntry
-import com.cpen321.usermanagement.ui.screens.catalog.AddToCatalogDialog
-import com.cpen321.usermanagement.ui.screens.catalog.CatalogOption
+import com.cpen321.usermanagement.data.repository.EntryRecognitionUpdate
 import com.cpen321.usermanagement.ui.components.ConfirmEntryActionDialog
 import com.cpen321.usermanagement.ui.components.EntryAction
 import com.cpen321.usermanagement.ui.components.EntryDetailDialog
 import com.cpen321.usermanagement.ui.components.EntryDetailDialogCallbacks
+import com.cpen321.usermanagement.ui.components.toCatalogEntry
+import com.cpen321.usermanagement.ui.screens.catalog.AddToCatalogDialog
+import com.cpen321.usermanagement.ui.screens.catalog.CatalogOption
 import com.cpen321.usermanagement.ui.viewmodels.catalog.CatalogViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun AddEntryToCatalogDialog(
@@ -39,29 +42,51 @@ internal fun AddEntryToCatalogDialog(
 }
 
 @Composable
-internal fun ObservationEntryDetailDialog(state: EntryDialogState) {
-    val entry = state.entry
-    if (!state.showEntryDialog || entry == null) return
+internal fun ObservationEntryDetailDialog(state: MainScreenState) {
+    val dialogState = state.entryDialogState
+    val entry = dialogState.entry
+    if (!dialogState.showEntryDialog || entry == null) return
 
     EntryDetailDialog(
         entry = entry,
-        isProcessing = state.isProcessing,
-        errorMessage = state.errorMessage,
+        isProcessing = dialogState.isProcessing,
+        errorMessage = dialogState.errorMessage,
         canRemoveFromCatalog = false,
         callbacks = EntryDetailDialogCallbacks(
             onDismiss = {
-                if (!state.isProcessing) {
-                    state.dismissAll()
+                if (!dialogState.isProcessing) {
+                    dialogState.dismissAll()
                 }
             },
             onAddToCatalog = {
-                if (!state.isProcessing) {
-                    state.openAddDialog()
+                if (!dialogState.isProcessing) {
+                    dialogState.openAddDialog()
+                }
+            },
+            onRerunRecognition = {
+                if (!dialogState.isProcessing) {
+                    performRerunRecognition(
+                        catalogViewModel = state.catalogViewModel,
+                        state = dialogState,
+                        currentCatalogId = null
+                    ) { update ->
+                        val updatedEntry = update.observation.toCatalogEntry().copy(
+                            linkedAt = entry.linkedAt,
+                            addedBy = entry.addedBy
+                        )
+                        dialogState.updateEntry(updatedEntry)
+                        state.mainViewModel.loadRecentObservations()
+                        state.profileViewModel.refreshStats()
+                        state.coroutineScope.launch {
+                            val label = updatedEntry.entry.species ?: "observation"
+                            state.snackBarHostState.showSnackbar("Recognition updated for $label")
+                        }
+                    }
                 }
             },
             onDeleteEntry = {
-                if (!state.isProcessing) {
-                    state.scheduleDelete()
+                if (!dialogState.isProcessing) {
+                    dialogState.scheduleDelete()
                 }
             }
         )
@@ -126,6 +151,25 @@ internal fun performDeleteEntry(
     }
 }
 
+private fun performRerunRecognition(
+    catalogViewModel: CatalogViewModel,
+    state: EntryDialogState,
+    currentCatalogId: String?,
+    onSuccess: (EntryRecognitionUpdate) -> Unit
+) {
+    val entryId = state.entry?.entry?._id ?: return
+    state.startProcessing()
+    state.clearError()
+    catalogViewModel.rerunEntryRecognition(entryId, currentCatalogId) { success, result, error ->
+        state.stopProcessing()
+        if (success && result != null) {
+            onSuccess(result)
+        } else {
+            state.setError(error ?: "Failed to re-run recognition")
+        }
+    }
+}
+
 @Composable
 internal fun rememberEntryDialogState(): EntryDialogState {
     return remember { EntryDialogState() }
@@ -186,6 +230,10 @@ internal class EntryDialogState {
 
     fun clearError() {
         errorMessage = null
+    }
+
+    fun updateEntry(updated: RemoteCatalogEntry) {
+        entry = updated
     }
 
     fun scheduleDelete() {

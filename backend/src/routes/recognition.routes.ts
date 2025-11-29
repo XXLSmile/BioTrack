@@ -27,6 +27,13 @@ router.post(
   asyncHandler(recognitionController.recognizeAndSave.bind(recognitionController))
 );
 
+router.post(
+  '/entry',
+  authenticateToken,
+  uploadRecognitionImage,
+  asyncHandler(recognitionController.saveImageEntry.bind(recognitionController))
+);
+
 /**
  * GET /api/catalog
  * Get user's saved catalog entries (requires auth)
@@ -47,6 +54,12 @@ router.delete(
   '/entry/:entryId',
   authenticateToken,
   asyncHandler(recognitionController.deleteEntry.bind(recognitionController))
+);
+
+router.post(
+  '/entry/:entryId/rerun',
+  authenticateToken,
+  asyncHandler(recognitionController.rerunEntryRecognition.bind(recognitionController))
 );
 
 export default router;

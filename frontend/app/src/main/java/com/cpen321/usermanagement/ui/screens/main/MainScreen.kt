@@ -70,7 +70,7 @@ private fun MainScreenHost(state: MainScreenState) {
         }
     }
 
-    ObservationEntryDetailDialog(state = state.entryDialogState)
+    ObservationEntryDetailDialog(state = state)
 
     ConfirmEntryDeletionDialog(
         catalogViewModel = state.catalogViewModel,
@@ -97,6 +97,10 @@ private fun HandleMainScreenSideEffects(state: MainScreenState) {
     LaunchedEffect(Unit) {
         state.catalogShareViewModel.loadSharedWithMe()
         state.mainViewModel.loadRecentObservations()
+    }
+
+    LaunchedEffect(Unit) {
+        state.profileViewModel.refreshStats()
     }
 
     LaunchedEffect(state.mainUiState.successMessage) {

@@ -52,15 +52,34 @@ private fun CameraScreenHost(
         onLocationUpdated = { controller.currentLocation = it }
     )
 
-    CameraScreenLayout(
-        onBack = onBack,
+    val layoutState = CameraLayoutState(
         imageUri = controller.uiState.imageUri,
         resultText = controller.uiState.resultText,
         isSaving = controller.uiState.isSaving,
-        isRecognizing = controller.uiState.isRecognizing,
-        imagePicker = imagePicker,
+        isRecognizing = controller.uiState.isRecognizing
+    )
+    val layoutCallbacks = CameraLayoutCallbacks(
+        onBack = onBack,
         onImageSelected = controller.uiState::updateImage,
-        onRecognizeClick = { triggerRecognition(controller, requestLocationPermission) }
+        onRecognizeClick = { triggerRecognition(controller, requestLocationPermission) },
+        onSaveImageOnly = {
+            val context = ImageOnlySaveContext(
+                appContext = controller.context,
+                scope = controller.scope,
+                uiState = controller.uiState,
+                fusedLocationClient = controller.fusedLocationClient,
+                currentLocation = controller.currentLocation,
+                onLocationUpdated = { controller.currentLocation = it },
+                viewModel = controller.viewModel,
+                profileViewModel = controller.profileViewModel
+            )
+            saveImageWithoutRecognition(context)
+        }
+    )
+    CameraScreenLayout(
+        state = layoutState,
+        callbacks = layoutCallbacks,
+        imagePicker = imagePicker
     )
 
     CameraScreenCatalogDialog(controller)

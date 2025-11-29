@@ -60,7 +60,7 @@ export class CatalogShareController {
         return res.status(401).json({ message: 'Authentication required' });
       }
       const { catalogId } = req.params;
-      const invitePayload = inviteCollaboratorSchema.parse(req.body) as InviteCollaboratorRequest;
+      const invitePayload = inviteCollaboratorSchema.parse(req.body);
       const inviteeId: string = invitePayload.inviteeId;
       const role: CatalogShareRole = invitePayload.role;
 
@@ -152,7 +152,7 @@ export class CatalogShareController {
         return res.status(401).json({ message: 'Authentication required' });
       }
       const { catalogId, shareId } = req.params;
-      const updatePayload = updateCollaboratorSchema.parse(req.body) as UpdateCollaboratorRequest;
+      const updatePayload = updateCollaboratorSchema.parse(req.body);
 
       const catalog = await catalogModel.findById(catalogId);
       if (!catalog) {

@@ -118,8 +118,11 @@ All responses follow:
 | --- | --- | --- | --- | --- |
 | POST | `/` | No | `multipart/form-data` field `image` (+ optional `latitude`, `longitude`) | Runs iNaturalist image recognition and returns candidate species. |
 | POST | `/save` | Yes | Same form-data | Recognize, persist catalog entry (stores image, metadata). |
+| POST | `/entry` | Yes | `multipart/form-data` field `image` (+ optional `latitude`,`longitude`,`notes`) | Save an observation image without running recognition so it can be processed later. |
 | GET | `/catalog` | Yes | — | Shortcut to fetch the authenticated user’s catalog entries. |
 | GET | `/recent` | Yes | `?limit=10` | Latest observations for the current user (sorted by `createdAt` desc). |
+| POST | `/entry/:entryId/rerun` | Yes | — | Re-run recognition on a saved observation’s stored image; updates species + confidence and returns the refreshed entry. |
+| DELETE | `/entry/:entryId` | Yes | — | Permanently delete an observation entry (and unlink it from catalogs). |
 
 **Recognition success response**
 ```json

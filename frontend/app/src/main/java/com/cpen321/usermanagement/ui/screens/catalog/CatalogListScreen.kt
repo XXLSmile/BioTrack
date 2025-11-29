@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -65,6 +66,35 @@ import com.cpen321.usermanagement.ui.viewmodels.catalog.CatalogViewModel
 import coil.compose.AsyncImage
 import androidx.compose.ui.draw.blur
 
+private data class CatalogListLayoutState(
+    val catalogs: List<Catalog>,
+    val shareUiState: CatalogShareUiState,
+    val selectedTab: CatalogListTab,
+    val catalogPreviews: Map<String, String?>,
+    val showNavigationIcon: Boolean
+)
+
+private data class CatalogListLayoutHandlers(
+    val callbacks: CatalogListCallbacks,
+    val onRequestDeleteCatalog: (String, String) -> Unit,
+    val onRequestPreview: (String) -> Unit
+)
+
+private data class AllCatalogsContent(
+    val myCatalogs: List<Catalog>,
+    val sharedCatalogs: List<CatalogShareEntry>,
+    val catalogPreviews: Map<String, String?>,
+    val isProcessingInvites: Boolean,
+    val pendingInvitations: List<CatalogShareEntry>
+)
+
+private data class AllCatalogsCallbacks(
+    val onOpenCatalog: (String) -> Unit,
+    val onDeleteCatalog: (String, String) -> Unit,
+    val onRespondToInvitation: (String, String) -> Unit,
+    val onRequestPreview: (String) -> Unit
+)
+
 @Composable
 fun CatalogListScreen(
     viewModel: CatalogViewModel,
@@ -95,19 +125,25 @@ private fun CatalogListScreenHost(state: CatalogListScreenState) {
         onDeleteCatalog = { state.viewModel.deleteCatalog(it) }
     )
 
-    CatalogListScreenLayout(
+    val layoutState = CatalogListLayoutState(
         catalogs = state.catalogs,
         shareUiState = state.shareUiState,
         selectedTab = selectedTab,
         catalogPreviews = state.catalogPreviews,
-        showNavigationIcon = state.showNavigationIcon,
-        snackbarHostState = state.snackbarHostState,
+        showNavigationIcon = state.showNavigationIcon
+    )
+    val layoutHandlers = CatalogListLayoutHandlers(
         callbacks = callbacks,
         onRequestDeleteCatalog = { catalogId, catalogName ->
             catalogPendingDeleteId = catalogId
             catalogPendingDeleteName = catalogName
         },
         onRequestPreview = state::requestCatalogPreview
+    )
+    CatalogListScreenLayout(
+        layoutState = layoutState,
+        snackbarHostState = state.snackbarHostState,
+        handlers = layoutHandlers
     )
 
     CatalogCreationDialog(
@@ -137,31 +173,20 @@ private fun CatalogListScreenHost(state: CatalogListScreenState) {
 
 @Composable
 private fun CatalogListScreenLayout(
-    catalogs: List<Catalog>,
-    shareUiState: CatalogShareUiState,
-    selectedTab: CatalogListTab,
-    catalogPreviews: Map<String, String?>,
-    showNavigationIcon: Boolean,
+    layoutState: CatalogListLayoutState,
     snackbarHostState: SnackbarHostState,
-    callbacks: CatalogListCallbacks,
-    onRequestDeleteCatalog: (String, String) -> Unit,
-    onRequestPreview: (String) -> Unit
+    handlers: CatalogListLayoutHandlers
 ) {
     CatalogListScaffold(
         snackbarHostState = snackbarHostState,
-        showNavigationIcon = showNavigationIcon,
-        selectedTab = selectedTab,
-        callbacks = callbacks
+        showNavigationIcon = layoutState.showNavigationIcon,
+        selectedTab = layoutState.selectedTab,
+        callbacks = handlers.callbacks
     ) { paddingValues ->
         CatalogListBody(
             paddingValues = paddingValues,
-            catalogs = catalogs,
-            shareUiState = shareUiState,
-            selectedTab = selectedTab,
-            callbacks = callbacks,
-            onRequestDeleteCatalog = onRequestDeleteCatalog,
-            catalogPreviews = catalogPreviews,
-            onRequestPreview = onRequestPreview
+            layoutState = layoutState,
+            handlers = handlers
         )
     }
 }
@@ -197,13 +222,8 @@ private fun CatalogListScaffold(
 @Composable
 private fun CatalogListBody(
     paddingValues: PaddingValues,
-    catalogs: List<Catalog>,
-    shareUiState: CatalogShareUiState,
-    selectedTab: CatalogListTab,
-    callbacks: CatalogListCallbacks,
-    onRequestDeleteCatalog: (String, String) -> Unit,
-    catalogPreviews: Map<String, String?>,
-    onRequestPreview: (String) -> Unit
+    layoutState: CatalogListLayoutState,
+    handlers: CatalogListLayoutHandlers
 ) {
     Column(
         modifier = Modifier
@@ -212,51 +232,55 @@ private fun CatalogListBody(
             .padding(16.dp),
         verticalArrangement = Arrangement.Top
     ) {
-        ManageAllEntriesCard(onManageAll = callbacks.onOpenCatalogEntries)
+        ManageAllEntriesCard(onManageAll = handlers.callbacks.onOpenCatalogEntries)
         Spacer(modifier = Modifier.height(16.dp))
 
-    CatalogTabSelector(
-        selectedTab = selectedTab,
-        onMyCatalogs = callbacks.onSelectMyTab,
-        onSharedCatalogs = callbacks.onSelectSharedTab,
-        onAllCatalogs = callbacks.onSelectAllTab
-    )
-    Spacer(modifier = Modifier.height(16.dp))
+        CatalogTabSelector(
+            selectedTab = layoutState.selectedTab,
+            onMyCatalogs = handlers.callbacks.onSelectMyTab,
+            onSharedCatalogs = handlers.callbacks.onSelectSharedTab,
+            onAllCatalogs = handlers.callbacks.onSelectAllTab
+        )
+        Spacer(modifier = Modifier.height(16.dp))
 
         Box(modifier = Modifier.weight(1f, fill = true)) {
-            when (selectedTab) {
+            when (layoutState.selectedTab) {
                 CatalogListTab.MY_CATALOGS -> {
                     MyCatalogsSection(
-                        catalogs = catalogs,
-                        onOpenCatalog = callbacks.onOpenCatalog,
-                        onDeleteCatalog = onRequestDeleteCatalog,
-                        catalogPreviews = catalogPreviews,
-                        onRequestPreview = onRequestPreview,
+                        catalogs = layoutState.catalogs,
+                        onOpenCatalog = handlers.callbacks.onOpenCatalog,
+                        onDeleteCatalog = handlers.onRequestDeleteCatalog,
+                        catalogPreviews = layoutState.catalogPreviews,
+                        onRequestPreview = handlers.onRequestPreview,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
                 CatalogListTab.SHARED_CATALOGS -> {
                     SharedCatalogsList(
-                        invitations = shareUiState.pendingInvitations,
-                        isProcessing = shareUiState.isProcessing,
-                        onRespond = callbacks.onRespondToInvitation,
-                        shares = shareUiState.sharedCatalogs,
-                        onOpenCatalog = callbacks.onOpenCatalog,
-                        catalogPreviews = catalogPreviews,
-                        onRequestPreview = onRequestPreview
+                        invitations = layoutState.shareUiState.pendingInvitations,
+                        isProcessing = layoutState.shareUiState.isProcessing,
+                        onRespond = handlers.callbacks.onRespondToInvitation,
+                        shares = layoutState.shareUiState.sharedCatalogs,
+                        onOpenCatalog = handlers.callbacks.onOpenCatalog,
+                        catalogPreviews = layoutState.catalogPreviews,
+                        onRequestPreview = handlers.onRequestPreview
                     )
                 }
                 CatalogListTab.ALL_CATALOGS -> {
                     AllCatalogsList(
-                        myCatalogs = catalogs,
-                        sharedCatalogs = shareUiState.sharedCatalogs,
-                        onOpenCatalog = callbacks.onOpenCatalog,
-                        onDeleteCatalog = onRequestDeleteCatalog,
-                        onRespondToInvitation = callbacks.onRespondToInvitation,
-                        catalogPreviews = catalogPreviews,
-                        onRequestPreview = onRequestPreview,
-                        isProcessingInvites = shareUiState.isProcessing,
-                        pendingInvitations = shareUiState.pendingInvitations
+                        content = AllCatalogsContent(
+                            myCatalogs = layoutState.catalogs,
+                            sharedCatalogs = layoutState.shareUiState.sharedCatalogs,
+                            catalogPreviews = layoutState.catalogPreviews,
+                            isProcessingInvites = layoutState.shareUiState.isProcessing,
+                            pendingInvitations = layoutState.shareUiState.pendingInvitations
+                        ),
+                        actions = AllCatalogsCallbacks(
+                            onOpenCatalog = handlers.callbacks.onOpenCatalog,
+                            onDeleteCatalog = handlers.onRequestDeleteCatalog,
+                            onRespondToInvitation = handlers.callbacks.onRespondToInvitation,
+                            onRequestPreview = handlers.onRequestPreview
+                        )
                     )
                 }
             }
@@ -412,15 +436,8 @@ private fun SharedCatalogsList(
 
 @Composable
 private fun AllCatalogsList(
-    myCatalogs: List<Catalog>,
-    sharedCatalogs: List<CatalogShareEntry>,
-    onOpenCatalog: (String) -> Unit,
-    onDeleteCatalog: (String, String) -> Unit,
-    onRespondToInvitation: (String, String) -> Unit,
-    catalogPreviews: Map<String, String?>,
-    onRequestPreview: (String) -> Unit,
-    isProcessingInvites: Boolean,
-    pendingInvitations: List<CatalogShareEntry>
+    content: AllCatalogsContent,
+    actions: AllCatalogsCallbacks
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -435,17 +452,17 @@ private fun AllCatalogsList(
             )
         }
 
-        if (pendingInvitations.isNotEmpty()) {
+        if (content.pendingInvitations.isNotEmpty()) {
             item {
                 CatalogInvitationsSection(
-                    invitations = pendingInvitations,
-                    isProcessing = isProcessingInvites,
-                    onRespond = onRespondToInvitation
+                    invitations = content.pendingInvitations,
+                    isProcessing = content.isProcessingInvites,
+                    onRespond = actions.onRespondToInvitation
                 )
             }
         }
 
-        if (myCatalogs.isEmpty() && sharedCatalogs.isEmpty()) {
+        if (content.myCatalogs.isEmpty() && content.sharedCatalogs.isEmpty()) {
             item {
                 Text(
                     text = "No catalogs available yet.",
@@ -455,26 +472,23 @@ private fun AllCatalogsList(
             }
         }
 
-        if (myCatalogs.isNotEmpty()) {
-            items(
-                items = myCatalogs,
-                key = { it._id }
-            ) { catalog ->
-                val previewUrl = catalogPreviews[catalog._id]
-                val hasPreview = catalogPreviews.containsKey(catalog._id)
+        if (content.myCatalogs.isNotEmpty()) {
+            items(items = content.myCatalogs, key = { it._id }) { catalog ->
+                val previewUrl = content.catalogPreviews[catalog._id]
+                val hasPreview = content.catalogPreviews.containsKey(catalog._id)
                 CatalogCard(
                     catalogName = catalog.name,
                     description = catalog.description,
-                    onOpen = { onOpenCatalog(catalog._id) },
-                    onDelete = { onDeleteCatalog(catalog._id, catalog.name ?: "Catalog") },
+                    onOpen = { actions.onOpenCatalog(catalog._id) },
+                    onDelete = { actions.onDeleteCatalog(catalog._id, catalog.name ?: "Catalog") },
                     previewUrl = previewUrl,
                     hasPreview = hasPreview,
-                    requestPreview = { onRequestPreview(catalog._id) }
+                    requestPreview = { actions.onRequestPreview(catalog._id) }
                 )
             }
         }
 
-        if (sharedCatalogs.isNotEmpty()) {
+        if (content.sharedCatalogs.isNotEmpty()) {
             item {
                 Text(
                     text = "Shared Catalogs",
@@ -482,13 +496,10 @@ private fun AllCatalogsList(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            items(
-                items = sharedCatalogs,
-                key = { it._id }
-            ) { share ->
+            items(items = content.sharedCatalogs, key = { it._id }) { share ->
                 val catalogId = share.catalog?._id ?: return@items
-                val previewUrl = catalogPreviews[catalogId]
-                val hasPreview = catalogPreviews.containsKey(catalogId)
+                val previewUrl = content.catalogPreviews[catalogId]
+                val hasPreview = content.catalogPreviews.containsKey(catalogId)
                 val ownerLabel = share.invitedBy?.let { resolveUserName(it) }
                     ?.takeIf { it.isNotBlank() }
                     ?: share.owner?.takeIf { it.isNotBlank() }
@@ -497,10 +508,10 @@ private fun AllCatalogsList(
                     catalogName = share.catalog.name ?: "Catalog",
                     roleLabel = share.role.replaceFirstChar { it.uppercase() },
                     ownerLabel = ownerLabel,
-                    onClick = { onOpenCatalog(catalogId) },
+                    onClick = { actions.onOpenCatalog(catalogId) },
                     previewUrl = previewUrl,
                     hasPreview = hasPreview,
-                    requestPreview = { onRequestPreview(catalogId) }
+                    requestPreview = { actions.onRequestPreview(catalogId) }
                 )
             }
         }
@@ -815,19 +826,14 @@ private fun CatalogCard(
 private fun ManageAllEntriesCard(onManageAll: () -> Unit) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        onClick = onManageAll
+        onClick = onManageAll,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.primaryContainer
-                        )
-                    )
-                )
                 .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
@@ -839,18 +845,18 @@ private fun ManageAllEntriesCard(onManageAll: () -> Unit) {
                 Text(
                     text = "Manage all Observations",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Text(
                     text = "View and edit every observation across catalogs.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                 )
             }
             Icon(
                 imageVector = Icons.AutoMirrored.Outlined.List,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimary,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.size(32.dp)
             )
         }
@@ -970,17 +976,27 @@ private fun rememberCatalogCreationDialogState(): CatalogCreationDialogState {
 }
 
 @Stable
+private data class CatalogListScreenData(
+    val catalogs: List<Catalog>,
+    val shareUiState: CatalogShareUiState,
+    val catalogPreviews: Map<String, String?>,
+    val showNavigationIcon: Boolean
+)
+
+@Stable
 private class CatalogListScreenState(
     val viewModel: CatalogViewModel,
     val shareViewModel: CatalogShareViewModel,
     val navController: NavController,
-    val catalogs: List<Catalog>,
-    val shareUiState: CatalogShareUiState,
-    val catalogPreviews: Map<String, String?>,
     val snackbarHostState: SnackbarHostState,
     val creationDialogState: CatalogCreationDialogState,
-    val showNavigationIcon: Boolean
+    private val data: CatalogListScreenData
 ) {
+    val catalogs: List<Catalog> get() = data.catalogs
+    val shareUiState: CatalogShareUiState get() = data.shareUiState
+    val catalogPreviews: Map<String, String?> get() = data.catalogPreviews
+    val showNavigationIcon: Boolean get() = data.showNavigationIcon
+
     fun navigateBack() {
         if (showNavigationIcon) {
             navController.popBackStack()
@@ -1018,12 +1034,14 @@ private fun rememberCatalogListState(
         viewModel = viewModel,
         shareViewModel = shareViewModel,
         navController = navController,
-        catalogs = catalogs,
-        shareUiState = shareUiState,
-        catalogPreviews = catalogPreviews,
         snackbarHostState = snackbarHostState,
         creationDialogState = creationDialogState,
-        showNavigationIcon = showNavigationIcon
+        data = CatalogListScreenData(
+            catalogs = catalogs,
+            shareUiState = shareUiState,
+            catalogPreviews = catalogPreviews,
+            showNavigationIcon = showNavigationIcon
+        )
     )
 }
 

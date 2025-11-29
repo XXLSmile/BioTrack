@@ -4,6 +4,7 @@ import path from 'path';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 import { Buffer } from 'node:buffer';
+import axios from 'axios';
 
 import { recognitionService } from '../services/recognition.service';
 import { catalogRepository, ICatalogEntry } from '../models/recognition/catalog.model';
@@ -26,6 +27,14 @@ import {
   renameSync as safeRenameSync,
   unlinkSync as safeUnlinkSync,
 } from '../utils/safeFs';
+
+interface RerunRecognitionResponse {
+  message: string;
+  data?: {
+    entry: ICatalogEntry;
+    recognition: RecognitionResult;
+  };
+}
 
 const parseCoordinate = (value: unknown): number | undefined => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -170,6 +179,23 @@ const guessMimeType = (filename: string): string => {
   }
 };
 
+const UNIDENTIFIED_SPECIES = {
+  inaturalistId: -1,
+  scientificName: 'Unidentified Species',
+  commonName: 'Unidentified species',
+  rank: 'species',
+  taxonomy: 'Unknown',
+};
+
+const ensureUnidentifiedSpecies = () =>
+  speciesRepository.findOrCreate({
+    inaturalistId: UNIDENTIFIED_SPECIES.inaturalistId,
+    scientificName: UNIDENTIFIED_SPECIES.scientificName,
+    commonName: UNIDENTIFIED_SPECIES.commonName,
+    rank: UNIDENTIFIED_SPECIES.rank,
+    taxonomy: UNIDENTIFIED_SPECIES.taxonomy,
+  });
+
 export class RecognitionController {
   /**
    * POST /api/recognition
@@ -247,7 +273,7 @@ export class RecognitionController {
       if (error instanceof Error) {
         if (error.message.includes('No species recognized')) {
           return res.status(404).json({
-            message: 'Could not recognize any species from the image. Try a clearer photo.',
+            message: 'Could not recognize any species. Try again later or save only.',
           });
         }
 
@@ -658,6 +684,236 @@ export class RecognitionController {
     } catch (error) {
       logger.error('Error fetching recent catalog entries:', error);
       next(error);
+    }
+  }
+
+  async rerunEntryRecognition(
+    req: Request<{ entryId: string }>,
+    res: Response<RerunRecognitionResponse>
+  ) {
+    try {
+      logger.info('Rerunning recognition for catalog entry');
+
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+
+      const { entryId } = req.params;
+      if (!entryId) {
+        return res.status(400).json({
+          message: 'Entry ID is required',
+        });
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(entryId)) {
+        return res.status(400).json({
+          message: 'Invalid entry ID',
+        });
+      }
+
+      const entry = await catalogRepository.findById(entryId);
+      if (!entry) {
+        return res.status(404).json({
+          message: 'Catalog entry not found',
+        });
+      }
+
+      const owningUserId =
+        entry.userId instanceof mongoose.Types.ObjectId
+          ? entry.userId
+          : new mongoose.Types.ObjectId(entry.userId);
+
+      if (!owningUserId.equals(user._id)) {
+        return res.status(403).json({
+          message: 'You do not have permission to re-run recognition for this entry',
+        });
+      }
+
+      if (!entry.imageUrl) {
+        return res.status(400).json({
+          message: 'This entry is missing an image. Capture a new photo to run recognition.',
+        });
+      }
+
+      let uploadsInfo: { relativePath: string; filename: string };
+      try {
+        uploadsInfo = normalizeUploadsPath(entry.imageUrl);
+      } catch (pathError) {
+        const message =
+          pathError instanceof Error
+            ? pathError.message
+            : 'Unable to locate the stored image for this entry.';
+        return res.status(400).json({ message });
+      }
+
+      const absoluteImagePath = resolveWithinRoot(UPLOADS_ROOT, uploadsInfo.relativePath);
+      if (!safeExistsSync(absoluteImagePath)) {
+        return res.status(404).json({
+          message: 'Observation image could not be found. Please capture a new photo.',
+        });
+      }
+
+      const normalizedRelativePath = `/uploads/${uploadsInfo.relativePath.replace(/^\/+/, '')}`;
+      const accessibleImageUrl = buildAccessibleImageUrl(normalizedRelativePath, req);
+      logger.info('Prepared uploads image for Zyla recognition', {
+        entryId,
+        relativePath: uploadsInfo.relativePath,
+        filesystemPath: absoluteImagePath,
+        absoluteUrl: accessibleImageUrl,
+      });
+
+      const recognitionResult = await recognitionService.recognizeFromUrl(accessibleImageUrl);
+      const species = await speciesRepository.findOrCreate({
+        inaturalistId: recognitionResult.species.id,
+        scientificName: recognitionResult.species.scientificName,
+        commonName: recognitionResult.species.commonName,
+        rank: recognitionResult.species.rank,
+        taxonomy: recognitionResult.species.taxonomy,
+        wikipediaUrl: recognitionResult.species.wikipediaUrl,
+        imageUrl: recognitionResult.species.imageUrl,
+      });
+
+      entry.speciesId = species._id;
+      entry.confidence = recognitionResult.confidence;
+      await entry.save();
+
+      const refreshedEntry = await catalogRepository.findById(entryId);
+      const responseEntry = refreshedEntry ?? entry;
+
+      return res.status(200).json({
+        message: 'Recognition rerun successfully',
+        data: {
+          entry: responseEntry,
+          recognition: recognitionResult,
+        },
+      });
+    } catch (error) {
+      logger.error('Error rerunning recognition for entry:', error);
+      if (axios.isAxiosError(error)) {
+        return res.status(error.response?.status ?? 502).json({
+          message: 'Failed to recognize species. Please try again later.',
+        });
+      }
+      if (error instanceof Error && error.message === 'No species recognized from image') {
+        return res.status(404).json({
+          message: 'Recognition service could not identify this image. Please try again later.',
+        });
+      }
+      return res.status(500).json({
+        message: 'Failed to recognize species. Please try again later.',
+      });
+    }
+  }
+
+  async saveImageEntry(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    let savedImage:
+      | { fullPath: string; relativePath: string; filename: string }
+      | undefined;
+
+    try {
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          message: 'Provide an image file to save as an observation.',
+        });
+      }
+
+      const body = req.body as Record<string, unknown>;
+      const latitude = parseCoordinate(body.latitude);
+      const longitude = parseCoordinate(body.longitude);
+      const notes = typeof body.notes === 'string' ? body.notes : undefined;
+
+      savedImage = saveUploadedFile(req.file, 'tmp');
+      const imageBuffer = readFileBufferSync(savedImage.fullPath);
+      const imageHash = crypto.createHash('sha256').update(imageBuffer).digest('hex');
+
+      const existingEntry = await catalogRepository.findByHash(
+        user._id.toString(),
+        imageHash
+      );
+      if (existingEntry) {
+        safeUnlinkSync(savedImage.fullPath);
+        return res.status(200).json({
+          message: 'This image is already saved as an observation.',
+          data: { entry: existingEntry },
+        });
+      }
+
+      const imagesDir = ensureDirectoryExists(resolveWithinRoot(UPLOADS_ROOT, 'images'));
+      const targetFilename = generateUniqueFilename(imagesDir, savedImage.filename);
+      const destinationPath = ensurePathWithinRoot(
+        UPLOADS_ROOT,
+        path.join(imagesDir, targetFilename)
+      );
+      safeRenameSync(savedImage.fullPath, destinationPath);
+      const finalRelativePath = `/uploads/images/${targetFilename}`;
+      const accessibleImageUrl = buildAccessibleImageUrl(finalRelativePath, req);
+
+      const locationInfo =
+        latitude !== undefined && longitude !== undefined
+          ? await geocodingService.reverseGeocode(latitude, longitude)
+          : undefined;
+
+      const placeholderSpecies = await ensureUnidentifiedSpecies();
+      const imageMimeType = guessMimeType(targetFilename);
+
+      const entry = await catalogRepository.create({
+        userId: user._id.toString(),
+        speciesId: placeholderSpecies._id.toString(),
+        imageUrl: finalRelativePath,
+        imageData: imageBuffer,
+        imageMimeType,
+        latitude,
+        longitude,
+        city: locationInfo?.city,
+        province: locationInfo?.province,
+        confidence: 0,
+        notes,
+        imageHash,
+      });
+
+      await userModel.incrementObservationCount(user._id);
+      const userCatalog = await catalogRepository.findByUserId(user._id.toString());
+      const uniqueSpeciesIds = new Set(userCatalog.map(item => item.speciesId.toString()));
+      const newSpeciesCount = uniqueSpeciesIds.size;
+
+      if (newSpeciesCount === 1) {
+        await userModel.addBadge(user._id, 'First Sighting');
+      }
+      if (newSpeciesCount === 10) {
+        await userModel.addBadge(user._id, 'Explorer');
+      }
+      if (newSpeciesCount === 50) {
+        await userModel.addBadge(user._id, 'Naturalist');
+      }
+
+      return res.status(201).json({
+        message: 'Image saved successfully. Re-run recognition when ready.',
+        data: {
+          entry,
+          imageUrl: accessibleImageUrl,
+        },
+      });
+    } catch (error) {
+      logger.error('Error saving image entry without recognition:', error);
+      next(error);
+    } finally {
+      if (savedImage) {
+        try {
+          safeUnlinkSync(savedImage.fullPath);
+        } catch {
+          // ignore missing temp file
+        }
+      }
     }
   }
 

@@ -33,7 +33,7 @@ export class UserController {
       if (!user) {
         return res.status(401).json({ message: 'Authentication required' });
       }
-      const updatePayload = updateProfileSchema.parse(req.body) as UpdateProfileRequest;
+      const updatePayload = updateProfileSchema.parse(req.body);
       const username = updatePayload.username;
 
       // Check if username is being changed and if it's available

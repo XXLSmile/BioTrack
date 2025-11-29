@@ -473,6 +473,10 @@ class CatalogEntryDialogState {
     fun clearPendingAction() {
         pendingAction = null
     }
+
+    fun updateEntry(updated: RemoteCatalogEntry) {
+        entry = updated
+    }
 }
 
 @Composable
