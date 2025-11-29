@@ -82,41 +82,8 @@ class ScanPictureTest {
         composeRule.onNodeWithText("Gallery").performClick()
 
         // --- Step 7: Use UIAutomator to select an image ---
-        device.waitForWindowUpdate(null, 4000)
-
-        val gallerySelectors = listOf(
-            UiSelector().className("android.widget.ImageView"),
-            UiSelector().className("android.widget.FrameLayout"),
-            UiSelector().className("android.widget.RelativeLayout"),
-            UiSelector().descriptionContains("Photo"),
-            UiSelector().resourceIdMatches(".*photo.*|.*image.*|.*thumbnail.*")
-        )
-
-        var selected = false
-        for (sel in gallerySelectors) {
-            val node = device.findObject(sel.instance(0))
-            if (node.exists()) {
-                node.click()
-                selected = true
-                println("✅ Selected image using selector: $sel")
-                break
-            }
-        }
-
-        if (!selected) {
-            Thread.sleep(2500)
-            for (sel in gallerySelectors) {
-                val node = device.findObject(sel.instance(0))
-                if (node.exists()) {
-                    node.click()
-                    selected = true
-                    println("✅ Selected image after retry using selector: $sel")
-                    break
-                }
-            }
-        }
-
-        if (!selected) {
+        val imageSelected = selectImageFromDeviceGallery()
+        if (!imageSelected) {
             println("⚠️ No selectable image found. Dumping UI hierarchy for debug.")
             val dumpPath = "/sdcard/picker_dump.xml"
             device.dumpWindowHierarchy(dumpPath)
@@ -149,5 +116,32 @@ class ScanPictureTest {
         // ✅ PASS TEST
         println("🎉 Recognize Animal button clicked successfully — test passed!")
         assert(true)
+    }
+
+    private fun selectImageFromDeviceGallery(): Boolean {
+        device.waitForWindowUpdate(null, 4000)
+        val selectors = listOf(
+            UiSelector().className("android.widget.ImageView"),
+            UiSelector().className("android.widget.FrameLayout"),
+            UiSelector().className("android.widget.RelativeLayout"),
+            UiSelector().descriptionContains("Photo"),
+            UiSelector().resourceIdMatches(".*photo.*|.*image.*|.*thumbnail.*")
+        )
+
+        if (tapFirstMatchingImage(selectors, "initial")) return true
+        Thread.sleep(2500)
+        return tapFirstMatchingImage(selectors, "retry")
+    }
+
+    private fun tapFirstMatchingImage(selectors: List<UiSelector>, attemptLabel: String): Boolean {
+        selectors.forEach { sel ->
+            val node = device.findObject(sel.instance(0))
+            if (node.exists()) {
+                node.click()
+                println("✅ Selected image during $attemptLabel attempt using selector: $sel")
+                return true
+            }
+        }
+        return false
     }
 }

@@ -4,9 +4,9 @@ import fs from 'fs';
 
 const serviceAccountPath = path.resolve(__dirname, '../firebase-adminsdk.json');
 
-type MessagingAdapter = {
+interface MessagingAdapter {
   send(message: admin.messaging.Message, dryRun?: boolean): Promise<string>;
-};
+}
 
 const initializeWithCredentials = (): MessagingAdapter => {
   const serviceAccountRaw = fs.readFileSync(serviceAccountPath, 'utf8');
@@ -16,7 +16,8 @@ const initializeWithCredentials = (): MessagingAdapter => {
   });
   return {
     send(message: admin.messaging.Message, dryRun?: boolean) {
-      return admin.messaging().send(message, dryRun);
+      const result: Promise<string> = admin.messaging().send(message, dryRun);
+      return result;
     },
   };
 };
@@ -29,10 +30,16 @@ const initializeWithoutCredentials = (): MessagingAdapter => {
   }
 
   const noopMessaging: MessagingAdapter = {
-    send(_message: admin.messaging.Message) {
+    send(message: admin.messaging.Message) {
       if (process.env.NODE_ENV !== 'test') {
+        const target =
+          message.token ??
+          message.topic ??
+          message.condition ??
+          message.fcmOptions?.analyticsLabel ??
+          'unknown target';
         console.warn(
-          'Firebase service account not found. Messaging send() invoked in noop mode.'
+          `Firebase service account not found. Messaging send() invoked in noop mode for target: ${target}.`
         );
       }
       return Promise.resolve('');

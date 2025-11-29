@@ -5,6 +5,7 @@ package com.cpen321.usermanagement.ui.screens.catalog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.List
@@ -58,7 +60,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.cpen321.usermanagement.data.model.Catalog
 import com.cpen321.usermanagement.data.model.CatalogShareEntry
-import com.cpen321.usermanagement.data.remote.dto.PublicUserSummary
 import com.cpen321.usermanagement.ui.navigation.NavRoutes
 import com.cpen321.usermanagement.ui.viewmodels.catalog.CatalogShareUiState
 import com.cpen321.usermanagement.ui.viewmodels.catalog.CatalogShareViewModel
@@ -244,46 +245,54 @@ private fun CatalogListBody(
         Spacer(modifier = Modifier.height(16.dp))
 
         Box(modifier = Modifier.weight(1f, fill = true)) {
-            when (layoutState.selectedTab) {
-                CatalogListTab.MY_CATALOGS -> {
-                    MyCatalogsSection(
-                        catalogs = layoutState.catalogs,
-                        onOpenCatalog = handlers.callbacks.onOpenCatalog,
-                        onDeleteCatalog = handlers.onRequestDeleteCatalog,
-                        catalogPreviews = layoutState.catalogPreviews,
-                        onRequestPreview = handlers.onRequestPreview,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                CatalogListTab.SHARED_CATALOGS -> {
-                    SharedCatalogsList(
-                        invitations = layoutState.shareUiState.pendingInvitations,
-                        isProcessing = layoutState.shareUiState.isProcessing,
-                        onRespond = handlers.callbacks.onRespondToInvitation,
-                        shares = layoutState.shareUiState.sharedCatalogs,
-                        onOpenCatalog = handlers.callbacks.onOpenCatalog,
-                        catalogPreviews = layoutState.catalogPreviews,
-                        onRequestPreview = handlers.onRequestPreview
-                    )
-                }
-                CatalogListTab.ALL_CATALOGS -> {
-                    AllCatalogsList(
-                        content = AllCatalogsContent(
-                            myCatalogs = layoutState.catalogs,
-                            sharedCatalogs = layoutState.shareUiState.sharedCatalogs,
-                            catalogPreviews = layoutState.catalogPreviews,
-                            isProcessingInvites = layoutState.shareUiState.isProcessing,
-                            pendingInvitations = layoutState.shareUiState.pendingInvitations
-                        ),
-                        actions = AllCatalogsCallbacks(
-                            onOpenCatalog = handlers.callbacks.onOpenCatalog,
-                            onDeleteCatalog = handlers.onRequestDeleteCatalog,
-                            onRespondToInvitation = handlers.callbacks.onRespondToInvitation,
-                            onRequestPreview = handlers.onRequestPreview
-                        )
-                    )
-                }
-            }
+            CatalogListContent(layoutState, handlers)
+        }
+    }
+}
+
+@Composable
+private fun CatalogListContent(
+    layoutState: CatalogListLayoutState,
+    handlers: CatalogListLayoutHandlers
+) {
+    when (layoutState.selectedTab) {
+        CatalogListTab.MY_CATALOGS -> {
+            MyCatalogsSection(
+                catalogs = layoutState.catalogs,
+                onOpenCatalog = handlers.callbacks.onOpenCatalog,
+                onDeleteCatalog = handlers.onRequestDeleteCatalog,
+                catalogPreviews = layoutState.catalogPreviews,
+                onRequestPreview = handlers.onRequestPreview,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        CatalogListTab.SHARED_CATALOGS -> {
+            SharedCatalogsList(
+                invitations = layoutState.shareUiState.pendingInvitations,
+                isProcessing = layoutState.shareUiState.isProcessing,
+                onRespond = handlers.callbacks.onRespondToInvitation,
+                shares = layoutState.shareUiState.sharedCatalogs,
+                onOpenCatalog = handlers.callbacks.onOpenCatalog,
+                catalogPreviews = layoutState.catalogPreviews,
+                onRequestPreview = handlers.onRequestPreview
+            )
+        }
+        CatalogListTab.ALL_CATALOGS -> {
+            AllCatalogsList(
+                content = AllCatalogsContent(
+                    myCatalogs = layoutState.catalogs,
+                    sharedCatalogs = layoutState.shareUiState.sharedCatalogs,
+                    catalogPreviews = layoutState.catalogPreviews,
+                    isProcessingInvites = layoutState.shareUiState.isProcessing,
+                    pendingInvitations = layoutState.shareUiState.pendingInvitations
+                ),
+                actions = AllCatalogsCallbacks(
+                    onOpenCatalog = handlers.callbacks.onOpenCatalog,
+                    onDeleteCatalog = handlers.onRequestDeleteCatalog,
+                    onRespondToInvitation = handlers.callbacks.onRespondToInvitation,
+                    onRequestPreview = handlers.onRequestPreview
+                )
+            )
         }
     }
 }
@@ -472,50 +481,61 @@ private fun AllCatalogsList(
             }
         }
 
-        if (content.myCatalogs.isNotEmpty()) {
-            items(items = content.myCatalogs, key = { it._id }) { catalog ->
-                val previewUrl = content.catalogPreviews[catalog._id]
-                val hasPreview = content.catalogPreviews.containsKey(catalog._id)
-                CatalogCard(
-                    catalogName = catalog.name,
-                    description = catalog.description,
-                    onOpen = { actions.onOpenCatalog(catalog._id) },
-                    onDelete = { actions.onDeleteCatalog(catalog._id, catalog.name ?: "Catalog") },
-                    previewUrl = previewUrl,
-                    hasPreview = hasPreview,
-                    requestPreview = { actions.onRequestPreview(catalog._id) }
-                )
-            }
-        }
+        allCatalogsListMySection(content, actions)
+        allCatalogsListSharedSection(content, actions)
+    }
+}
 
-        if (content.sharedCatalogs.isNotEmpty()) {
-            item {
-                Text(
-                    text = "Shared Catalogs",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            items(items = content.sharedCatalogs, key = { it._id }) { share ->
-                val catalogId = share.catalog?._id
-                if (catalogId != null) {
-                    val previewUrl = content.catalogPreviews[catalogId]
-                    val hasPreview = content.catalogPreviews.containsKey(catalogId)
-                    val ownerLabel = share.invitedBy?.let { resolveUserName(it) }
-                        ?.takeIf { it.isNotBlank() }
-                        ?: share.owner?.takeIf { it.isNotBlank() }
-                        ?: "Unknown owner"
-                    SharedCatalogCard(
-                        catalogName = share.catalog.name ?: "Catalog",
-                        roleLabel = share.role.replaceFirstChar { it.uppercase() },
-                        ownerLabel = ownerLabel,
-                        onClick = { actions.onOpenCatalog(catalogId) },
-                        previewUrl = previewUrl,
-                        hasPreview = hasPreview,
-                        requestPreview = { actions.onRequestPreview(catalogId) }
-                    )
-                }
-            }
+private fun LazyListScope.allCatalogsListMySection(
+    content: AllCatalogsContent,
+    actions: AllCatalogsCallbacks
+) {
+    if (content.myCatalogs.isEmpty()) return
+    items(items = content.myCatalogs, key = { it._id }) { catalog ->
+        val previewUrl = content.catalogPreviews[catalog._id]
+        val hasPreview = content.catalogPreviews.containsKey(catalog._id)
+        CatalogCard(
+            catalogName = catalog.name,
+            description = catalog.description,
+            onOpen = { actions.onOpenCatalog(catalog._id) },
+            onDelete = { actions.onDeleteCatalog(catalog._id, catalog.name ?: "Catalog") },
+            previewUrl = previewUrl,
+            hasPreview = hasPreview,
+            requestPreview = { actions.onRequestPreview(catalog._id) }
+        )
+    }
+}
+
+private fun LazyListScope.allCatalogsListSharedSection(
+    content: AllCatalogsContent,
+    actions: AllCatalogsCallbacks
+) {
+    if (content.sharedCatalogs.isEmpty()) return
+    item {
+        Text(
+            text = "Shared Catalogs",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+    items(items = content.sharedCatalogs, key = { it._id }) { share ->
+        val catalogId = share.catalog?._id
+        if (catalogId != null) {
+            val previewUrl = content.catalogPreviews[catalogId]
+            val hasPreview = content.catalogPreviews.containsKey(catalogId)
+            val ownerLabel = share.invitedBy?.let { resolveUserName(it) }
+                ?.takeIf { it.isNotBlank() }
+                ?: share.owner?.takeIf { it.isNotBlank() }
+                ?: "Unknown owner"
+            SharedCatalogCard(
+                catalogName = share.catalog.name ?: "Catalog",
+                roleLabel = share.role.replaceFirstChar { it.uppercase() },
+                ownerLabel = ownerLabel,
+                onClick = { actions.onOpenCatalog(catalogId) },
+                previewUrl = previewUrl,
+                hasPreview = hasPreview,
+                requestPreview = { actions.onRequestPreview(catalogId) }
+            )
         }
     }
 }
@@ -555,109 +575,6 @@ private fun SharedCatalogsSection(
         }
     }
     Spacer(modifier = Modifier.height(16.dp))
-}
-
-private fun resolveUserName(user: PublicUserSummary?): String {
-    if (user == null) return "Unknown"
-    return user.name?.takeIf { it.isNotBlank() }
-        ?: user.username?.takeIf { it.isNotBlank() }
-        ?: "Unknown"
-}
-
-@Composable
-private fun SharedCatalogCard(
-    catalogName: String,
-    roleLabel: String,
-    ownerLabel: String,
-    onClick: () -> Unit,
-    previewUrl: String?,
-    hasPreview: Boolean,
-    requestPreview: () -> Unit
-) {
-    LaunchedEffect(hasPreview) {
-        if (!hasPreview) {
-            requestPreview()
-        }
-    }
-
-    ElevatedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(220.dp),
-        onClick = onClick
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (previewUrl != null) {
-                AsyncImage(
-                    model = previewUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .matchParentSize()
-                        .blur(25.dp),
-                    contentScale = ContentScale.Crop
-                )
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Black.copy(alpha = 0.65f),
-                                    Color.Black.copy(alpha = 0.3f),
-                                    Color.Black.copy(alpha = 0.75f)
-                                )
-                            )
-                        )
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primary,
-                                    MaterialTheme.colorScheme.primaryContainer
-                                )
-                            )
-                        )
-                )
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        catalogName,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "Role: $roleLabel",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.9f)
-                    )
-                    Text(
-                        text = "Owner: $ownerLabel",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.9f)
-                    )
-                }
-
-                Text(
-                    text = "Tap to open",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.85f)
-                )
-            }
-        }
-    }
 }
 
 @Composable
@@ -733,97 +650,130 @@ private fun CatalogCard(
             .fillMaxWidth()
             .height(220.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-        ) {
-            if (previewUrl != null) {
-                AsyncImage(
-                    model = previewUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .matchParentSize()
-                        .blur(25.dp),
-                    contentScale = ContentScale.Crop
-                )
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Black.copy(alpha = 0.65f),
-                                    Color.Black.copy(alpha = 0.3f),
-                                    Color.Black.copy(alpha = 0.75f)
-                                )
-                            )
-                        )
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primary,
-                                    MaterialTheme.colorScheme.primaryContainer
-                                )
-                            )
-                        )
-                )
-            }
+        CatalogCardBackground(previewUrl) {
+            CatalogCardContent(
+                catalogName = catalogName,
+                description = description,
+                onDelete = onDelete
+            )
+        }
+    }
+}
 
-            Column(
+@Composable
+private fun CatalogCardBackground(
+    previewUrl: String?,
+    content: @Composable BoxScope.() -> Unit
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (previewUrl != null) {
+            AsyncImage(
+                model = previewUrl,
+                contentDescription = null,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = catalogName,
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = Color.White
-                        )
-                        if (!description.isNullOrBlank()) {
-                            Text(
-                                text = description,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White.copy(alpha = 0.85f),
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
+                    .blur(25.dp),
+                contentScale = ContentScale.Crop
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.65f),
+                                Color.Black.copy(alpha = 0.3f),
+                                Color.Black.copy(alpha = 0.75f)
                             )
-                        }
-                    }
-                    IconButton(
-                        onClick = onDelete,
-                        colors = IconButtonDefaults.iconButtonColors(
-                            contentColor = Color.White
                         )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Delete,
-                            contentDescription = "Delete catalog"
+                    )
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.primaryContainer
+                            )
                         )
-                    }
-                }
+                    )
+            )
+        }
 
+        content()
+    }
+}
+
+@Composable
+private fun CatalogCardContent(
+    catalogName: String,
+    description: String?,
+    onDelete: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        CatalogCardHeader(catalogName = catalogName, description = description, onDelete = onDelete)
+        CatalogCardFooter()
+    }
+}
+
+@Composable
+private fun CatalogCardHeader(
+    catalogName: String,
+    description: String?,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = catalogName,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = Color.White
+            )
+            if (!description.isNullOrBlank()) {
                 Text(
-                    text = "Tap to open",
+                    text = description,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.85f)
+                    color = Color.White.copy(alpha = 0.85f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
+        IconButton(
+            onClick = onDelete,
+            colors = IconButtonDefaults.iconButtonColors(
+                contentColor = Color.White
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Delete,
+                contentDescription = "Delete catalog"
+            )
+        }
     }
+}
+
+@Composable
+private fun CatalogCardFooter() {
+    Text(
+        text = "Tap to open",
+        style = MaterialTheme.typography.bodyMedium,
+        color = Color.White.copy(alpha = 0.85f)
+    )
 }
 
 @Composable
