@@ -9,8 +9,11 @@ const storage = multer.diskStorage({
     cb(null, UPLOADS_ROOT);
   },
   filename: (req, file, cb) => {
-    const originalName = typeof file.originalname === 'string' ? file.originalname : '';
-    const extension = path.extname(originalName || 'upload').toLowerCase();
+    const originalName: string =
+      typeof file.originalname === 'string' && file.originalname.length > 0
+        ? file.originalname
+        : 'upload';
+    const extension = path.extname(originalName).toLowerCase();
     const secureName = `${randomBytes(16).toString('hex')}${extension}`;
     cb(null, secureName);
   },
