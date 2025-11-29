@@ -24,7 +24,7 @@ export const resolveUserObjectId = (
 const hasUserIdClaim = (
   payload: string | jwt.JwtPayload
 ): payload is jwt.JwtPayload & { id: unknown } => {
-  return typeof payload === 'object' && payload !== null && 'id' in payload;
+  return typeof payload === 'object' && 'id' in (payload as Record<string, unknown>);
 };
 
 const authenticateTokenImpl = async (
