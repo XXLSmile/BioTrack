@@ -4,30 +4,38 @@ import fs from 'fs';
 
 const serviceAccountPath = path.resolve(__dirname, '../firebase-adminsdk.json');
 
-const initializeWithCredentials = (): admin.messaging.Messaging => {
+type MessagingAdapter = {
+  send(message: admin.messaging.Message, dryRun?: boolean): Promise<string>;
+};
+
+const initializeWithCredentials = (): MessagingAdapter => {
   const serviceAccountRaw = fs.readFileSync(serviceAccountPath, 'utf8');
   const serviceAccount = JSON.parse(serviceAccountRaw);
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
   });
-  return admin.messaging();
+  return {
+    send(message: admin.messaging.Message, dryRun?: boolean) {
+      return admin.messaging().send(message, dryRun);
+    },
+  };
 };
 
-const initializeWithoutCredentials = (): Pick<admin.messaging.Messaging, 'send'> => {
+const initializeWithoutCredentials = (): MessagingAdapter => {
   if (!admin.apps.length) {
     admin.initializeApp({
       projectId: process.env.FIREBASE_PROJECT_ID ?? 'local-dev',
     });
   }
 
-  const noopMessaging = {
-    async send() {
+  const noopMessaging: MessagingAdapter = {
+    send(_message: admin.messaging.Message) {
       if (process.env.NODE_ENV !== 'test') {
         console.warn(
           'Firebase service account not found. Messaging send() invoked in noop mode.'
         );
       }
-      return '';
+      return Promise.resolve('');
     },
   };
 
@@ -38,5 +46,5 @@ const messagingInstance = fs.existsSync(serviceAccountPath)
   ? initializeWithCredentials()
   : initializeWithoutCredentials();
 
-export const messaging: admin.messaging.Messaging | Pick<admin.messaging.Messaging, 'send'> = messagingInstance;
+export const messaging: MessagingAdapter = messagingInstance;
 export default admin;

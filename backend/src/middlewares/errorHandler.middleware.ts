@@ -13,6 +13,8 @@ export const notFoundHandler = (req: Request, res: Response) => {
 };
 
 export const errorHandler = (error: Error, _req: Request, res: Response, _next: NextFunction) => {
+  void _req;
+  void _next;
   logger.error('Error:', error);
 
   return res.status(500).json({
