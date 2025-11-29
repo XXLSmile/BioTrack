@@ -99,6 +99,10 @@ private fun HandleMainScreenSideEffects(state: MainScreenState) {
         state.mainViewModel.loadRecentObservations()
     }
 
+    LaunchedEffect(Unit) {
+        state.profileViewModel.refreshStats()
+    }
+
     LaunchedEffect(state.mainUiState.successMessage) {
         state.mainUiState.successMessage?.let { message ->
             state.snackBarHostState.showSnackbar(message)

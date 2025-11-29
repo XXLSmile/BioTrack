@@ -4,6 +4,7 @@ import path from 'path';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 import { Buffer } from 'node:buffer';
+import axios from 'axios';
 
 import { recognitionService } from '../services/recognition.service';
 import { catalogRepository, ICatalogEntry } from '../models/recognition/catalog.model';
@@ -790,7 +791,19 @@ export class RecognitionController {
       });
     } catch (error) {
       logger.error('Error rerunning recognition for entry:', error);
-      next(error);
+      if (axios.isAxiosError?.(error)) {
+        return res.status(error.response?.status ?? 502).json({
+          message: 'Failed to recognize species. Please try again later.',
+        });
+      }
+      if (error instanceof Error && error.message === 'No species recognized from image') {
+        return res.status(404).json({
+          message: 'Recognition service could not identify this image. Please try again later.',
+        });
+      }
+      return res.status(500).json({
+        message: 'Failed to recognize species. Please try again later.',
+      });
     }
   }
 

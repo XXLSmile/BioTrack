@@ -298,7 +298,7 @@ private fun AppNavHost(
         )
         addCatalogRoutes(navController)
         addIdentifyAndCameraRoutes(navController)
-        addFriendRoutes(navController, dependencies.friendViewModel)
+        addFriendRoutes(navController, dependencies.friendViewModel, dependencies.profileViewModel)
         addProfileRoutes(dependencies, navigationStateManager)
         addObservationRoutes(navController, dependencies.mainViewModel)
     }
@@ -371,11 +371,13 @@ private fun NavGraphBuilder.addIdentifyAndCameraRoutes(navController: NavHostCon
 
 private fun NavGraphBuilder.addFriendRoutes(
     navController: NavHostController,
-    friendViewModel: FriendViewModel
+    friendViewModel: FriendViewModel,
+    profileViewModel: ProfileViewModel
 ) {
     composable(NavRoutes.FRIENDS) {
         FriendsScreen(
             viewModel = friendViewModel,
+            profileViewModel = profileViewModel,
             onUserSelected = { user ->
                 user.username?.let { username ->
                     navController.navigate(NavRoutes.publicProfile(Uri.encode(username)))
