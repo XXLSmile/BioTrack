@@ -3,6 +3,11 @@ import { api, createCatalogRequest, dropTestDb } from './test.utils';
 import { createUserAndToken, createUserAndTokenWithPayload } from '../auth/helpers';
 import { userModel } from '../../../src/models/user/user.model';
 
+// Interface POST /api/catalogs and GET /api/catalogs
+// Input: authenticated user with catalog name/description, optional listing requests without auth
+// Expected status code: 201 for successful creation, 200 for listing, 400/401/409 for validation/auth/duplicate issues, 500 for internal errors
+// Expected behavior: persists new catalog for owner, listing respects auth, rejects invalid payloads and duplicates, surfaces controller/model failures
+// Expected output: created catalog payload and list of catalogs or detailed error message
 describe('API: catalog creation flow', () => {
   beforeEach(async () => {
     await dropTestDb();
@@ -79,12 +84,6 @@ describe('API: catalog creation flow', () => {
     catalogModelModule.catalogModel.createCatalog = originalCreate;
   });
 
-  test.skip('handles duplicate catalog name with MongoDB error code 11000 (covered by CatalogNameConflictError test)', async () => {
-    // This scenario is already covered via the CatalogNameConflictError-specific test above.
-    // The MongoDB 11000 path is exercised in integration flows and is prone to socket-level
-    // flakiness in this isolated feature spec, so we skip it here.
-  });
-
   test('handles Zod validation errors from controller (bubbled to global error handler)', async () => {
     const token = await createUserAndToken(api);
     
@@ -110,7 +109,7 @@ describe('API: catalog creation flow', () => {
     jest.restoreAllMocks();
   });
 
-  test('handles mongoose ValidationError', async () => {
+  test('handles mongoose ValidationError (bubbled to global error handler)', async () => {
     const token = await createUserAndToken(api);
     
     // Mock mongoose ValidationError
@@ -121,8 +120,9 @@ describe('API: catalog creation flow', () => {
     jest.spyOn(catalogModel.catalogModel, 'createCatalog').mockRejectedValueOnce(validationError);
 
     const response = await createCatalogRequest(token, { name: 'Test' });
-    expect(response.status).toBe(400);
-    expect(response.body?.message).toBe('Invalid catalog data');
+    // Mongoose ValidationError is now handled by the global error handler, which returns 500
+    expect(response.status).toBe(500);
+    expect(response.body?.message).toBe('Internal server error');
 
     catalogModel.catalogModel.createCatalog = originalCreate;
   });

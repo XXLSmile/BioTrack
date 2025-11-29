@@ -21,6 +21,11 @@ import {
 const app = createApp();
 const api = request(app);
 
+// Interface GET /api/friends/recommendations
+// Input: authenticated user requesting suggested matches with optional limit
+// Expected status code: 200 when recommendations succeed, 401 when unauthenticated, 500 when friend data lacks populated users
+// Expected behavior: returns mutual-friend-based suggestions, enforces auth, handles incomplete data via error handler
+// Expected output: recommendation array + count or error message
 describe('API: GET /api/friends/recommendations', () => {
   beforeEach(async () => {
     await dropTestDb();

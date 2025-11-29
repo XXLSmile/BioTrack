@@ -2,6 +2,11 @@ import { afterEach, beforeEach, describe, expect, test, jest } from '@jest/globa
 import { api, createCatalogRequest, dropTestDb } from './test.utils';
 import { createUserAndToken, createUserAndTokenWithPayload } from '../auth/helpers';
 
+// Interface DELETE /api/catalogs/:catalogId
+// Input: authenticated owner or other user attempting deletion
+// Expected status code: 200 for owner deletions, 403 for unauthorized deletions, 404 when catalog missing
+// Expected behavior: removes catalog when owner requests it, rejects non-owners, clears test DB each run
+// Expected output: success confirmation or error message
 describe('API: catalog deletion flow', () => {
   beforeEach(async () => {
     await dropTestDb();

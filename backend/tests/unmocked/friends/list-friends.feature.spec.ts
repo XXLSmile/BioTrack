@@ -7,6 +7,11 @@ import { dropTestDb, registerUser, respondFriendRequest, sendFriendRequest } fro
 const app = createApp();
 const api = request(app);
 
+// Interface GET /api/friends
+// Input: authenticated user requesting their friend list
+// Expected status code: 200 with friends array when authenticated, 401 when missing auth, 500 when friendships data lacks populated users
+// Expected behavior: returns accepted friendships only, forbids unauthorized requests, handles unpopulated documents via global handler
+// Expected output: count + friends list or descriptive error message
 describe('API: GET /api/friends', () => {
   beforeEach(async () => {
     await dropTestDb();

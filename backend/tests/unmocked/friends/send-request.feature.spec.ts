@@ -7,6 +7,11 @@ import { dropTestDb, registerUser, sendFriendRequest } from './test.utils';
 const app = createApp();
 const api = request(app);
 
+// Interface POST /api/friends/requests
+// Input: authenticated user with targetUserId to invite
+// Expected status code: 201 on new request, 400 for self-requests, 404 for missing targets, 409 for duplicates, 401 when unauthenticated
+// Expected behavior: creates pending requests for valid targets, rejects self or duplicate attempts, enforces authentication
+// Expected output: pending request payload or error message
 describe('API: POST /api/friends/requests', () => {
   beforeEach(async () => {
     await dropTestDb();

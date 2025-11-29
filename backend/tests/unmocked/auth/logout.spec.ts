@@ -7,6 +7,11 @@ import { mockGoogleVerifySuccess, VALID_ID_TOKEN } from './helpers';
 const app = createApp();
 const api = request(app);
 
+// Interface POST /api/auth/logout
+// Input: optional bearer token
+// Expected status code: 200 for success, 500 when authService throws
+// Expected behavior: clears session details or gracefully handles logout errors
+// Expected output: success confirmation or internal error message
 describe('Unmocked: POST /api/auth/logout', () => {
   afterEach(() => {
     jest.restoreAllMocks();

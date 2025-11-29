@@ -15,6 +15,11 @@ const app = createApp();
 const api = request(app);
 const ORIGINAL_JWT_SECRET = process.env.JWT_SECRET;
 
+// Interface POST /api/auth/signup
+// Input: Google idToken for a user
+// Expected status code: 201 on first registration, 400/401/409/500 on validation or internal failures
+// Expected behavior: creates a user record, rejects duplicates and invalid tokens, surfaces internal errors
+// Expected output: JWT token (when successful) or an error payload
 describe('Unmocked: POST /api/auth/signup', () => {
   beforeEach(async () => {
     await userModel.deleteAllUsers();
