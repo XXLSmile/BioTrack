@@ -213,7 +213,7 @@ private fun ShareDialogFriendSelector(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            return@Column
+            return
         }
         LazyColumn(
             modifier = Modifier

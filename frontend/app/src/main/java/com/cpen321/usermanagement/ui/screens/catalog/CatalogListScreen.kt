@@ -497,7 +497,10 @@ private fun AllCatalogsList(
                 )
             }
             items(items = content.sharedCatalogs, key = { it._id }) { share ->
-                val catalogId = share.catalog?._id ?: return@items
+                val catalogId = share.catalog?._id
+                if (catalogId == null) {
+                    return@items
+                }
                 val previewUrl = content.catalogPreviews[catalogId]
                 val hasPreview = content.catalogPreviews.containsKey(catalogId)
                 val ownerLabel = share.invitedBy?.let { resolveUserName(it) }
@@ -532,7 +535,10 @@ private fun SharedCatalogsSection(
     ) {
         Text(text = "Catalogs shared with you", style = MaterialTheme.typography.titleMedium)
         shares.forEach { share ->
-            val catalogId = share.catalog?._id ?: return@forEach
+            val catalogId = share.catalog?._id
+            if (catalogId == null) {
+                return@forEach
+            }
             val previewUrl = catalogPreviews[catalogId]
             val hasPreview = catalogPreviews.containsKey(catalogId)
             val ownerLabel = share.invitedBy?.let { resolveUserName(it) }
