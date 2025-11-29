@@ -19,7 +19,7 @@
 | 26/11/25 | 3.4 | Removed Share scanned image use case. Wasn't something that we decided to implement in the app so removed it |
 | 26/11/25 | 3.2 | Updated use case diagram to match changes made to use cases |
 | 26/11/25 | 3.5 | Made minor change to formal use case spec based on M2 feedback |
-
+| 26/11/28 | 3.4 | Added re-run scanning and catalog picture without scanning use case, allows for more flexibility |
 ## 2. Project Description
 
 BioTrack – Wildlife Scanner & Collection App
@@ -59,17 +59,19 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
 - Use cases for feature 2: Wildlife Recognition
 6. **Get Picture**: The user takes a photo of wildlife using the apps camera feature or uploads a photo already in device storage.
 7. **Scan Picture**: The app scans the picture and identifies the wildlife and description of the wildlife (eg. species type, mammel, rarity, endarngered) using an external recognition API.
+8. **Re-Scan Picture**: The user chooses to re-run scanning on an existing cataloged picture.
 - Use cases for feature 3: Catalog
-8. **Create Catalog**: The user creates a personal collection to store the picture taken of the wildlife as well as the time and location of the sighting and the description of the wildlife and organize by species encountered wildlife. The user can title catalogs and make mulitple catalogs
-9. **Delete Catalog**: The user deletes their catalog, permanently removing all stored encounters in said catalog.
-10. **Edit Catalog**: The user can edit their catalog name, and remove entries from the catalog.
-11. **Catalog Scanned Picture**: After scanning, the user saves the identified species along with the time and location of the sighting via google maps as well as a description of the species to their catalog. 
+1. **Create Catalog**: The user creates a personal collection to store the picture taken of the wildlife as well as the time and location of the sighting and the description of the wildlife and organize by species encountered wildlife. The user can title catalogs and make mulitple catalogs
+2. **Delete Catalog**: The user deletes their catalog, permanently removing all stored encounters in said catalog.
+3.  **Edit Catalog**: The user can edit their catalog name, and remove entries from the catalog.
+4.  **Catalog Scanned Picture**: After scanning, the user saves the identified species along with the time and location of the sighting via google maps as well as a description of the species to their catalog. 
+5.  **Catalog Picture Without Scanning**: The user choose to save the picture without identifying species, this can be used when scanning service is unavailable or fails to identify.
 - Use cases for feature 4: Manage Friends
-12. **Search for Friends**: The user can search for other users on the app by typing their username into the searchbar.
-13. **Add Friends**: The user can send or accept friend requests to connect with other app users. There will be a reccommended list of users that the user can use to add friends based on catalog similarity.
-14. **Remove Friends**: The user can remove other users that they were previously friends with. When a user removes a friend, they will automatically be removed from the other users friend list as well as any catalogs they had previously shared with the Ex-friend.
-15. **Share Catalog**: The user can share one or multiple of their catalogs with friends. Friends can view the catalog or, if the catalog owner gives permission for collaboration, friends can contribute their own pictures to the catalog.
-16. **Edit Shared Catalog Permissions**: After sharing a catalog with friends, the owner of the catalog can change the permissions to view only or to collaborate for each friend the catalog is shared with, as well as remove friends from the shared catalog all together.
+1.  **Search for Friends**: The user can search for other users on the app by typing their username into the searchbar.
+2.  **Add Friends**: The user can send or accept friend requests to connect with other app users. There will be a reccommended list of users that the user can use to add friends based on catalog similarity.
+3.  **Remove Friends**: The user can remove other users that they were previously friends with. When a user removes a friend, they will automatically be removed from the other users friend list as well as any catalogs they had previously shared with the Ex-friend.
+4.  **Share Catalog**: The user can share one or multiple of their catalogs with friends. Friends can view the catalog or, if the catalog owner gives permission for collaboration, friends can contribute their own pictures to the catalog.
+5.  **Edit Shared Catalog Permissions**: After sharing a catalog with friends, the owner of the catalog can change the permissions to view only or to collaborate for each friend the catalog is shared with, as well as remove friends from the shared catalog all together.
 
 ### **3.5. Formal Use Case Specifications (5 Most Major Use Cases)**
 <a name="uc1"></a>
@@ -245,22 +247,15 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
             - **Parameters**: Same photo payload with optional catalog target and metadata.
             - **Returns**: JSON payload with persisted catalog entry identifiers and species details.
             - **Description**: Supports the one-tap recognise-and-store workflow.
-        - `RecognitionResult RecognitionService.recognizeFromUrl(String imageUrl)`
-            - **Parameters**: Publicly reachable image URL generated during upload.
-            - **Returns**: Domain `RecognitionResult` containing species metadata and alternative candidates.
-            - **Description**: Wraps the Zyla Animal Recognition API call with timeout handling and logging.
-        - `SpeciesDocument speciesRepository.findOrCreate(SpeciesDraft draft)`
-            - **Parameters**: Species attributes (scientific/common names, taxonomy, image URL) derived from recognition.
-            - **Returns**: MongoDB species document, reusing previous entries when available.
-            - **Description**: Guarantees consistent species identifiers for catalog entries.
-        - `suspend fun WildlifeApi.recognizeAnimal(MultipartBody.Part image, RequestBody? latitude, RequestBody? longitude): Response<ScanResponse>`
-            - **Parameters**: Binary photo payload and optional coordinate bodies captured on Android.
-            - **Returns**: Retrofit `Response` with the recognition payload.
-            - **Description**: Mobile client call that kicks off the `POST /api/recognition` workflow.
-        - `suspend fun WildlifeApi.recognizeAndSave(MultipartBody.Part image, RequestBody? catalogId, RequestBody? latitude, RequestBody? longitude): Response<RecognizeAndSaveResponse>`
-            - **Parameters**: Photo payload plus optional catalog identifier.
-            - **Returns**: Retrofit `Response` with saved entry details.
-            - **Description**: Invokes the combined recognition-and-persist endpoint when users bypass manual review.
+        -  `POST /api/recognition/entry(image: multipart/form-data, catalogId?: string, latitude?: number, longitude?: number, notes?: string) -> CatalogEntryResponse`
+            - **Parameters**: Multipart form data with the uploaded photo and optional metadata, but this route skips automated recognition.
+            - **Returns**: Catalog entry identifier plus any metadata persisted alongside the raw image.
+            - **Description**: Enables offline-first capture or manual review flows where the user wants to save an observation without invoking the classifier.
+        - `POST /api/recognition/entry/:entryId/rerun -> CatalogEntryResponse`
+            - **Parameters**: Path parameter `entryId` referencing the previously saved sighting.
+            - **Returns**: Updated catalog entry populated with refreshed recognition results.
+            - **Description**: Lets the backend rerun classification on a stored image, useful after regaining network connectivity or when model confidence needs improvement.
+2. **
 2. **Catalog**
     - **Purpose**: Organises recognised sightings into personal or shared catalogs, enriches entries with location data, and keeps collaborators in sync.
     - **Interfaces**:
@@ -272,26 +267,6 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
             - **Parameters**: JSON body defining catalog `name` and optional `description`.
             - **Returns**: Newly created catalog object.
             - **Description**: Allows users to create themed collections for future sightings.
-        - `Catalog CatalogModel.createCatalog(ObjectId ownerId, CatalogDraft payload)`
-            - **Parameters**: Owner id plus validated catalog payload.
-            - **Returns**: Persisted catalog document.
-            - **Description**: Back-end creation path that enforces per-user uniqueness constraints.
-        - `ICatalogEntryLink CatalogEntryLinkModel.linkEntry(ObjectId catalogId, ObjectId entryId, ObjectId addedBy)`
-            - **Parameters**: Catalog, entry, and acting user identifiers.
-            - **Returns**: Link document recording who added the entry and when.
-            - **Description**: Maintains many-to-many relationships for shared catalogs.
-        - `void SocketManager.emitCatalogEntriesUpdated(String catalogId, CatalogEntryLinkResponse[] entries, String triggeredBy)`
-            - **Parameters**: Catalog identifier, updated entries payload, and triggering user id.
-            - **Returns**: None.
-            - **Description**: Broadcasts real-time updates to collaborators via Socket.IO rooms.
-        - `ReverseGeocodeResult? GeocodingService.reverseGeocode(double latitude, double longitude)`
-            - **Parameters**: Latitude and longitude values stored with an entry.
-            - **Returns**: Optional city and province metadata.
-            - **Description**: Uses Google Geocoding to enrich catalog entries with human-readable locations.
-        - `suspend fun RecognitionApi.getRecentEntries(limit: Int = 10): Response<ApiResponse<RecentEntriesResponse>>`
-            - **Parameters**: Optional limit controlling how many entries to fetch.
-            - **Returns**: Retrofit `Response` containing recently catalogued sightings.
-            - **Description**: Supplies the activity feed that surfaces catalog changes on Android.
 3. **User**
     - **Purpose**: Authenticates users, manages profiles, and coordinates social interactions such as friend requests, recommendations, and notifications.
     - **Interfaces**:
@@ -303,10 +278,6 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
             - **Parameters**: Google `idToken`.
             - **Returns**: Same `AuthResponse` schema as signup.
             - **Description**: Issues application sessions for returning users.
-        - `AuthResult AuthService.signInWithGoogle(String idToken)`
-            - **Parameters**: Verified Google token.
-            - **Returns**: Domain result bundling MongoDB user and JWT.
-            - **Description**: Server-side helper used by both sign-in and sign-up controllers.
         - `GET /api/user/profile -> GetProfileResponse`
             - **Parameters**: Authenticated request headers.
             - **Returns**: JSON payload with the user’s profile data.
@@ -327,27 +298,6 @@ The project aims to bridge this gap by providing a simple yet powerful mobile ap
             - **Parameters**: Optional limit query.
             - **Returns**: Recommendation list with mutual species and proximity metadata.
             - **Description**: Backs the friend recommendations tab in the app.
-        - `IFriendship FriendshipModel.createRequest(ObjectId requesterId, ObjectId addresseeId)`
-            - **Parameters**: Requester and addressee identifiers.
-            - **Returns**: Newly created friendship document.
-            - **Description**: Persists friend requests and seeds notification workflows.
-        - `IFriendship? FriendshipModel.updateRequestStatus(ObjectId requestId, FriendshipStatus status)`
-            - **Parameters**: Request id and the new status value.
-            - **Returns**: Updated friendship or `null` if not found.
-            - **Description**: Centralises transitions for accept/decline flows.
-        - `suspend fun FriendApi.sendFriendRequest(SendFriendRequestBody body): Response<ApiResponse<Void>>`
-            - **Parameters**: Kotlin data class containing the target user id.
-            - **Returns**: Retrofit `Response` mirroring the REST endpoint.
-            - **Description**: View models call this to create outgoing invitations.
-        - `suspend fun FriendApi.getFriendRecommendations(Int? limit): Response<ApiResponse<FriendRecommendationsResponse>>`
-            - **Parameters**: Optional limit integer.
-            - **Returns**: Retrofit `Response` with recommendation data.
-            - **Description**: Populates the recommendation UI state in `FriendViewModel`.
-        - `Promise<string> FirebaseMessaging.send(Message message)`
-            - **Parameters**: Firebase message with recipient token plus notification payload.
-            - **Returns**: Message id string.
-            - **Description**: Sends push notifications for friend requests, catalog shares, and other social alerts.
-
 
 
 ### **4.2. Databases**
