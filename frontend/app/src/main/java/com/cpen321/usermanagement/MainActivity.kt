@@ -76,28 +76,27 @@ class MainActivity : ComponentActivity() {
 fun UserManagementApp(
     isTest: Boolean = false
 ) {
-    ProvideSpacing {
-        ProvideFontSizes {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.background
-            ) {
-                if (isTest) {
-                    // Directly show main navigation for tests
-                    AppNavigation()
-                } else {
-                    var showSplash by remember { mutableStateOf(true) }
-
-                    if (showSplash) {
-                        SplashScreen(onTimeout = { showSplash = false })
-                    } else {
+    UserManagementTheme {
+        ProvideSpacing {
+            ProvideFontSizes {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    if (isTest) {
                         AppNavigation()
+                    } else {
+                        var showSplash by remember { mutableStateOf(true) }
+                        if (showSplash) {
+                            SplashScreen(onTimeout = { showSplash = false })
+                        } else {
+                            AppNavigation()
+                        }
                     }
                 }
             }
         }
     }
 }
-
 
 
