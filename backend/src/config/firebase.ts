@@ -8,29 +8,27 @@ interface MessagingAdapter {
   send(message: admin.messaging.Message, dryRun?: boolean): Promise<string>;
 }
 
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.length > 0;
+
 const resolveMessageTarget = (message: admin.messaging.Message): string => {
-  const targetToken =
-    'token' in message && typeof message.token === 'string' ? message.token : undefined;
-  if (targetToken && targetToken.length > 0) {
+  const targetToken = 'token' in message ? (message.token as unknown) : undefined;
+  if (isNonEmptyString(targetToken)) {
     return targetToken;
   }
 
-  const targetTopic =
-    'topic' in message && typeof message.topic === 'string' ? message.topic : undefined;
-  if (targetTopic && targetTopic.length > 0) {
+  const targetTopic = 'topic' in message ? (message.topic as unknown) : undefined;
+  if (isNonEmptyString(targetTopic)) {
     return targetTopic;
   }
 
-  const targetCondition =
-    'condition' in message && typeof message.condition === 'string'
-      ? message.condition
-      : undefined;
-  if (targetCondition && targetCondition.length > 0) {
+  const targetCondition = 'condition' in message ? (message.condition as unknown) : undefined;
+  if (isNonEmptyString(targetCondition)) {
     return targetCondition;
   }
 
-  const analyticsLabel = message.fcmOptions?.analyticsLabel;
-  if (analyticsLabel && analyticsLabel.length > 0) {
+  const analyticsLabel = message.fcmOptions?.analyticsLabel as unknown;
+  if (isNonEmptyString(analyticsLabel)) {
     return analyticsLabel;
   }
 
