@@ -15,7 +15,12 @@ export const notFoundHandler = (req: Request, res: Response) => {
 export const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
   logger.error(`Error handling ${req.method} ${req.originalUrl}:`, error);
 
-  return res.status(500).json({
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
+
+  res.status(500).json({
     message: 'Internal server error',
   });
 };
