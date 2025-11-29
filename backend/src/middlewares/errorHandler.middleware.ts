@@ -1,4 +1,4 @@
-import { NextFunction, Request, Response } from 'express';
+import type { ErrorRequestHandler, Request, Response } from 'express';
 
 import logger from '../utils/logger.util';
 
@@ -12,8 +12,12 @@ export const notFoundHandler = (req: Request, res: Response) => {
   });
 };
 
-export const errorHandler = (error: Error, _req: Request, res: Response, _next: NextFunction) => {
-  logger.error('Error:', error);
+export const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
+  if (res.headersSent) {
+    return next(error);
+  }
+
+  logger.error(`Error handling ${req.method} ${req.originalUrl}:`, error);
 
   return res.status(500).json({
     message: 'Internal server error',

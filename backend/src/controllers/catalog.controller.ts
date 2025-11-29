@@ -2,16 +2,25 @@ import { NextFunction, Request, Response } from 'express';
 import type { ParamsDictionary } from 'express-serve-static-core';
 import mongoose from 'mongoose';
 
-import logger from '../utils/logger.util';
+import { buildCatalogEntriesResponse } from '../helpers/catalog.helpers';
+import {
+  emitCatalogDeleted,
+  emitCatalogEntriesUpdated,
+  emitCatalogMetadataUpdated,
+} from '../infrastructure/socket.manager';
+import { CatalogNameConflictError, catalogModel } from '../models/catalog/catalog.model';
+import { catalogEntryLinkModel } from '../models/catalog/catalogEntryLink.model';
+import { catalogShareModel } from '../models/catalog/catalogShare.model';
+import { catalogRepository } from '../models/recognition/catalog.model';
 import {
   CatalogEntryLinkResponse,
   CatalogListResponse,
   CatalogResponse,
   CreateCatalogRequest,
-  createCatalogSchema,
   UpdateCatalogRequest,
+  createCatalogSchema,
 } from '../types/catalog.types';
-import { catalogModel, CatalogNameConflictError } from '../models/catalog/catalog.model';
+import logger from '../utils/logger.util';
 
 const isCatalogNameConflict = (error: unknown): boolean => {
   if (error instanceof CatalogNameConflictError) {
@@ -30,15 +39,6 @@ const isCatalogNameConflict = (error: unknown): boolean => {
 
   return false;
 };
-import { catalogShareModel } from '../models/catalog/catalogShare.model';
-import { catalogEntryLinkModel } from '../models/catalog/catalogEntryLink.model';
-import { catalogRepository } from '../models/recognition/catalog.model';
-import { buildCatalogEntriesResponse } from '../helpers/catalog.helpers';
-import {
-  emitCatalogDeleted,
-  emitCatalogEntriesUpdated,
-  emitCatalogMetadataUpdated,
-} from '../infrastructure/socket.manager';
 
 export class CatalogController {
   async createCatalog(
