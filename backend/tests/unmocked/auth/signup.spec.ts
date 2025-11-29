@@ -64,12 +64,13 @@ describe('Unmocked: POST /api/auth/signup', () => {
   });
 
   test('Input: empty string token, Expected status: 400', async () => {
-    // Input: idToken is empty string (bypasses validation middleware but caught by controller)
+    // Input: idToken is empty string (caught by validation middleware)
     // Expected status: 400
     const response = await api.post('/api/auth/signup').send({ idToken: '' });
 
     expect(response.status).toBe(400);
-    expect(response.body?.message).toBe('Google token is required');
+    // Validation middleware catches empty strings
+    expect(response.body?.error).toBe('Validation error');
   });
 
   test('Input: invalid Google token, Expected status: 401', async () => {

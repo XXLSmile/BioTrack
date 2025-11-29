@@ -55,7 +55,7 @@ describe('API: catalog creation flow', () => {
   });
 
   test('requires authentication to create catalog', async () => {
-    const response = await createCatalogRequest(null as any, { name: 'Test' });
+    const response = await api.post('/api/catalogs').send({ name: 'Test' });
     expect(response.status).toBe(401);
     expect(response.body?.message).toBe('Authentication required');
   });
@@ -65,10 +65,10 @@ describe('API: catalog creation flow', () => {
     await createCatalogRequest(token, { name: 'Birds' });
 
     // Mock to throw CatalogNameConflictError
-    const catalogModel = require('../../../src/models/catalog/catalog.model');
-    const originalCreate = catalogModel.catalogModel.createCatalog;
-    const { CatalogNameConflictError } = require('../../../src/types/catalog.types');
-    jest.spyOn(catalogModel.catalogModel, 'createCatalog').mockRejectedValueOnce(
+    const catalogModelModule = require('../../../src/models/catalog/catalog.model');
+    const { CatalogNameConflictError } = catalogModelModule;
+    const originalCreate = catalogModelModule.catalogModel.createCatalog;
+    jest.spyOn(catalogModelModule.catalogModel, 'createCatalog').mockRejectedValueOnce(
       new CatalogNameConflictError('Duplicate name')
     );
 
@@ -76,7 +76,7 @@ describe('API: catalog creation flow', () => {
     expect(response.status).toBe(409);
     expect(response.body?.message).toBe('Catalog with the same name already exists');
 
-    catalogModel.catalogModel.createCatalog = originalCreate;
+    catalogModelModule.catalogModel.createCatalog = originalCreate;
   });
 
   test('handles duplicate catalog name with MongoDB error code 11000', async () => {
@@ -96,25 +96,33 @@ describe('API: catalog creation flow', () => {
     catalogModel.catalogModel.createCatalog = originalCreate;
   });
 
-  test('handles Zod validation errors', async () => {
+  test('handles Zod validation errors from controller', async () => {
     const token = await createUserAndToken(api);
     
-    // Mock Zod to throw validation error
-    const zod = require('zod');
-    const originalParse = zod.z.object;
-    jest.spyOn(zod, 'z').mockImplementationOnce(() => ({
-      object: () => ({
-        parse: () => {
-          const error = new Error('Validation error');
-          (error as any).issues = [{ path: ['name'], message: 'Invalid' }];
-          throw error;
-        },
+    // Mock the controller's createCatalogSchema.parse call to throw validation error
+    // This tests the error handling path in the controller (lines 69-73)
+    const catalogTypes = require('../../../src/types/catalog.types');
+    const originalSchema = catalogTypes.createCatalogSchema;
+    const mockSchema = {
+      parse: jest.fn(() => {
+        const error = new Error('Validation error');
+        (error as any).issues = [{ path: ['name'], message: 'Invalid' }];
+        throw error;
       }),
-    }));
+    };
+    
+    // Replace the schema temporarily
+    const catalogController = require('../../../src/controllers/catalog.controller');
+    const originalCreateCatalog = catalogController.CatalogController.prototype.createCatalog;
+    
+    // Create a spy that will throw the Zod error
+    jest.spyOn(catalogTypes, 'createCatalogSchema').mockReturnValueOnce(mockSchema as any);
 
     const response = await createCatalogRequest(token, { name: 'Test' });
     expect(response.status).toBe(400);
     expect(response.body?.message).toBe('Invalid catalog data');
+
+    jest.restoreAllMocks();
   });
 
   test('handles mongoose ValidationError', async () => {

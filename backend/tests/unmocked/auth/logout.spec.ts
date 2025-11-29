@@ -33,15 +33,15 @@ describe('Unmocked: POST /api/auth/logout', () => {
   test('Input: authService throws error during logout, Expected status: 500', async () => {
     // Input: authService.logout throws an error
     // Expected status: 500
-    const authService = require('../../../src/services/auth.service');
-    const originalLogout = authService.logout;
-    jest.spyOn(authService, 'logout').mockRejectedValueOnce(new Error('logout failed'));
+    const authServiceModule = require('../../../src/services/auth.service');
+    const originalLogout = authServiceModule.authService.logout;
+    jest.spyOn(authServiceModule.authService, 'logout').mockRejectedValueOnce(new Error('logout failed'));
 
     const response = await api.post('/api/auth/logout');
 
     expect(response.status).toBe(500);
     expect(response.body?.message).toBe('Internal server error');
     
-    authService.logout = originalLogout;
+    authServiceModule.authService.logout = originalLogout;
   });
 });

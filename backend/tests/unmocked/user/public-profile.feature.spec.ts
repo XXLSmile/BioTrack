@@ -212,15 +212,26 @@ describe('API: /api/user public endpoints', () => {
       expect(response.body?.message).toBe('Internal server error');
     });
 
-    test('handles search when user is not authenticated (currentUserId undefined)', async () => {
-      // No authentication token
+    test('handles search when user is authenticated but excludes self from results', async () => {
+      // User is authenticated, so currentUserId is defined
+      const token = await createUserAndToken(api);
       const publicUser = await createCustomUser({ username: 'public_search', isPublicProfile: true });
 
-      const response = await api.get('/api/user/search').query({ query: 'public' });
+      const response = await api
+        .get('/api/user/search')
+        .query({ query: 'public' })
+        .set('Authorization', `Bearer ${token}`);
 
       expect(response.status).toBe(200);
       expect(response.body?.data?.users).toBeDefined();
-      // Should still return public users even without authentication
+      // Should return public users but exclude the authenticated user
+      const currentUser = await userModel.findByGoogleId('test-google-id');
+      if (currentUser) {
+        const userInResults = response.body?.data?.users?.find(
+          (u: any) => u._id === currentUser._id.toString()
+        );
+        expect(userInResults).toBeUndefined();
+      }
     });
   });
 

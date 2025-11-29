@@ -48,15 +48,19 @@ describe('API: GET /api/friends', () => {
 
     await acceptRequest(alice.token, bob.token, bob.user._id.toString());
 
-    // Mock getFriendsForUser to return friendship with unpopulated user
+    // Mock getFriendsForUser to return friendship with unpopulated user (ObjectId instead of populated document)
     const friendshipModel = require('../../../src/models/friends/friend.model');
     const originalGetFriends = friendshipModel.friendshipModel.getFriendsForUser;
-    const friendships = await friendshipModel.friendshipModel.getFriendsForUser(alice.user._id);
+    const mongoose = require('mongoose');
     
-    // Create a friendship with unpopulated ObjectId instead of populated user
+    // Create a mock friendship where requester is an ObjectId (not populated)
     const mockFriendship = {
-      ...friendships[0],
-      requester: alice.user._id, // ObjectId instead of populated user
+      _id: new mongoose.Types.ObjectId(),
+      requester: alice.user._id, // ObjectId, not populated
+      addressee: bob.user._id, // ObjectId, not populated
+      status: 'accepted',
+      createdAt: new Date(),
+      respondedAt: new Date(),
     };
     
     jest.spyOn(friendshipModel.friendshipModel, 'getFriendsForUser').mockResolvedValueOnce([mockFriendship]);
@@ -64,7 +68,7 @@ describe('API: GET /api/friends', () => {
     const response = await api.get('/api/friends').set('Authorization', `Bearer ${alice.token}`);
 
     expect(response.status).toBe(200);
-    expect(response.body?.data?.friends).toHaveLength(0); // Should filter out null entries
+    expect(response.body?.data?.friends).toHaveLength(0); // Should filter out null entries due to unpopulated users
 
     friendshipModel.friendshipModel.getFriendsForUser = originalGetFriends;
   });
