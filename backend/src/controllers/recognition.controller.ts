@@ -178,6 +178,23 @@ const guessMimeType = (filename: string): string => {
   }
 };
 
+const UNIDENTIFIED_SPECIES = {
+  inaturalistId: -1,
+  scientificName: 'Unidentified Species',
+  commonName: 'Unidentified species',
+  rank: 'species',
+  taxonomy: 'Unknown',
+};
+
+const ensureUnidentifiedSpecies = () =>
+  speciesRepository.findOrCreate({
+    inaturalistId: UNIDENTIFIED_SPECIES.inaturalistId,
+    scientificName: UNIDENTIFIED_SPECIES.scientificName,
+    commonName: UNIDENTIFIED_SPECIES.commonName,
+    rank: UNIDENTIFIED_SPECIES.rank,
+    taxonomy: UNIDENTIFIED_SPECIES.taxonomy,
+  });
+
 export class RecognitionController {
   /**
    * POST /api/recognition
@@ -774,6 +791,117 @@ export class RecognitionController {
     } catch (error) {
       logger.error('Error rerunning recognition for entry:', error);
       next(error);
+    }
+  }
+
+  async saveImageEntry(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    let savedImage:
+      | { fullPath: string; relativePath: string; filename: string }
+      | undefined;
+
+    try {
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          message: 'Provide an image file to save as an observation.',
+        });
+      }
+
+      const body = req.body as Record<string, unknown>;
+      const latitude = parseCoordinate(body.latitude);
+      const longitude = parseCoordinate(body.longitude);
+      const notes = typeof body.notes === 'string' ? body.notes : undefined;
+
+      savedImage = saveUploadedFile(req.file, 'tmp');
+      const imageBuffer = readFileBufferSync(savedImage.fullPath);
+      const imageHash = crypto.createHash('sha256').update(imageBuffer).digest('hex');
+
+      const existingEntry = await catalogRepository.findByHash(
+        user._id.toString(),
+        imageHash
+      );
+      if (existingEntry) {
+        safeUnlinkSync(savedImage.fullPath);
+        return res.status(200).json({
+          message: 'This image is already saved as an observation.',
+          data: { entry: existingEntry },
+        });
+      }
+
+      const imagesDir = ensureDirectoryExists(resolveWithinRoot(UPLOADS_ROOT, 'images'));
+      const targetFilename = generateUniqueFilename(imagesDir, savedImage.filename);
+      const destinationPath = ensurePathWithinRoot(
+        UPLOADS_ROOT,
+        path.join(imagesDir, targetFilename)
+      );
+      safeRenameSync(savedImage.fullPath, destinationPath);
+      const finalRelativePath = `/uploads/images/${targetFilename}`;
+      const accessibleImageUrl = buildAccessibleImageUrl(finalRelativePath, req);
+
+      const locationInfo =
+        latitude !== undefined && longitude !== undefined
+          ? await geocodingService.reverseGeocode(latitude, longitude)
+          : undefined;
+
+      const placeholderSpecies = await ensureUnidentifiedSpecies();
+      const imageMimeType = guessMimeType(targetFilename);
+
+      const entry = await catalogRepository.create({
+        userId: user._id.toString(),
+        speciesId: placeholderSpecies._id.toString(),
+        imageUrl: finalRelativePath,
+        imageData: imageBuffer,
+        imageMimeType,
+        latitude,
+        longitude,
+        city: locationInfo?.city,
+        province: locationInfo?.province,
+        confidence: 0,
+        notes,
+        imageHash,
+      });
+
+      await userModel.incrementObservationCount(user._id);
+      const userCatalog = await catalogRepository.findByUserId(user._id.toString());
+      const uniqueSpeciesIds = new Set(userCatalog.map(item => item.speciesId.toString()));
+      const newSpeciesCount = uniqueSpeciesIds.size;
+
+      if (newSpeciesCount === 1) {
+        await userModel.addBadge(user._id, 'First Sighting');
+      }
+      if (newSpeciesCount === 10) {
+        await userModel.addBadge(user._id, 'Explorer');
+      }
+      if (newSpeciesCount === 50) {
+        await userModel.addBadge(user._id, 'Naturalist');
+      }
+
+      return res.status(201).json({
+        message: 'Image saved successfully. Re-run recognition when ready.',
+        data: {
+          entry,
+          imageUrl: accessibleImageUrl,
+        },
+      });
+    } catch (error) {
+      logger.error('Error saving image entry without recognition:', error);
+      next(error);
+    } finally {
+      if (savedImage) {
+        try {
+          safeUnlinkSync(savedImage.fullPath);
+        } catch {
+          // ignore missing temp file
+        }
+      }
     }
   }
 

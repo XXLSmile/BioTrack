@@ -60,7 +60,20 @@ private fun CameraScreenHost(
         isRecognizing = controller.uiState.isRecognizing,
         imagePicker = imagePicker,
         onImageSelected = controller.uiState::updateImage,
-        onRecognizeClick = { triggerRecognition(controller, requestLocationPermission) }
+        onRecognizeClick = { triggerRecognition(controller, requestLocationPermission) },
+        onSaveImageOnly = {
+            val context = ImageOnlySaveContext(
+                appContext = controller.context,
+                scope = controller.scope,
+                uiState = controller.uiState,
+                fusedLocationClient = controller.fusedLocationClient,
+                currentLocation = controller.currentLocation,
+                onLocationUpdated = { controller.currentLocation = it },
+                viewModel = controller.viewModel,
+                profileViewModel = controller.profileViewModel
+            )
+            saveImageWithoutRecognition(context)
+        }
     )
 
     CameraScreenCatalogDialog(controller)

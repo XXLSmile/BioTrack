@@ -5,7 +5,11 @@ import com.cpen321.usermanagement.data.remote.api.RecognitionApi
 import com.cpen321.usermanagement.data.remote.api.RetrofitClient
 import com.cpen321.usermanagement.data.remote.dto.EntryRecognitionUpdateDto
 import com.cpen321.usermanagement.data.remote.dto.RecentEntryDto
+import com.cpen321.usermanagement.data.remote.dto.SavedCatalogEntry
 import com.cpen321.usermanagement.data.remote.dto.ScanData
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -58,6 +62,29 @@ class RecognitionRepository @Inject constructor(
         } else {
             throw RecognitionRepositoryException(
                 response.errorBody()?.string().orEmpty().ifBlank { "Failed to re-run recognition" }
+            )
+        }
+    }
+
+    suspend fun saveImageEntry(
+        image: MultipartBody.Part,
+        latitude: Double?,
+        longitude: Double?,
+        notes: String?
+    ): Result<SavedCatalogEntry> = runCatching {
+        val notesBody = notes?.takeIf { it.isNotBlank() }?.toRequestBody(MultipartBody.FORM)
+        val response = recognitionApi.saveImageEntry(
+            image = image,
+            latitude = latitude,
+            longitude = longitude,
+            notes = notesBody
+        )
+        if (response.isSuccessful) {
+            val entry = response.body()?.data?.entry
+            entry ?: throw RecognitionRepositoryException("Missing entry from save response")
+        } else {
+            throw RecognitionRepositoryException(
+                response.errorBody()?.string().orEmpty().ifBlank { "Failed to save observation image" }
             )
         }
     }

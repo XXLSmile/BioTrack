@@ -38,6 +38,17 @@ internal data class RecognitionContext(
     val requestLocationPermission: () -> Unit
 )
 
+internal data class ImageOnlySaveContext(
+    val appContext: Context,
+    val scope: CoroutineScope,
+    val uiState: CameraUiState,
+    val fusedLocationClient: FusedLocationProviderClient,
+    val currentLocation: Location?,
+    val onLocationUpdated: (Location?) -> Unit,
+    val viewModel: CatalogViewModel,
+    val profileViewModel: ProfileViewModel
+)
+
 internal data class CatalogSaveContext(
     val uiState: CameraUiState,
     val hasLocationPermission: Boolean,
@@ -84,6 +95,48 @@ internal fun performRecognition(environment: RecognitionContext) {
             uiState.showRecognitionResult(message, response)
         } finally {
             uiState.setRecognizingState(false)
+        }
+    }
+}
+
+internal fun saveImageWithoutRecognition(context: ImageOnlySaveContext) {
+    val uiState = context.uiState
+    if (uiState.isSaving) {
+        uiState.updateResult("Save already in progress. Please wait…")
+        return
+    }
+
+    val imageUri = uiState.imageUri
+    if (imageUri == null) {
+        uiState.updateResult("Select a photo before saving.")
+        return
+    }
+
+    uiState.setSavingState(true)
+    context.scope.launch {
+        try {
+            val hasPermission = hasLocationPermission(context.appContext)
+            val location = if (hasPermission) {
+                context.currentLocation ?: fetchCurrentLocation(context.fusedLocationClient).also {
+                    context.onLocationUpdated(it)
+                }
+            } else {
+                context.currentLocation
+            }
+
+            val (success, message) = saveImageEntryWithoutRecognition(
+                appContext = context.appContext,
+                uri = imageUri,
+                location = location
+            )
+            uiState.updateResult(message)
+            if (success) {
+                uiState.resetAfterSave()
+                context.viewModel.loadCatalogs()
+                context.profileViewModel.refreshStats()
+            }
+        } finally {
+            uiState.setSavingState(false)
         }
     }
 }
@@ -184,6 +237,39 @@ private suspend fun saveRecognitionToCatalog(
     }
 }
 
+private suspend fun saveImageEntryWithoutRecognition(
+    appContext: Context,
+    uri: Uri,
+    location: Location?
+): Pair<Boolean, String> {
+    var tempFile: File? = null
+    return try {
+        val (imagePart, file) = createImagePart(appContext, uri)
+        tempFile = file
+        val response = withContext(Dispatchers.IO) {
+            RetrofitClient.recognitionApi.saveImageEntry(
+                image = imagePart,
+                latitude = location?.latitude,
+                longitude = location?.longitude,
+                notes = null
+            )
+        }
+        if (response.isSuccessful) {
+            true to (response.body()?.message ?: "Observation saved. Re-run recognition later from your catalog.")
+        } else {
+            false to extractErrorMessage(response)
+        }
+    } catch (e: IOException) {
+        false to ("⚠️ Save failed: ${e.localizedMessage ?: "Check your connection and try again."}")
+    } catch (e: HttpException) {
+        false to ("⚠️ Save failed: HTTP ${e.code()}")
+    } catch (e: IllegalArgumentException) {
+        false to ("⚠️ Save failed: ${e.localizedMessage ?: "Invalid data"}")
+    } finally {
+        tempFile?.delete()
+    }
+}
+
 private suspend fun createImagePart(
     context: Context,
     uri: Uri
@@ -197,6 +283,17 @@ private suspend fun createImagePart(
 
     val requestFile = tempFile.asRequestBody("image/jpeg".toMediaTypeOrNull())
     MultipartBody.Part.createFormData("image", tempFile.name, requestFile) to tempFile
+}
+
+private fun extractErrorMessage(response: Response<*>): String {
+    val fallback = "⚠️ Save failed. Try again later."
+    return try {
+        val errorBody = response.errorBody()?.string() ?: return fallback
+        val json = JSONObject(errorBody)
+        json.optString("message").ifBlank { fallback }
+    } catch (_: JSONException) {
+        fallback
+    }
 }
 
 private suspend fun emitProgress(progress: (String) -> Unit, message: String) {

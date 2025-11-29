@@ -45,7 +45,8 @@ fun CameraScreenLayout(
     isRecognizing: Boolean,
     imagePicker: ImagePicker,
     onImageSelected: (Uri?) -> Unit,
-    onRecognizeClick: () -> Unit
+    onRecognizeClick: () -> Unit,
+    onSaveImageOnly: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -71,7 +72,8 @@ fun CameraScreenLayout(
             isRecognizing = isRecognizing,
             imagePicker = imagePicker,
             onImageSelected = onImageSelected,
-            onRecognizeClick = onRecognizeClick
+            onRecognizeClick = onRecognizeClick,
+            onSaveImageOnly = onSaveImageOnly
         )
     }
 }
@@ -85,7 +87,8 @@ private fun CameraScreenBody(
     isRecognizing: Boolean,
     imagePicker: ImagePicker,
     onImageSelected: (Uri?) -> Unit,
-    onRecognizeClick: () -> Unit
+    onRecognizeClick: () -> Unit,
+    onSaveImageOnly: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -102,6 +105,11 @@ private fun CameraScreenBody(
         RecognizeButton(
             enabled = !isSaving && !isRecognizing,
             onClick = onRecognizeClick
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        SaveImageOnlyButton(
+            enabled = !isSaving && !isRecognizing,
+            onClick = onSaveImageOnly
         )
         Spacer(modifier = Modifier.height(24.dp))
         resultText?.let {
@@ -159,5 +167,19 @@ private fun RecognizeButton(
         Icon(Icons.Default.Search, contentDescription = null)
         Spacer(Modifier.width(8.dp))
         Text("Recognize Animal")
+    }
+}
+
+@Composable
+private fun SaveImageOnlyButton(
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth(0.8f)
+    ) {
+        Text("Save Without Recognition")
     }
 }

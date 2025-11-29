@@ -27,6 +27,13 @@ router.post(
   asyncHandler(recognitionController.recognizeAndSave.bind(recognitionController))
 );
 
+router.post(
+  '/entry',
+  authenticateToken,
+  uploadRecognitionImage,
+  asyncHandler(recognitionController.saveImageEntry.bind(recognitionController))
+);
+
 /**
  * GET /api/catalog
  * Get user's saved catalog entries (requires auth)
