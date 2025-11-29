@@ -255,7 +255,7 @@ export class RecognitionController {
       if (error instanceof Error) {
         if (error.message.includes('No species recognized')) {
           return res.status(404).json({
-            message: 'Could not recognize any species from the image. Try a clearer photo.',
+            message: 'Could not recognize any species. Try again later or save only.',
           });
         }
 
@@ -675,6 +675,8 @@ export class RecognitionController {
     next: NextFunction
   ) {
     try {
+      logger.info('Rerunning recognition for catalog entry');
+
       const user = req.user;
       if (!user) {
         return res.status(401).json({ message: 'Authentication required' });
