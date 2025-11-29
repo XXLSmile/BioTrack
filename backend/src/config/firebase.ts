@@ -8,6 +8,27 @@ interface MessagingAdapter {
   send(message: admin.messaging.Message, dryRun?: boolean): Promise<string>;
 }
 
+const resolveMessageTarget = (message: admin.messaging.Message): string => {
+  if ('token' in message && typeof message.token === 'string' && message.token) {
+    return message.token;
+  }
+  if ('topic' in message && typeof message.topic === 'string' && message.topic) {
+    return message.topic;
+  }
+  if (
+    'condition' in message &&
+    typeof message.condition === 'string' &&
+    message.condition
+  ) {
+    return message.condition;
+  }
+  const analyticsLabel = message.fcmOptions?.analyticsLabel;
+  if (analyticsLabel && analyticsLabel.length > 0) {
+    return analyticsLabel;
+  }
+  return 'unknown target';
+};
+
 const initializeWithCredentials = (): MessagingAdapter => {
   const serviceAccountRaw = fs.readFileSync(serviceAccountPath, 'utf8');
   const serviceAccount = JSON.parse(serviceAccountRaw);
@@ -32,12 +53,7 @@ const initializeWithoutCredentials = (): MessagingAdapter => {
   const noopMessaging: MessagingAdapter = {
     send(message: admin.messaging.Message) {
       if (process.env.NODE_ENV !== 'test') {
-        const target =
-          message.token ??
-          message.topic ??
-          message.condition ??
-          message.fcmOptions?.analyticsLabel ??
-          'unknown target';
+        const target = resolveMessageTarget(message);
         console.warn(
           `Firebase service account not found. Messaging send() invoked in noop mode for target: ${target}.`
         );
