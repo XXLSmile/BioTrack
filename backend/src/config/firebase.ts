@@ -9,23 +9,31 @@ interface MessagingAdapter {
 }
 
 const resolveMessageTarget = (message: admin.messaging.Message): string => {
-  if ('token' in message && typeof message.token === 'string' && message.token) {
-    return message.token;
+  const targetToken =
+    'token' in message && typeof message.token === 'string' ? message.token : undefined;
+  if (targetToken && targetToken.length > 0) {
+    return targetToken;
   }
-  if ('topic' in message && typeof message.topic === 'string' && message.topic) {
-    return message.topic;
+
+  const targetTopic =
+    'topic' in message && typeof message.topic === 'string' ? message.topic : undefined;
+  if (targetTopic && targetTopic.length > 0) {
+    return targetTopic;
   }
-  if (
-    'condition' in message &&
-    typeof message.condition === 'string' &&
-    message.condition
-  ) {
-    return message.condition;
+
+  const targetCondition =
+    'condition' in message && typeof message.condition === 'string'
+      ? message.condition
+      : undefined;
+  if (targetCondition && targetCondition.length > 0) {
+    return targetCondition;
   }
+
   const analyticsLabel = message.fcmOptions?.analyticsLabel;
   if (analyticsLabel && analyticsLabel.length > 0) {
     return analyticsLabel;
   }
+
   return 'unknown target';
 };
 
