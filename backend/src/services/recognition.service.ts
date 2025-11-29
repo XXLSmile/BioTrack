@@ -27,6 +27,12 @@ export class RecognitionService {
         }
       );
 
+      logger.info('Zyla API responded', {
+        message: response.data?.message,
+        success: response.data?.success,
+        outputs: Array.isArray(response.data?.output) ? response.data.output.length : 0,
+      });
+
       const outputs: { label: string; score?: number }[] = response.data?.output ?? [];
 
       if (!response.data?.success || outputs.length === 0) {
@@ -73,6 +79,7 @@ export class RecognitionService {
         logger.error('Zyla API error:', {
           status: error.response?.status,
           message: error.message,
+          data: error.response?.data,
         });
       }
 

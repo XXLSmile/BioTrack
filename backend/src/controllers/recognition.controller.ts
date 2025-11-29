@@ -739,6 +739,12 @@ export class RecognitionController {
 
       const normalizedRelativePath = `/uploads/${uploadsInfo.relativePath.replace(/^\/+/, '')}`;
       const accessibleImageUrl = buildAccessibleImageUrl(normalizedRelativePath, req);
+      logger.info('Prepared uploads image for Zyla recognition', {
+        entryId,
+        relativePath: uploadsInfo.relativePath,
+        filesystemPath: absoluteImagePath,
+        absoluteUrl: accessibleImageUrl,
+      });
 
       const recognitionResult = await recognitionService.recognizeFromUrl(accessibleImageUrl);
       const species = await speciesRepository.findOrCreate({
