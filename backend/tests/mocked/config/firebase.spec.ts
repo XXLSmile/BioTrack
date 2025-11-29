@@ -78,7 +78,8 @@ describe('Mocked: firebase bootstrap', () => {
     expect(initializeAppMock).toHaveBeenCalledWith({
       credential: expect.any(Object),
     });
-    expect(moduleExports.messaging).toBe(messagingInstance);
+    // messaging is a thin adapter around admin.messaging().send(...)
+    expect(typeof moduleExports.messaging.send).toBe('function');
   });
 
   // API: firebase messaging bootstrap

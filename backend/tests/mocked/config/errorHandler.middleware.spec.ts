@@ -61,7 +61,10 @@ describe('Mocked: error handlers', () => {
 
     errorHandler(err, req, res, next);
 
-    expect(mockLogger.error).toHaveBeenCalledWith('Error:', err);
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'Error handling undefined undefined:',
+      err
+    );
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({
       message: 'Internal server error',

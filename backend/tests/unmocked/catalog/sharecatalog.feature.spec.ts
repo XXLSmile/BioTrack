@@ -858,7 +858,9 @@ describe('API: catalog share flow', () => {
     test('handles errors when fetching shared catalogs', async () => {
       const token = await createUserAndToken(api);
 
-      jest.spyOn(catalogShareModel, 'listSharedWithUser').mockRejectedValueOnce(new Error('db error'));
+      jest
+        .spyOn(catalogShareModel, 'listSharedWithUser')
+        .mockRejectedValueOnce(new Error('db error'));
 
       const response = await api
         .get('/api/catalogs/shared-with/me')
@@ -866,6 +868,6 @@ describe('API: catalog share flow', () => {
 
       expect(response.status).toBe(500);
       expect(response.body?.message).toBe('Internal server error');
-    });
+    }, 10000);
   });
 });

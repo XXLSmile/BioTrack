@@ -60,10 +60,23 @@
    ```bash
    npm run test:watch
    ```
+6. **Run the unmocked recognition feature spec against the real ML service**
+   ```bash
+   cd backend
+   npx jest --runInBand tests/unmocked/recognition/recognition.feature.spec.ts
+   ```
+   - Ensure `MEDIA_BASE_URL` points at a publicly reachable image (set/defaulted in `backend/tests/setup/env.ts`) so the upstream service can download it; the spec already raises the timeout via `jest.setTimeout(30000)` and uses two deterministic image URLs.
 Notes:
    - Mocked suites redirect Firebase Admin and JWT signing to jest spies so no service account is required.
    - Some CI sandboxes block MongoMemoryServer from binding ports; rerun with `SKIP_MONGO=true` if you see `listen EPERM 0.0.0.0`.
    - The current coverage runs still log expected errors from `recognition.controller.spec.ts` (missing `MEDIA_BASE_URL`, “No species recognized,” or rate-limit errors). Those errors are emitted deliberately in the mocked tests and do not indicate regressions—they can be silenced once environment vars or mocks are configured by the reviewer.
+
+#### 2.1.4. Common Local Failures & How to Fix Them
+
+- **MongoMemoryServer can’t bind to 0.0.0.0** – this usually shows up as `listen EPERM` when Jest tries to start the in-memory database. Make sure no other service is listening on the same ports, or run the suite with `SKIP_MONGO_MEMORY=1 npm test` (tests will skip spinning up MongoDB, so only run the mocked suites in that case).
+- **Recognition spec fails because the media URL is unreachable** – `tests/unmocked/recognition/recognition.feature.spec.ts` calls `MEDIA_BASE_URL` (configured in `backend/tests/setup/env.ts`). Verify that `MEDIA_BASE_URL` points at a publicly accessible image (e.g., `http://4.206.208.211:80/uploads/images/dc606ab876ac356ace4cc107d20646ca.jpg`) or override it via `.env` before running the unmocked spec. The test already raises `jest.setTimeout(30000)` to allow for upstream latency.
+- **Real tests fail with authentication errors** – ensure the Google/Firebase mocks in `tests/unmock/auth/helpers.ts` are invoked before hitting auth routes so that `validateIdToken` is mocked; the helper is wired into every auth spec.
+- **Coverage run logs “Expected error” noise** – those logs come from intentionally rejected promises in the mocked recognition controller (rate limits, missing payloads). They can be ignored unless you purposely change those flows.
 
 ### 2.2. Jest Configuration and CI Workflow
 
