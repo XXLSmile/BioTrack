@@ -689,8 +689,7 @@ export class RecognitionController {
 
   async rerunEntryRecognition(
     req: Request<{ entryId: string }>,
-    res: Response<RerunRecognitionResponse>,
-    next: NextFunction
+    res: Response<RerunRecognitionResponse>
   ) {
     try {
       logger.info('Rerunning recognition for catalog entry');
