@@ -5,6 +5,7 @@ package com.cpen321.usermanagement.ui.screens.catalog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,31 +14,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -58,7 +51,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.cpen321.usermanagement.data.model.Catalog
 import com.cpen321.usermanagement.data.model.CatalogShareEntry
-import com.cpen321.usermanagement.data.remote.dto.PublicUserSummary
 import com.cpen321.usermanagement.ui.navigation.NavRoutes
 import com.cpen321.usermanagement.ui.viewmodels.catalog.CatalogShareUiState
 import com.cpen321.usermanagement.ui.viewmodels.catalog.CatalogShareViewModel
@@ -244,46 +236,54 @@ private fun CatalogListBody(
         Spacer(modifier = Modifier.height(16.dp))
 
         Box(modifier = Modifier.weight(1f, fill = true)) {
-            when (layoutState.selectedTab) {
-                CatalogListTab.MY_CATALOGS -> {
-                    MyCatalogsSection(
-                        catalogs = layoutState.catalogs,
-                        onOpenCatalog = handlers.callbacks.onOpenCatalog,
-                        onDeleteCatalog = handlers.onRequestDeleteCatalog,
-                        catalogPreviews = layoutState.catalogPreviews,
-                        onRequestPreview = handlers.onRequestPreview,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                CatalogListTab.SHARED_CATALOGS -> {
-                    SharedCatalogsList(
-                        invitations = layoutState.shareUiState.pendingInvitations,
-                        isProcessing = layoutState.shareUiState.isProcessing,
-                        onRespond = handlers.callbacks.onRespondToInvitation,
-                        shares = layoutState.shareUiState.sharedCatalogs,
-                        onOpenCatalog = handlers.callbacks.onOpenCatalog,
-                        catalogPreviews = layoutState.catalogPreviews,
-                        onRequestPreview = handlers.onRequestPreview
-                    )
-                }
-                CatalogListTab.ALL_CATALOGS -> {
-                    AllCatalogsList(
-                        content = AllCatalogsContent(
-                            myCatalogs = layoutState.catalogs,
-                            sharedCatalogs = layoutState.shareUiState.sharedCatalogs,
-                            catalogPreviews = layoutState.catalogPreviews,
-                            isProcessingInvites = layoutState.shareUiState.isProcessing,
-                            pendingInvitations = layoutState.shareUiState.pendingInvitations
-                        ),
-                        actions = AllCatalogsCallbacks(
-                            onOpenCatalog = handlers.callbacks.onOpenCatalog,
-                            onDeleteCatalog = handlers.onRequestDeleteCatalog,
-                            onRespondToInvitation = handlers.callbacks.onRespondToInvitation,
-                            onRequestPreview = handlers.onRequestPreview
-                        )
-                    )
-                }
-            }
+            CatalogListContent(layoutState, handlers)
+        }
+    }
+}
+
+@Composable
+private fun CatalogListContent(
+    layoutState: CatalogListLayoutState,
+    handlers: CatalogListLayoutHandlers
+) {
+    when (layoutState.selectedTab) {
+        CatalogListTab.MY_CATALOGS -> {
+            MyCatalogsSection(
+                catalogs = layoutState.catalogs,
+                onOpenCatalog = handlers.callbacks.onOpenCatalog,
+                onDeleteCatalog = handlers.onRequestDeleteCatalog,
+                catalogPreviews = layoutState.catalogPreviews,
+                onRequestPreview = handlers.onRequestPreview,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        CatalogListTab.SHARED_CATALOGS -> {
+            SharedCatalogsList(
+                invitations = layoutState.shareUiState.pendingInvitations,
+                isProcessing = layoutState.shareUiState.isProcessing,
+                onRespond = handlers.callbacks.onRespondToInvitation,
+                shares = layoutState.shareUiState.sharedCatalogs,
+                onOpenCatalog = handlers.callbacks.onOpenCatalog,
+                catalogPreviews = layoutState.catalogPreviews,
+                onRequestPreview = handlers.onRequestPreview
+            )
+        }
+        CatalogListTab.ALL_CATALOGS -> {
+            AllCatalogsList(
+                content = AllCatalogsContent(
+                    myCatalogs = layoutState.catalogs,
+                    sharedCatalogs = layoutState.shareUiState.sharedCatalogs,
+                    catalogPreviews = layoutState.catalogPreviews,
+                    isProcessingInvites = layoutState.shareUiState.isProcessing,
+                    pendingInvitations = layoutState.shareUiState.pendingInvitations
+                ),
+                actions = AllCatalogsCallbacks(
+                    onOpenCatalog = handlers.callbacks.onOpenCatalog,
+                    onDeleteCatalog = handlers.onRequestDeleteCatalog,
+                    onRespondToInvitation = handlers.callbacks.onRespondToInvitation,
+                    onRequestPreview = handlers.onRequestPreview
+                )
+            )
         }
     }
 }
@@ -472,50 +472,61 @@ private fun AllCatalogsList(
             }
         }
 
-        if (content.myCatalogs.isNotEmpty()) {
-            items(items = content.myCatalogs, key = { it._id }) { catalog ->
-                val previewUrl = content.catalogPreviews[catalog._id]
-                val hasPreview = content.catalogPreviews.containsKey(catalog._id)
-                CatalogCard(
-                    catalogName = catalog.name,
-                    description = catalog.description,
-                    onOpen = { actions.onOpenCatalog(catalog._id) },
-                    onDelete = { actions.onDeleteCatalog(catalog._id, catalog.name ?: "Catalog") },
-                    previewUrl = previewUrl,
-                    hasPreview = hasPreview,
-                    requestPreview = { actions.onRequestPreview(catalog._id) }
-                )
-            }
-        }
+        allCatalogsListMySection(content, actions)
+        allCatalogsListSharedSection(content, actions)
+    }
+}
 
-        if (content.sharedCatalogs.isNotEmpty()) {
-            item {
-                Text(
-                    text = "Shared Catalogs",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            items(items = content.sharedCatalogs, key = { it._id }) { share ->
-                val catalogId = share.catalog?._id
-                if (catalogId != null) {
-                    val previewUrl = content.catalogPreviews[catalogId]
-                    val hasPreview = content.catalogPreviews.containsKey(catalogId)
-                    val ownerLabel = share.invitedBy?.let { resolveUserName(it) }
-                        ?.takeIf { it.isNotBlank() }
-                        ?: share.owner?.takeIf { it.isNotBlank() }
-                        ?: "Unknown owner"
-                    SharedCatalogCard(
-                        catalogName = share.catalog.name ?: "Catalog",
-                        roleLabel = share.role.replaceFirstChar { it.uppercase() },
-                        ownerLabel = ownerLabel,
-                        onClick = { actions.onOpenCatalog(catalogId) },
-                        previewUrl = previewUrl,
-                        hasPreview = hasPreview,
-                        requestPreview = { actions.onRequestPreview(catalogId) }
-                    )
-                }
-            }
+private fun LazyListScope.allCatalogsListMySection(
+    content: AllCatalogsContent,
+    actions: AllCatalogsCallbacks
+) {
+    if (content.myCatalogs.isEmpty()) return
+    items(items = content.myCatalogs, key = { it._id }) { catalog ->
+        val previewUrl = content.catalogPreviews[catalog._id]
+        val hasPreview = content.catalogPreviews.containsKey(catalog._id)
+        CatalogCard(
+            catalogName = catalog.name,
+            description = catalog.description,
+            onOpen = { actions.onOpenCatalog(catalog._id) },
+            onDelete = { actions.onDeleteCatalog(catalog._id, catalog.name ?: "Catalog") },
+            previewUrl = previewUrl,
+            hasPreview = hasPreview,
+            requestPreview = { actions.onRequestPreview(catalog._id) }
+        )
+    }
+}
+
+private fun LazyListScope.allCatalogsListSharedSection(
+    content: AllCatalogsContent,
+    actions: AllCatalogsCallbacks
+) {
+    if (content.sharedCatalogs.isEmpty()) return
+    item {
+        Text(
+            text = "Shared Catalogs",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+    items(items = content.sharedCatalogs, key = { it._id }) { share ->
+        val catalogId = share.catalog?._id
+        if (catalogId != null) {
+            val previewUrl = content.catalogPreviews[catalogId]
+            val hasPreview = content.catalogPreviews.containsKey(catalogId)
+            val ownerLabel = share.invitedBy?.let { resolveUserName(it) }
+                ?.takeIf { it.isNotBlank() }
+                ?: share.owner?.takeIf { it.isNotBlank() }
+                ?: "Unknown owner"
+            SharedCatalogCard(
+                catalogName = share.catalog.name ?: "Catalog",
+                roleLabel = share.role.replaceFirstChar { it.uppercase() },
+                ownerLabel = ownerLabel,
+                onClick = { actions.onOpenCatalog(catalogId) },
+                previewUrl = previewUrl,
+                hasPreview = hasPreview,
+                requestPreview = { actions.onRequestPreview(catalogId) }
+            )
         }
     }
 }
@@ -555,109 +566,6 @@ private fun SharedCatalogsSection(
         }
     }
     Spacer(modifier = Modifier.height(16.dp))
-}
-
-private fun resolveUserName(user: PublicUserSummary?): String {
-    if (user == null) return "Unknown"
-    return user.name?.takeIf { it.isNotBlank() }
-        ?: user.username?.takeIf { it.isNotBlank() }
-        ?: "Unknown"
-}
-
-@Composable
-private fun SharedCatalogCard(
-    catalogName: String,
-    roleLabel: String,
-    ownerLabel: String,
-    onClick: () -> Unit,
-    previewUrl: String?,
-    hasPreview: Boolean,
-    requestPreview: () -> Unit
-) {
-    LaunchedEffect(hasPreview) {
-        if (!hasPreview) {
-            requestPreview()
-        }
-    }
-
-    ElevatedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(220.dp),
-        onClick = onClick
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (previewUrl != null) {
-                AsyncImage(
-                    model = previewUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .matchParentSize()
-                        .blur(25.dp),
-                    contentScale = ContentScale.Crop
-                )
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Black.copy(alpha = 0.65f),
-                                    Color.Black.copy(alpha = 0.3f),
-                                    Color.Black.copy(alpha = 0.75f)
-                                )
-                            )
-                        )
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primary,
-                                    MaterialTheme.colorScheme.primaryContainer
-                                )
-                            )
-                        )
-                )
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        catalogName,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "Role: $roleLabel",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.9f)
-                    )
-                    Text(
-                        text = "Owner: $ownerLabel",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.9f)
-                    )
-                }
-
-                Text(
-                    text = "Tap to open",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.85f)
-                )
-            }
-        }
-    }
 }
 
 @Composable
@@ -712,229 +620,6 @@ private fun MyCatalogsSection(
 }
 
 @Composable
-private fun CatalogCard(
-    catalogName: String,
-    description: String?,
-    onOpen: () -> Unit,
-    onDelete: () -> Unit,
-    previewUrl: String?,
-    hasPreview: Boolean,
-    requestPreview: () -> Unit
-) {
-    LaunchedEffect(hasPreview) {
-        if (!hasPreview) {
-            requestPreview()
-        }
-    }
-
-    ElevatedCard(
-        onClick = onOpen,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(220.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-        ) {
-            if (previewUrl != null) {
-                AsyncImage(
-                    model = previewUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .matchParentSize()
-                        .blur(25.dp),
-                    contentScale = ContentScale.Crop
-                )
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Black.copy(alpha = 0.65f),
-                                    Color.Black.copy(alpha = 0.3f),
-                                    Color.Black.copy(alpha = 0.75f)
-                                )
-                            )
-                        )
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primary,
-                                    MaterialTheme.colorScheme.primaryContainer
-                                )
-                            )
-                        )
-                )
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = catalogName,
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = Color.White
-                        )
-                        if (!description.isNullOrBlank()) {
-                            Text(
-                                text = description,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White.copy(alpha = 0.85f),
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                    IconButton(
-                        onClick = onDelete,
-                        colors = IconButtonDefaults.iconButtonColors(
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Delete,
-                            contentDescription = "Delete catalog"
-                        )
-                    }
-                }
-
-                Text(
-                    text = "Tap to open",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.85f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ManageAllEntriesCard(onManageAll: () -> Unit) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onManageAll,
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "Manage all Observations",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-                Text(
-                    text = "View and edit every observation across catalogs.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                )
-            }
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.List,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(32.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun DeleteCatalogConfirmationDialog(
-    catalogName: String?,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text("Delete")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        },
-        title = { Text("Delete catalog?") },
-        text = {
-            val name = catalogName?.takeIf { it.isNotBlank() } ?: "this catalog"
-            Text("Are you sure you want to delete $name? This cannot be undone.")
-        }
-    )
-}
-
-@Composable
-private fun CatalogCreationDialog(
-    state: CatalogCreationDialogState,
-    onCreate: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    if (!state.isVisible) return
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (state.name.isNotBlank()) {
-                        onCreate(state.name.trim())
-                    } else {
-                        onDismiss()
-                    }
-                }
-            ) {
-                Text("Create")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        },
-        title = { Text("New Catalog") },
-        text = {
-            OutlinedTextField(
-                value = state.name,
-                onValueChange = { state.updateName(it) },
-                label = { Text("Catalog Name") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    )
-}
-
-@Composable
 private fun CatalogListSideEffects(state: CatalogListScreenState) {
     LaunchedEffect(Unit) {
         state.viewModel.loadCatalogs()
@@ -952,7 +637,7 @@ private fun CatalogListSideEffects(state: CatalogListScreenState) {
 }
 
 @Stable
-private class CatalogCreationDialogState {
+internal class CatalogCreationDialogState {
     var isVisible by mutableStateOf(false)
         private set
     var name by mutableStateOf("")

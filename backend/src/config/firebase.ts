@@ -4,8 +4,35 @@ import fs from 'fs';
 
 const serviceAccountPath = path.resolve(__dirname, '../firebase-adminsdk.json');
 
-type MessagingAdapter = {
+interface MessagingAdapter {
   send(message: admin.messaging.Message, dryRun?: boolean): Promise<string>;
+}
+
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.length > 0;
+
+const resolveMessageTarget = (message: admin.messaging.Message): string => {
+  const targetToken = 'token' in message ? (message.token as unknown) : undefined;
+  if (isNonEmptyString(targetToken)) {
+    return targetToken;
+  }
+
+  const targetTopic = 'topic' in message ? (message.topic as unknown) : undefined;
+  if (isNonEmptyString(targetTopic)) {
+    return targetTopic;
+  }
+
+  const targetCondition = 'condition' in message ? (message.condition as unknown) : undefined;
+  if (isNonEmptyString(targetCondition)) {
+    return targetCondition;
+  }
+
+  const analyticsLabel = message.fcmOptions?.analyticsLabel as unknown;
+  if (isNonEmptyString(analyticsLabel)) {
+    return analyticsLabel;
+  }
+
+  return 'unknown target';
 };
 
 const initializeWithCredentials = (): MessagingAdapter => {
@@ -16,7 +43,8 @@ const initializeWithCredentials = (): MessagingAdapter => {
   });
   return {
     send(message: admin.messaging.Message, dryRun?: boolean) {
-      return admin.messaging().send(message, dryRun);
+      const result: Promise<string> = admin.messaging().send(message, dryRun);
+      return result;
     },
   };
 };
@@ -29,10 +57,11 @@ const initializeWithoutCredentials = (): MessagingAdapter => {
   }
 
   const noopMessaging: MessagingAdapter = {
-    send(_message: admin.messaging.Message) {
+    send(message: admin.messaging.Message) {
       if (process.env.NODE_ENV !== 'test') {
+        const target = resolveMessageTarget(message);
         console.warn(
-          'Firebase service account not found. Messaging send() invoked in noop mode.'
+          `Firebase service account not found. Messaging send() invoked in noop mode for target: ${target}.`
         );
       }
       return Promise.resolve('');

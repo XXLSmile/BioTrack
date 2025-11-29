@@ -335,9 +335,27 @@ private fun CatalogEntriesDialogs(
     val profileViewModel = dependencies.profileViewModel
     val snackbarHostState = dependencies.snackbarHostState
     val coroutineScope = dependencies.coroutineScope
-    val entry = dialogState.entry
+    CatalogAddDialog(dialogState, catalogViewModel, dependencies, callbacks)
+    CatalogEntryDetailDialog(
+        dialogState,
+        catalogViewModel,
+        profileViewModel,
+        snackbarHostState,
+        coroutineScope,
+        callbacks
+    )
+    ConfirmEntryDeletionDialog(dialogState, catalogViewModel, profileViewModel, callbacks)
+}
 
-    if (dialogState.showAddDialog && entry != null) {
+@Composable
+private fun CatalogAddDialog(
+    dialogState: CatalogEntriesDialogState,
+    catalogViewModel: CatalogViewModel,
+    dependencies: CatalogEntriesDialogDependencies,
+    callbacks: CatalogEntriesDialogCallbacks
+) {
+    val entry = dialogState.entry ?: return
+    if (dialogState.showAddDialog) {
         AddToCatalogDialog(
             viewModel = catalogViewModel,
             isSaving = dialogState.isProcessing,
@@ -352,37 +370,54 @@ private fun CatalogEntriesDialogs(
             additionalCatalogs = dependencies.additionalCatalogOptions
         )
     }
+}
 
-    if (entry != null) {
-        EntryDetailDialog(
-            entry = entry,
-            isProcessing = dialogState.isProcessing,
-            errorMessage = dialogState.errorMessage,
-            canRemoveFromCatalog = false,
-            callbacks = EntryDetailDialogCallbacks(
-                onDismiss = {
-                    if (!dialogState.isProcessing) {
-                        dialogState.dismissDetail()
-                    }
-                },
-                onAddToCatalog = { dialogState.openAddDialog() },
-                onDeleteEntry = { dialogState.scheduleDelete() },
-                onRerunRecognition = {
-                    if (!dialogState.isProcessing) {
-                        handleRerunRecognition(
-                            dialogState = dialogState,
-                            catalogViewModel = catalogViewModel,
-                            profileViewModel = profileViewModel,
-                            snackbarHostState = snackbarHostState,
-                            coroutineScope = coroutineScope,
-                            onEntryUpdated = callbacks.onEntryUpdated
-                        )
-                    }
+@Composable
+private fun CatalogEntryDetailDialog(
+    dialogState: CatalogEntriesDialogState,
+    catalogViewModel: CatalogViewModel,
+    profileViewModel: ProfileViewModel,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope,
+    callbacks: CatalogEntriesDialogCallbacks
+) {
+    val entry = dialogState.entry ?: return
+    EntryDetailDialog(
+        entry = entry,
+        isProcessing = dialogState.isProcessing,
+        errorMessage = dialogState.errorMessage,
+        canRemoveFromCatalog = false,
+        callbacks = EntryDetailDialogCallbacks(
+            onDismiss = {
+                if (!dialogState.isProcessing) {
+                    dialogState.dismissDetail()
                 }
-            )
+            },
+            onAddToCatalog = { dialogState.openAddDialog() },
+            onDeleteEntry = { dialogState.scheduleDelete() },
+            onRerunRecognition = {
+                if (!dialogState.isProcessing) {
+                    handleRerunRecognition(
+                        dialogState = dialogState,
+                        catalogViewModel = catalogViewModel,
+                        profileViewModel = profileViewModel,
+                        snackbarHostState = snackbarHostState,
+                        coroutineScope = coroutineScope,
+                        onEntryUpdated = callbacks.onEntryUpdated
+                    )
+                }
+            }
         )
-    }
+    )
+}
 
+@Composable
+private fun ConfirmEntryDeletionDialog(
+    dialogState: CatalogEntriesDialogState,
+    catalogViewModel: CatalogViewModel,
+    profileViewModel: ProfileViewModel,
+    callbacks: CatalogEntriesDialogCallbacks
+) {
     val pendingAction = dialogState.pendingAction
     if (pendingAction is EntryAction.Delete && !dialogState.isProcessing) {
         ConfirmEntryActionDialog(
