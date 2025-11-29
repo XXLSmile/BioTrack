@@ -11,7 +11,7 @@ import { catalogRepository } from '../models/recognition/catalog.model';
 import { catalogModel } from '../models/catalog/catalog.model';
 
 export class UserController {
-  async getProfile(req: Request, res: Response<GetProfileResponse>) {
+  getProfile(req: Request, res: Response<GetProfileResponse>) {
     const user = req.user;
     if (!user) {
       return res.status(401).json({ message: 'Authentication required' });
