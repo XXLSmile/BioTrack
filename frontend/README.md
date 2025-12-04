@@ -27,6 +27,7 @@
   API_BASE_URL="http://10.0.2.2:3000/api/"
   IMAGE_BASE_URL="http://10.0.2.2:3000/"
   GOOGLE_CLIENT_ID="xxxxxxx.apps.googleusercontent.com"
+  MAPS_API_KEY="your-google-maps-api-key"
   ```
 
   You will need to obtain a Google client ID for Google Sign-In, as described in [this google official guide](https://developer.android.com/identity/sign-in/credential-manager-siwg).
